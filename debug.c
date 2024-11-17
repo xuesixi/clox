@@ -25,12 +25,17 @@ static int simple_instruction(const char *name, int offset) {
 }
 
 static int constant_instruction(const char *name, const Chunk *chunk, int offset) {
-    uint8_t constant = chunk->code[offset + 1];
-    printf("%-16s %4d '", name, constant);
-    print_value(chunk->constants.values[constant]);
+    uint8_t index = chunk->code[offset + 1];
+    printf("%-16s %4d '", name, index);
+    print_value(chunk->constants.values[index]);
+    printf("\n");
     return offset + 2;
 }
 
+/**
+ * 给定一个 offset，将对应的 instruction 的信息打印
+ * @return 下一个 instruction 的 offset
+ */
 int disassemble_instruction(Chunk *chunk, int offset) {
     printf("%04d ", offset);
     if (offset > 0 && chunk->lines[offset] == chunk->lines[offset-1]) {
@@ -44,6 +49,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("OP_RETURN", offset);
         case OP_CONSTANT:
             return constant_instruction("OP_CONSTANT", chunk, offset);
+        case OP_NEGATE:
+            return simple_instruction("OP_NEGATE", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

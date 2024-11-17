@@ -29,6 +29,10 @@ void free_ValueArray(ValueArray* array) {
     init_ValueArray(array);
 }
 
+/**
+ * 打印一个 value
+ * @param value 想要打印的 value
+ */
 void print_value(Value value) {
     printf("%g", value);
 }

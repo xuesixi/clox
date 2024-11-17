@@ -4,6 +4,7 @@
 
 *.iml
 *.out
+*.dSYM
 .idea/
 out/
 public/
