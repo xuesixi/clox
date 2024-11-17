@@ -15,9 +15,34 @@ static void reset_stack();
 static Value read_constant();
 static InterpretResult run();
 static void show_stack();
+static void binary_op(char operator);
 
 /* ------------------上面是静态函数申明-----------------------
    ------------------下面是静态函数定义----------------------- */
+
+static void binary_op(char operator) {
+    double b = stack_pop();
+    double a = stack_pop();
+    double result;
+    switch (operator) {
+        case '+':
+            result = a + b;
+            break;
+        case '-':
+            result = a - b;
+            break;
+        case '*':
+            result = a * b;
+            break;
+        case '/':
+            result = a / b;
+            break;
+        default:
+            printf("%c is not a valid binary operator\n", operator);
+            return;
+    }
+    stack_push(result);
+}
 
 static void show_stack() {
     for (Value *i = vm.stack; i < vm.stack_top; i++) {
@@ -71,6 +96,18 @@ static InterpretResult run() {
             }
             case OP_NEGATE:
                 stack_push(- stack_pop());
+                break;
+            case OP_ADD:
+                binary_op('+');
+                break;
+            case OP_SUBTRACT:
+                binary_op('-');
+                break;
+            case OP_MULTIPLY:
+                binary_op('*');
+                break;
+            case OP_DIVIDE:
+                binary_op('/');
                 break;
         }
     }
