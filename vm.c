@@ -3,6 +3,7 @@
 //
 
 #include "vm.h"
+#include "compiler.h"
 #include "stdio.h"
 #include "debug.h"
 
@@ -21,8 +22,8 @@ static void binary_op(char operator);
    ------------------下面是静态函数定义----------------------- */
 
 static void binary_op(char operator) {
-    double b = stack_pop();
-    double a = stack_pop();
+    Value b = pop_stack();
+    Value a = pop_stack();
     double result;
     switch (operator) {
         case '+':
@@ -41,7 +42,7 @@ static void binary_op(char operator) {
             printf("%c is not a valid binary operator\n", operator);
             return;
     }
-    stack_push(result);
+    push_stack(result);
 }
 
 static void show_stack() {
@@ -61,11 +62,11 @@ static void reset_stack() {
  * 读取下一个字节，然后移动 ip
  * @return 下一个字节
  */
-static uint8_t read_byte() {
+static inline uint8_t read_byte() {
     return (*vm.ip++);
 }
 
-static Value read_constant() {
+static inline Value read_constant() {
     uint8_t index = read_byte();
     return vm.chunk->constants.values[index];
 }
@@ -85,17 +86,17 @@ static InterpretResult run() {
 
         switch (instruction) {
             case OP_RETURN: {
-                print_value(stack_pop());
+                print_value(pop_stack());
                 NEW_LINE();
                 return INTERPRET_OK;
             }
             case OP_CONSTANT: {
                 Value value = read_constant();
-                stack_push(value);
+                push_stack(value);
                 break;
             }
             case OP_NEGATE:
-                stack_push(- stack_pop());
+                push_stack(-pop_stack());
                 break;
             case OP_ADD:
                 binary_op('+');
@@ -122,12 +123,12 @@ void init_VM() {
 
 void free_VM() {}
 
-void stack_push(Value value) {
+void push_stack(Value value) {
     * vm.stack_top = value;
     vm.stack_top++;
 }
 
-Value stack_pop() {
+Value pop_stack() {
     vm.stack_top--;
     return *(vm.stack_top);
 }
@@ -137,9 +138,11 @@ Value stack_pop() {
  * @param chunk 要执行的代码快
  * @return 执行结果（是否出错等）
  */
-InterpretResult interpret(Chunk *chunk) {
-    vm.chunk = chunk;
-    vm.ip = chunk->code;
-    return run();
+InterpretResult interpret(const char *src) {
+    compile(src);
+//    vm.chunk = chunk;
+//    vm.ip = chunk->code;
+//    return run();
+    return INTERPRET_OK;
 }
 

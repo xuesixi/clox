@@ -22,12 +22,12 @@ typedef enum {
     INTERPRET_RUNTIME_ERROR
 } InterpretResult;
 
-extern VM vm;
+//extern VM vm;
 
 void init_VM();
 void free_VM();
-InterpretResult interpret(Chunk *chunk);
-void stack_push(Value value);
-Value stack_pop();
+InterpretResult interpret(const char *src);
+void push_stack(Value value);
+Value pop_stack();
 
 #endif //CLOX_VM_H
