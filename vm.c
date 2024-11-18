@@ -139,10 +139,19 @@ Value pop_stack() {
  * @return 执行结果（是否出错等）
  */
 InterpretResult interpret(const char *src) {
-    compile(src);
-//    vm.chunk = chunk;
-//    vm.ip = chunk->code;
-//    return run();
-    return INTERPRET_OK;
+    Chunk chunk;
+    init_chunk(&chunk);
+
+    if (!compile(src, &chunk)) {
+        free_chunk(&chunk);
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    vm.chunk = &chunk;
+    vm.ip = chunk.code;
+
+    InterpretResult result = run();
+    free_chunk(&chunk);
+    return result;
 }
 
