@@ -61,46 +61,6 @@ int main(int argc, const char **argv) {
         fprintf(stderr, "no arg to start REPL, one arg to run a file!\n");
     }
 
-//    Chunk chunk;
-//    init_chunk(&chunk);
-//
-//    write_chunk(&chunk, OP_CONSTANT, 999);
-//    int c1 = add_constant(&chunk, 1);
-//    write_chunk(&chunk, c1, 999);
-//
-//    write_chunk(&chunk, OP_CONSTANT, 999);
-//    int c2 = add_constant(&chunk, 2);
-//    write_chunk(&chunk, c2, 999);
-//
-//    write_chunk(&chunk, OP_CONSTANT, 999);
-//    int c3 = add_constant(&chunk, 3);
-//    write_chunk(&chunk, c3, 999);
-//
-//    write_chunk(&chunk, OP_MULTIPLY, 999);
-//
-//    write_chunk(&chunk, OP_ADD, 999);
-//
-//    write_chunk(&chunk, OP_CONSTANT, 999);
-//    int c4 = add_constant(&chunk, 4);
-//    write_chunk(&chunk, c4, 999);
-//
-//    write_chunk(&chunk, OP_CONSTANT, 999);
-//    int c5 = add_constant(&chunk, 5);
-//    write_chunk(&chunk, c5, 999);
-//
-//    write_chunk(&chunk, OP_NEGATE, 999);
-//
-//    write_chunk(&chunk, OP_DIVIDE, 999);
-//
-//    write_chunk(&chunk, OP_SUBTRACT, 999);
-//
-//    write_chunk(&chunk, OP_RETURN, 999);
-//
-//    interpret(&chunk);
-//
-//    free_chunk(&chunk);
-//    printf("\n");
-
     free_VM();
 }
 

@@ -5,6 +5,7 @@
 #ifndef CLOX_COMPILER_H
 #define CLOX_COMPILER_H
 
+#define DEBUG_PRINT_CODE
 #include "chunk.h"
 
 bool compile(const char* source, Chunk *chunk);
