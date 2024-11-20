@@ -50,6 +50,12 @@ static void binary_number_op(Value a, Value b, char operator) {
             case '%':
                 push_stack(int_value(a_v % b_v));
                 break;
+            case '>':
+                push_stack(bool_value(a_v > b_v));
+                break;
+            case '<':
+                push_stack(bool_value(a_v < b_v));
+                break;
             default:
                 runtime_error("invalid binary operator");
                 return;
@@ -69,6 +75,12 @@ static void binary_number_op(Value a, Value b, char operator) {
                 break;
             case '/':
                 push_stack(float_value(a_v / b_v));
+                break;
+            case '>':
+                push_stack(bool_value(a_v > b_v));
+                break;
+            case '<':
+                push_stack(bool_value(a_v < b_v));
                 break;
             default:
                 runtime_error("invalid binary operator");
@@ -90,6 +102,12 @@ static void binary_number_op(Value a, Value b, char operator) {
             case '/':
                 push_stack(float_value(a_v / b_v));
                 break;
+            case '>':
+                push_stack(bool_value(a_v > b_v));
+                break;
+            case '<':
+                push_stack(bool_value(a_v < b_v));
+                break;
             default:
                 runtime_error("invalid binary operator");
                 return;
@@ -110,6 +128,12 @@ static void binary_number_op(Value a, Value b, char operator) {
             case '/':
                 push_stack(float_value(a_v / b_v));
                 break;
+            case '>':
+                push_stack(bool_value(a_v > b_v));
+                break;
+            case '<':
+                push_stack(bool_value(a_v < b_v));
+                break;
             default:
                 runtime_error("invalid binary operator");
                 return;
@@ -126,6 +150,8 @@ static void binary_op(char operator) {
         case '*':
         case '%':
         case '/':
+        case '>':
+        case '<':
             binary_number_op(a, b, operator);
             break;
         default:
@@ -241,6 +267,18 @@ static InterpretResult run() {
             case OP_MOD:
                 binary_op('%');
                 break;
+            case OP_LESS:
+                binary_op('<');
+                break;
+            case OP_GREATER:
+                binary_op('>');
+                break;
+            case OP_EQUAL: {
+                Value b = pop_stack();
+                Value a = pop_stack();
+                push_stack(bool_value(equal_value(a, b)));
+                break;
+            }
             case OP_NIL:
                 push_stack(nil_value());
                 break;

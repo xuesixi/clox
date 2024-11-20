@@ -89,6 +89,24 @@ inline Value nil_value() {
     };
 }
 
+inline bool equal_value(Value a, Value b) {
+    if (a.type != b.type) {
+        return false;
+    }
+    switch (a.type) {
+        case VAL_BOOL:
+            return as_bool(a) == as_bool(b);
+        case VAL_INT:
+            return as_int(a) == as_int(b);
+        case VAL_FLOAT:
+            return as_float(a) == as_float(b);
+        case VAL_NIL:
+            return true;
+        default:
+            return true;
+    }
+}
+
 /**
  * 打印一个 value
  * @param value 想要打印的 value

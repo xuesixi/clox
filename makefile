@@ -1,17 +1,30 @@
+CC = gcc
+CFLAGS = -Wall -Wextra -Wformat -g
+SRC = $(wildcard *.c)
+OBJ = $(SRC:.c=.o)
+TARGET = main.out
+
 all: run
 
 .PHONY: run
-run: main 
-	@./main.out
-	@rm main.out
+run: $(TARGET)
+	@./$(TARGET)
+	@rm $(TARGET)
 
-main:
-	@gcc *.c -o main.out
+$(TARGET): $(OBJ)
+	@$(CC) $(OBJ) -o $(TARGET)
 
-debug: 
-	@gcc -g *.c -o main.out
-	@lldb main.out
+%.o: %.c
+	@$(CC) $(CFLAGS) -c $< -o $@
+
+debug: $(OBJ)
+	@$(CC) -g $(OBJ) -o $(TARGET)
+	@lldb $(TARGET)
 	@trash-put *.dSYM
 
-clion_debug:
-	@gcc -g *.c -o main.out
+clion_debug: $(OBJ)
+	@$(CC) -g $(OBJ) -o $(TARGET)
+
+.PHONY: clean
+clean:
+	@rm $(OBJ)

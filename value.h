@@ -56,4 +56,6 @@ Value float_value(double value);
 Value int_value(int value);
 Value nil_value();
 
+bool equal_value(Value a, Value b);
+
 #endif //CLOX_VALUE_H

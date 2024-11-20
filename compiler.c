@@ -2,6 +2,13 @@
 // Created by Yue Xue  on 11/17/24.
 //
 
+/**
+ * compiler 中并不存在 token 的列表或者数组。
+ * 我们永远只有只在栈中保留两个 token：prev 和 current。
+ * 每当我们要解析下一个的时候，才用 advance 函数（它调用了 scan_token 函数）去读取下一个 token
+ * 
+ * */
+
 #include "compiler.h"
 #include "scanner.h"
 #include "stdio.h"
@@ -97,13 +104,13 @@ ParseRule rules[] = {
         [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
         [TOKEN_PERCENT]       = {NULL,     binary, PREC_FACTOR},
         [TOKEN_BANG]          = {unary,     NULL,   PREC_NONE},
-        [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE},
+        [TOKEN_BANG_EQUAL]    = {NULL,     binary,   PREC_EQUALITY},
         [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_GREATER]       = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_LESS_EQUAL]    = {NULL,     NULL,   PREC_NONE},
+        [TOKEN_EQUAL_EQUAL]   = {NULL,     binary,   PREC_EQUALITY},
+        [TOKEN_GREATER]       = {NULL,     binary,   PREC_COMPARISON},
+        [TOKEN_GREATER_EQUAL] = {NULL,     binary,   PREC_COMPARISON},
+        [TOKEN_LESS]          = {NULL,     binary,   PREC_COMPARISON},
+        [TOKEN_LESS_EQUAL]    = {NULL,     binary,   PREC_COMPARISON},
         [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
         [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
         [TOKEN_FLOAT]         = {float_num, NULL, PREC_NONE},
@@ -174,6 +181,27 @@ static void binary() {
         case TOKEN_PERCENT:
             emit_byte(OP_MOD);
             break;
+        case TOKEN_LESS:
+            emit_byte(OP_LESS);
+            break;
+        case TOKEN_GREATER:
+            emit_byte(OP_GREATER);
+            break;
+        case TOKEN_EQUAL_EQUAL:
+            emit_byte(OP_EQUAL);
+            break;
+        case TOKEN_LESS_EQUAL:
+            emit_byte(OP_GREATER);
+            emit_byte(OP_NOT);
+            break;
+        case TOKEN_GREATER_EQUAL:
+            emit_byte(OP_LESS);
+            emit_byte(OP_NOT);
+            break;
+        case TOKEN_BANG_EQUAL:
+            emit_byte(OP_EQUAL);
+            emit_byte(OP_NOT);
+            break;
         default:
             break;
     }
@@ -232,6 +260,9 @@ static void grouping() {
     consume(TOKEN_RIGHT_PAREN, "missing expected )");
 }
 
+/**
+ * 将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引
+ * */
 static int make_constant(Value value) {
     int index = add_constant(current_chunk(), value);
     if (index > UINT8_MAX) {
