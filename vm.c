@@ -4,6 +4,7 @@
 
 #include "vm.h"
 #include "compiler.h"
+#include "stdarg.h"
 #include "stdio.h"
 #include "debug.h"
 
@@ -12,37 +13,125 @@
 VM vm;
 
 static uint8_t read_byte();
+static bool is_falsy(Value value);
 static void reset_stack();
+static void runtime_error(const char *format, ...);
 static Value read_constant();
 static InterpretResult run();
 static void show_stack();
+static Value peek_stack(int distance);
 static void binary_op(char operator);
+static void binary_number_op(Value a, Value b, char operator);
 
 /* ------------------上面是静态函数申明-----------------------
    ------------------下面是静态函数定义----------------------- */
 
+static void binary_number_op(Value a, Value b, char operator) {
+    if (!is_number(a) || !is_number(b)) {
+        runtime_error("the operand is not a number");
+        return;
+    }
+    if (is_int(a) && is_int(b)) {
+        int a_v = as_int(a);
+        int b_v = as_int(b);
+        switch (operator) {
+            case '+':
+                push_stack(int_value(a_v + b_v));
+                break;
+            case '-':
+                push_stack(int_value(a_v - b_v));
+                break;
+            case '*':
+                push_stack(int_value(a_v * b_v));
+                break;
+            case '/':
+                push_stack(int_value(a_v / b_v));
+                break;
+            case '%':
+                push_stack(int_value(a_v % b_v));
+                break;
+            default:
+                runtime_error("invalid binary operator");
+                return;
+        }
+    } else if (is_int(a) && is_float(b)) {
+        int a_v = as_int(a);
+        double b_v = as_float(b);
+        switch (operator) {
+            case '+':
+                push_stack(float_value(a_v + b_v));
+                break;
+            case '-':
+                push_stack(float_value(a_v - b_v));
+                break;
+            case '*':
+                push_stack(float_value(a_v * b_v));
+                break;
+            case '/':
+                push_stack(float_value(a_v / b_v));
+                break;
+            default:
+                runtime_error("invalid binary operator");
+                return;
+        }
+    } else if (is_float(a) && is_int(b)) {
+        double a_v = as_float(a);
+        int b_v = as_int(b);
+        switch (operator) {
+            case '+':
+                push_stack(float_value(a_v + b_v));
+                break;
+            case '-':
+                push_stack(float_value(a_v - b_v));
+                break;
+            case '*':
+                push_stack(float_value(a_v * b_v));
+                break;
+            case '/':
+                push_stack(float_value(a_v / b_v));
+                break;
+            default:
+                runtime_error("invalid binary operator");
+                return;
+        }
+    } else {
+        double a_v = as_float(a);
+        double b_v = as_float(b);
+        switch (operator) {
+            case '+':
+                push_stack(float_value(a_v + b_v));
+                break;
+            case '-':
+                push_stack(float_value(a_v - b_v));
+                break;
+            case '*':
+                push_stack(float_value(a_v * b_v));
+                break;
+            case '/':
+                push_stack(float_value(a_v / b_v));
+                break;
+            default:
+                runtime_error("invalid binary operator");
+                return;
+        }
+    }
+}
+
 static void binary_op(char operator) {
     Value b = pop_stack();
     Value a = pop_stack();
-    double result;
     switch (operator) {
         case '+':
-            result = a + b;
-            break;
         case '-':
-            result = a - b;
-            break;
         case '*':
-            result = a * b;
-            break;
+        case '%':
         case '/':
-            result = a / b;
+            binary_number_op(a, b, operator);
             break;
         default:
             printf("%c is not a valid binary operator\n", operator);
             return;
     }
-    push_stack(result);
 }
 
 static void show_stack() {
@@ -54,8 +143,37 @@ static void show_stack() {
     NEW_LINE();
 }
 
+static bool is_falsy(Value value) {
+    if (is_bool(value)) {
+        return as_bool(value) == false;
+    }
+    if (is_nil(value)) {
+        return true;
+    }
+    return false;
+}
+
 static void reset_stack() {
     vm.stack_top = vm.stack;
+}
+
+static inline Value peek_stack(int distance) {
+    return vm.stack_top[-1 - distance];
+}
+
+/**
+ * 会自动添加换行符。
+ */
+static void runtime_error(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fputs("\n", stderr);
+    size_t index = vm.ip - vm.chunk->code - 1;
+    int line = vm.chunk->lines[index];
+    fprintf(stderr, "[line %d] in script\n", line);
+    reset_stack();
 }
 
 /**
@@ -95,9 +213,19 @@ static InterpretResult run() {
                 push_stack(value);
                 break;
             }
-            case OP_NEGATE:
-                push_stack(-pop_stack());
-                break;
+            case OP_NEGATE: {
+                Value value = peek_stack(0);
+                if (is_int(value)) {
+                    push_stack(int_value(-as_int(pop_stack())));
+                    break;
+                } else if (is_float(value)) {
+                    push_stack(float_value(-as_float(pop_stack())));
+                    break;
+                } else {
+                    runtime_error("the value of type: %d is cannot be negated", value.type);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+            }
             case OP_ADD:
                 binary_op('+');
                 break;
@@ -110,6 +238,23 @@ static InterpretResult run() {
             case OP_DIVIDE:
                 binary_op('/');
                 break;
+            case OP_MOD:
+                binary_op('%');
+                break;
+            case OP_NIL:
+                push_stack(nil_value());
+                break;
+            case OP_TRUE:
+                push_stack(bool_value(true));
+                break;
+            case OP_FALSE:
+                push_stack(bool_value(false));
+                break;
+            case OP_NOT:
+                push_stack(bool_value(is_falsy(pop_stack())));
+                break;
+            default:
+                runtime_error("unrecognized instruction");
         }
     }
 }

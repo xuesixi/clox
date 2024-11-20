@@ -26,8 +26,9 @@ static int simple_instruction(const char *name, int offset) {
 
 static int constant_instruction(const char *name, const Chunk *chunk, int offset) {
     uint8_t index = chunk->code[offset + 1];
-    printf("%-16s %4d '", name, index);
-    print_value(chunk->constants.values[index]);
+    printf("%-16s %4d -> ", name, index);
+    Value value = chunk->constants.values[index];
+    print_value_with_type(value);
     printf("\n");
     return offset + 2;
 }
@@ -59,6 +60,16 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("OP_MULTIPLY", offset);
         case OP_DIVIDE:
             return simple_instruction("OP_DIVIDE", offset);
+        case OP_MOD:
+            return simple_instruction("OP_MOD", offset);
+        case OP_NIL:
+            return simple_instruction("OP_NIL", offset);
+        case OP_TRUE:
+            return simple_instruction("OP_TRUE", offset);
+        case OP_FALSE:
+            return simple_instruction("OP_FALSE", offset);
+        case OP_NOT:
+            return simple_instruction("OP_NOT", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

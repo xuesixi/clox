@@ -115,9 +115,9 @@ static Token number_token() {
         advance();
 
         while (is_digit(peek())) advance();
+        return make_token(TOKEN_FLOAT);
     }
-
-    return make_token(TOKEN_NUMBER);
+    return make_token(TOKEN_INT);
 }
 
 static Token string_token() {
@@ -253,6 +253,8 @@ Token scan_token() {
             return make_token(TOKEN_SLASH);
         case '*':
             return make_token(TOKEN_STAR);
+        case '%':
+            return make_token(TOKEN_PERCENT);
         case '!':
             return make_token(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
         case '>':
@@ -266,7 +268,5 @@ Token scan_token() {
         default:
             return error_token("Unrecognized character!");
     }
-
-    return error_token("Unexpected token!");
 }
 
