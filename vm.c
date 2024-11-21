@@ -4,6 +4,7 @@
 
 #include "vm.h"
 #include "compiler.h"
+#include "object.h"
 #include "stdarg.h"
 #include "stdio.h"
 #include "debug.h"
@@ -15,7 +16,6 @@ VM vm;
 static uint8_t read_byte();
 static bool is_falsy(Value value);
 static void reset_stack();
-static void runtime_error(const char *format, ...);
 static Value read_constant();
 static InterpretResult run();
 static void show_stack();
@@ -27,6 +27,11 @@ static void binary_number_op(Value a, Value b, char operator);
    ------------------下面是静态函数定义----------------------- */
 
 static void binary_number_op(Value a, Value b, char operator) {
+    if (operator == '+' &&  (is_ref_of(a, OBJ_STRING) || is_ref_of(a, OBJ_STRING))) {
+        String *str = string_concat(a, b);
+        push_stack(ref_value(& str->object));
+        return;
+    }
     if (!is_number(a) || !is_number(b)) {
         runtime_error("the operand is not a number");
         return;
@@ -141,6 +146,9 @@ static void binary_number_op(Value a, Value b, char operator) {
     }
 }
 
+/**
+ * 处理二元操作符。两个出栈动作将由该函数执行
+ * */
 static void binary_op(char operator) {
     Value b = pop_stack();
     Value a = pop_stack();
@@ -190,7 +198,7 @@ static inline Value peek_stack(int distance) {
 /**
  * 会自动添加换行符。
  */
-static void runtime_error(const char *format, ...) {
+void runtime_error(const char *format, ...) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -276,7 +284,7 @@ static InterpretResult run() {
             case OP_EQUAL: {
                 Value b = pop_stack();
                 Value a = pop_stack();
-                push_stack(bool_value(equal_value(a, b)));
+                push_stack(bool_value(value_equal(a, b)));
                 break;
             }
             case OP_NIL:

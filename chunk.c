@@ -3,6 +3,7 @@
 //
 
 #include "chunk.h"
+
 #include "memory.h"
 
 void init_chunk(Chunk *c) {
@@ -10,7 +11,7 @@ void init_chunk(Chunk *c) {
     c->count = 0;
     c->code = NULL;
     c->lines = NULL;
-    init_ValueArray(& c->constants);
+    init_ValueArray(&c->constants);
 }
 
 int compute_new_capacity(Chunk *c) {
@@ -27,17 +28,17 @@ void write_chunk(Chunk *c, uint8_t data, int line) {
     if (c->capacity == c->count) {
         int new_capacity = compute_new_capacity(c);
         c->code = GROW_ARRAY(uint8_t, c->code, c->capacity, new_capacity);
-        c->lines = GROW_ARRAY(int , c->lines, c->capacity, new_capacity);
+        c->lines = GROW_ARRAY(int, c->lines, c->capacity, new_capacity);
         c->capacity = new_capacity;
     }
     c->code[c->count] = data;
     c->lines[c->count] = line;
-    c->count ++;
+    c->count++;
 }
 
 void free_chunk(Chunk *c) {
     FREE_ARRAY(uint8_t, c->code, c->count);
-    FREE_ARRAY(int , c->lines, c->count);
+    FREE_ARRAY(int, c->lines, c->count);
     init_chunk(c);
 }
 
@@ -48,8 +49,6 @@ void free_chunk(Chunk *c) {
  * @return 该常量在 chunk 中的 constants 中的索引。
  */
 int add_constant(Chunk *c, Value constant) {
-    write_ValueArray(& c->constants, constant);
+    write_ValueArray(&c->constants, constant);
     return c->constants.count - 1;
 }
-
-

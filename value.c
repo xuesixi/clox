@@ -3,8 +3,14 @@
 //
 
 #include "value.h"
+
+#include <string.h>
+
 #include "memory.h"
+#include "object.h"
 #include "stdio.h"
+
+static char *to_print_ref(Value value);
 
 void init_ValueArray(ValueArray *array) {
     array->values = NULL;
@@ -16,8 +22,8 @@ void write_ValueArray(ValueArray *array, Value value) {
     if (array->capacity < array->count + 1) {
         int oldCapacity = array->capacity;
         array->capacity = array->capacity < 8 ? 8 : 2 * array->capacity;
-        array->values = GROW_ARRAY(Value, array->values,
-                                   oldCapacity, array->capacity);
+        array->values =
+            GROW_ARRAY(Value, array->values, oldCapacity, array->capacity);
     }
 
     array->values[array->count] = value;
@@ -41,12 +47,19 @@ inline bool is_int(Value value) {
     return value.type == VAL_INT;
 }
 
+/**
+ * int 或者 float
+ * */
 inline bool is_number(Value value) {
     return is_int(value) || is_float(value);
 }
 
 inline bool is_nil(Value value) {
     return value.type == VAL_NIL;
+}
+
+inline bool is_ref(Value value) {
+    return value.type == VAL_REF;
 }
 
 inline double as_float(Value value) {
@@ -61,35 +74,31 @@ inline bool as_bool(Value value) {
     return value.as.boolean;
 }
 
+inline Object *as_ref(Value value) {
+    return value.as.reference;
+}
+
 inline Value bool_value(bool value) {
-    return (Value) {
-            .type = VAL_BOOL,
-            .as = {.boolean = value}
-    };
+    return (Value){.type = VAL_BOOL, .as = {.boolean = value}};
 }
 
 inline Value float_value(double value) {
-    return (Value) {
-            .type = VAL_FLOAT,
-            .as = {.decimal = value}
-    };
+    return (Value){.type = VAL_FLOAT, .as = {.decimal = value}};
 }
 
 inline Value int_value(int value) {
-    return (Value) {
-            .type = VAL_INT,
-            .as = {.integer = value}
-    };
+    return (Value){.type = VAL_INT, .as = {.integer = value}};
 }
 
 inline Value nil_value() {
-    return (Value) {
-            .type = VAL_NIL,
-            .as = {}
-    };
+    return (Value){.type = VAL_NIL, .as = {}};
 }
 
-inline bool equal_value(Value a, Value b) {
+inline Value ref_value(Object *value) {
+    return (Value){.type = VAL_REF, .as = {.reference = value}};
+}
+
+bool value_equal(Value a, Value b) {
     if (a.type != b.type) {
         return false;
     }
@@ -102,9 +111,41 @@ inline bool equal_value(Value a, Value b) {
             return as_float(a) == as_float(b);
         case VAL_NIL:
             return true;
+        case VAL_REF:
+            return object_equal(as_ref(a), as_ref(b));
         default:
             return true;
     }
+}
+
+bool object_equal(Object *a, Object *b) {
+    if (a->type != b->type) {
+        return false;
+    }
+    switch (a->type) {
+        case OBJ_STRING: {
+            String *a_str = (String *)a;
+            String *b_str = (String *)b;
+            return a_str->length == b_str->length &&
+                   memcmp(a_str->chars, b_str->chars, a_str->length) == 0;
+        }
+        default:
+            return false;
+    }
+}
+
+static char *to_print_ref(Value value) {
+    char *buffer;
+    ObjectType type = as_ref(value)->type;
+    switch (type) {
+        case OBJ_STRING:
+            asprintf(&buffer, "%s", as_string(value)->chars);
+            break;
+        default:
+            printf("error: encountering a value with unknown type: %d\n", type);
+            break;
+    }
+    return buffer;
 }
 
 /**
@@ -112,39 +153,54 @@ inline bool equal_value(Value a, Value b) {
  * @param value 想要打印的 value
  */
 void print_value(Value value) {
-    if (is_float(value)) {
-        printf("%g", as_float(value));
-    } else if (is_int(value)) {
-        printf("%d", as_int(value));
-    } else if (is_bool(value)) {
-        if (as_bool(value)) {
-            printf("true");
-        } else {
-            printf("false");
-        }
-    } else if (is_nil(value)) {
-        printf("nil");
-    } else{
-        printf("error: encountering a value with unknown type: %d\n", value.type);
-    }
+    char *str = to_print_chars(value);
+    printf("%s", str);
+    free(str);
 }
 
-void print_value_with_type(Value value) {
+/**
+ * 获取目标 value 的char*表达。调用者需要自己 free 之
+ * */
+char *to_print_chars(Value value) {
+    char *buffer;
     if (is_float(value)) {
-        printf("%g: float", as_float(value));
+        asprintf(&buffer, "%g", as_float(value));
     } else if (is_int(value)) {
-        printf("%d: int", as_int(value));
+        asprintf(&buffer, "%d", as_int(value));
     } else if (is_bool(value)) {
         if (as_bool(value)) {
-            printf("true");
+            asprintf(&buffer, "true");
         } else {
-            printf("false");
+            asprintf(&buffer, "false");
         }
     } else if (is_nil(value)) {
-        printf("nil");
-    } else{
+        asprintf(&buffer, "nil");
+    } else if (is_ref(value)) {
+        buffer = to_print_ref(value);
+    } else {
         printf("error: encountering a value with unknown type: %d\n", value.type);
+        buffer = NULL;
     }
+    return buffer;
 }
 
-
+// void print_value_with_type(Value value) {
+//     if (is_float(value)) {
+//         printf("%g: float", as_float(value));
+//     } else if (is_int(value)) {
+//         printf("%d: int", as_int(value));
+//     } else if (is_bool(value)) {
+//         if (as_bool(value)) {
+//             printf("true");
+//         } else {
+//             printf("false");
+//         }
+//     } else if (is_nil(value)) {
+//         printf("nil");
+//     } else if (is_ref(value)) {
+//         print_ref(value);
+//     } else {
+//         printf("error: encountering a value with unknown type: %d\n",
+//                value.type);
+//     }
+// }

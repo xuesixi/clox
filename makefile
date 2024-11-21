@@ -4,7 +4,7 @@ SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 TARGET = main.out
 
-all: run
+all: $(TARGET)
 
 .PHONY: run
 run: $(TARGET)

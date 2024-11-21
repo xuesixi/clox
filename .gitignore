@@ -5,6 +5,8 @@
 *.iml
 *.out
 *.dSYM
+compile_commands.json
+.clang-format
 .idea/
 out/
 *.o

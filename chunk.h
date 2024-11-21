@@ -39,4 +39,4 @@ void write_chunk(Chunk *c, uint8_t data, int line);
 void free_chunk(Chunk *c);
 int add_constant(Chunk *c, Value constant);
 
-#endif //CLOX_CHUNK_H
+#endif  // CLOX_CHUNK_H

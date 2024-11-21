@@ -13,6 +13,9 @@
 #define FREE_ARRAY(type, pointer, oldCount) \
     re_allocate(pointer, sizeof(type) * (oldCount), 0)
 
-void *re_allocate(void *ptr, size_t old_size, size_t new_size);
+#define ALLOCATE(type, length) \
+    (type*)(re_allocate(NULL, 0, sizeof(type) * (length)))
+
+void *re_allocate(void *ptr, size_t old_size, size_t byte_size);
 
 #endif //CLOX_MEMORY_H

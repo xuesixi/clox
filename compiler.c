@@ -10,6 +10,7 @@
  * */
 
 #include "compiler.h"
+#include "object.h"
 #include "scanner.h"
 #include "stdio.h"
 #include "debug.h"
@@ -86,6 +87,8 @@ static void grouping();
 
 static void binary();
 
+static void string();
+
 static int make_constant(Value value);
 
 //-------------------------------------------------------------------------
@@ -112,7 +115,7 @@ ParseRule rules[] = {
         [TOKEN_LESS]          = {NULL,     binary,   PREC_COMPARISON},
         [TOKEN_LESS_EQUAL]    = {NULL,     binary,   PREC_COMPARISON},
         [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
+        [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
         [TOKEN_FLOAT]         = {float_num, NULL, PREC_NONE},
         [TOKEN_INT]           = {int_num, NULL, PREC_NONE},
         [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
@@ -135,6 +138,12 @@ ParseRule rules[] = {
         [TOKEN_EOF]           = {NULL,     NULL,   PREC_NONE},
 };
 
+static void string() {
+    String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
+    Value value = ref_value((Object*) str);
+    int index = make_constant(value);
+    emit_two_bytes(OP_CONSTANT, index);
+}
 
 /**
  * 向后贪婪地解析所有连续的、优先级大于等于 precedence 的表达式
@@ -262,6 +271,7 @@ static void grouping() {
 
 /**
  * 将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引
+ * 该函数包装了 add_constant
  * */
 static int make_constant(Value value) {
     int index = add_constant(current_chunk(), value);
@@ -369,7 +379,8 @@ bool compile(const char *src, Chunk *chunk) {
     advance();
     expression();
     end_compiler();
+    bool has_error = parser.has_error;
     parser.panic_mode = false;
     parser.has_error = false;
-    return !parser.has_error;
+    return !has_error;
 }

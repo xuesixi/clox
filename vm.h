@@ -27,6 +27,7 @@ typedef enum {
 void init_VM();
 void free_VM();
 InterpretResult interpret(const char *src);
+void runtime_error(const char *format, ...);
 void push_stack(Value value);
 Value pop_stack();
 
