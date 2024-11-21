@@ -12,6 +12,9 @@ inline String *as_string(Value value) {
     return (String*)as_ref(value);
 }
 
+/**
+ * 从指定的 src 处产生一个新的 String。原 char*不会被修改。
+ * */
 String *string_copy(const char *src, int length) {
     char *chars = ALLOCATE(char, length + 1);
     memcpy(chars, src, length);
@@ -23,13 +26,16 @@ String *string_copy(const char *src, int length) {
  * 使用给定的 char* 来产生一个 String。
  * */
 String *string_allocate(char *chars, int length) {
-    String *str = ALLOCATE(String, 1);
+    String *str = (String*)allocate_object(sizeof(String), OBJ_STRING);
     str->object.type = OBJ_STRING;
     str->chars = chars;
     str->length = length;
     return str;
 }
 
+/**
+ * 将a 和 b 的字符串表达拼接在一起，产生一个 String
+ * */
 String *string_concat(Value a, Value b) {
     if (! (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
         runtime_error("at least one operand needs to be string");
@@ -42,4 +48,15 @@ String *string_concat(Value a, Value b) {
     free(a_str);
     free(b_str);
     return string_allocate(buffer, length);
+}
+
+/**
+ * 分配指定字节大小的 Object。所有引用类型的对象都应该由此产生。
+ * */
+Object *allocate_object(size_t size, ObjectType type) {
+    Object *obj = re_allocate(NULL, 0, size);
+    obj->type = type;
+    obj->next = vm.objects;
+    vm.objects = obj;
+    return obj;
 }

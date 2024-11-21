@@ -3,7 +3,9 @@
 //
 
 #include "memory.h"
+
 #include "assert.h"
+#include "vm.h"
 
 /**
  * @param ptr 想要重新分类的指针。为 NULL 则分为新的空间。
@@ -18,4 +20,26 @@ void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
     void *new_ptr = realloc(ptr, new_byte_size);
     assert(new_ptr != NULL);
     return new_ptr;
+}
+
+void free_all_objects() {
+    Object *curr = vm.objects;
+    while (curr != NULL) {
+        Object *next = curr->next;
+        free_object(curr);
+        curr = next;
+    }
+}
+
+void free_object(Object *object) {
+    switch (object->type) {
+        case OBJ_STRING: {
+            String *str = (String*)object;
+            FREE_ARRAY(char, 0, str->length + 1);
+            re_allocate(object, sizeof(String), 0);
+            break;
+        }
+        default:
+            return;
+    }
 }

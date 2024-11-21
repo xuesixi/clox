@@ -8,9 +8,10 @@ typedef enum {
   OBJ_STRING,
 } ObjectType;
 
-struct Object{
+typedef struct Object{
     ObjectType type;
-}; 
+    Object *next;
+} Object; 
 
 typedef struct {
     Object object;
@@ -23,5 +24,7 @@ String *as_string(Value value);
 String *string_copy(const char *src, int length);
 String *string_allocate(char *chars, int length);
 String *string_concat(Value a, Value b);
+
+Object *allocate_object(size_t size, ObjectType type);
 
 #endif

@@ -4,7 +4,9 @@
 
 #include "vm.h"
 #include "compiler.h"
+#include "memory.h"
 #include "object.h"
+
 #include "stdarg.h"
 #include "stdio.h"
 #include "debug.h"
@@ -310,9 +312,12 @@ static InterpretResult run() {
 
 void init_VM() {
     reset_stack();
+    vm.objects = NULL;
 }
 
-void free_VM() {}
+void free_VM() {
+    free_all_objects();
+}
 
 void push_stack(Value value) {
     * vm.stack_top = value;
