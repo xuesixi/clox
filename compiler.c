@@ -36,7 +36,7 @@ typedef enum {
     PREC_PRIMARY
 } Precedence;
 
-typedef void (*ParserFunction)();
+typedef void (*ParserFunction)(bool can_assign);
 
 /**
  * prefix: 当作为第一个 token 的时候的解析函数
@@ -74,21 +74,21 @@ static void parse_precedence(Precedence precedence);
 
 static void expression();
 
-static void float_num();
+static void float_num(bool can_assign);
 
-static void int_num();
+static void int_num(bool can_assign);
 
-static void literal();
+static void literal(bool can_assign);
 
-static void variable();
+static void variable(bool can_assign);
 
-static void unary();
+static void unary(bool can_assign);
 
-static void grouping();
+static void grouping(bool can_assign);
 
-static void binary();
+static void binary(bool can_assign);
 
-static void string();
+static void string(bool can_assign);
 
 static void declaration();
 
@@ -100,7 +100,7 @@ static int parse_variable();
 
 static int identifier_constant(Token *name);
 
-static void named_variable(Token *name);
+static void named_variable(Token *name, bool can_assign);
 
 static void print_statement();
 
@@ -161,7 +161,7 @@ ParseRule rules[] = {
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
 
-static void string() {
+static void string(bool can_assign) {
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
     Value value = ref_value((Object *) str);
     int index = make_constant(value);
@@ -180,12 +180,14 @@ static void parse_precedence(Precedence precedence) {
         error_at_previous("cannot be used as a value");
         return;
     }
-    rule->prefix();
+    bool can_assign = precedence <= PREC_ASSIGNMENT;
+    rule->prefix(can_assign);
     while (precedence <= rules[parser.current.type].precedence) {
         // 之所以要使用 while 循环，是因为 infix 一般都不贪婪，但 parse_precedence 是贪婪的
         advance(); // 先 advance，因为 infix 函数一般假设操作符是 prev 而非 curr
-        rules[parser.previous.type].infix();
+        rules[parser.previous.type].infix(can_assign);
     }
+    // a + b = 1 + 2;
 }
 
 static void declaration() {
@@ -236,7 +238,6 @@ static void statement() {
     } else {
         expression_statement();
     }
-    printf("doing st\n");
 }
 
 static void print_statement() {
@@ -258,13 +259,14 @@ static void expression() {
 /**
  * 标识符的前缀解析函数
  */
-static void variable() {
-    named_variable(&parser.previous);
+static void variable(bool can_assign) {
+    named_variable(&parser.previous, can_assign);
 }
 
-static void named_variable(Token *name) {
+static void named_variable(Token *name, bool can_assign) {
+    // a + b = 2 * 1
     int index = identifier_constant(name);
-    if (match(TOKEN_EQUAL)) {
+    if (can_assign && match(TOKEN_EQUAL)) {
         // 如果是赋值语句，则先解析后面的值表达式。
         expression();
         emit_two_bytes(OP_SET_GLOBAL, index);
@@ -279,7 +281,7 @@ static void named_variable(Token *name) {
  * 这个解析本身并不贪婪。
  *
  */
-static void binary() {
+static void binary(bool can_assign) {
     TokenType type = parser.previous.type;
     ParseRule *rule = &rules[type];
     parse_precedence(rule->precedence + 1); // parse the right operand
@@ -328,7 +330,7 @@ static void binary() {
 /**
  * 一元操作符表达式
  */
-static void unary() {
+static void unary(bool can_assign) {
     TokenType operator = parser.previous.type;
     parse_precedence(PREC_UNARY);
     switch (operator) {
@@ -343,19 +345,19 @@ static void unary() {
     }
 }
 
-static void float_num() {
+static void float_num(bool can_assign) {
     double value = strtod(parser.previous.start, NULL);
     int index = make_constant(float_value(value));
     emit_two_bytes(OP_CONSTANT, index);
 }
 
-static void int_num() {
+static void int_num(bool can_assign) {
     int value = (int) strtol(parser.previous.start, NULL, 10);
     int index = make_constant(int_value(value));
     emit_two_bytes(OP_CONSTANT, index);
 }
 
-static void literal() {
+static void literal(bool can_assign) {
     switch (parser.previous.type) {
         case TOKEN_NIL:
             emit_byte(OP_NIL);
@@ -372,7 +374,7 @@ static void literal() {
     }
 }
 
-static void grouping() {
+static void grouping(bool can_assign) {
     expression();
     consume(TOKEN_RIGHT_PAREN, "missing expected )");
 }
