@@ -88,6 +88,18 @@ static void binary();
 
 static void string();
 
+static void declaration();
+
+static void statement();
+
+static void print_statement();
+
+static void expression_statement();
+
+static bool match(TokenType type);
+
+static bool check(TokenType type);
+
 static int make_constant(Value value);
 
 //-------------------------------------------------------------------------
@@ -164,6 +176,35 @@ static void parse_precedence(Precedence precedence) {
     }
 }
 
+static void declaration() {
+    statement();
+}
+
+static void statement() {
+    if (match(TOKEN_PRINT)) {
+        print_statement();
+    } else {
+        expression_statement();
+    }
+    printf("doing st\n");
+}
+
+static void print_statement() {
+    expression();
+    consume(TOKEN_SEMICOLON, "A semicolon is needed to terminated the statement");
+    emit_byte(OP_PRINT);
+}
+
+static void expression_statement() {
+    expression();
+    consume(TOKEN_SEMICOLON, "A semicolon is needed to terminated the statement");
+    emit_byte(OP_POP);
+}
+
+static void expression() {
+    parse_precedence(PREC_ASSIGNMENT);
+}
+
 /**
  * 在左侧操作项已经被解析, previous 为操作符时，向后解析并完成这个 binary 表达式。
  * 这个解析本身并不贪婪。
@@ -213,10 +254,6 @@ static void binary() {
         default:
             break;
     }
-}
-
-static void expression() {
-    parse_precedence(PREC_ASSIGNMENT);
 }
 
 static void unary() {
@@ -304,6 +341,19 @@ static inline void emit_byte(uint8_t byte) {
     write_chunk(current_chunk(), byte, parser.previous.line);
 }
 
+static bool match(TokenType type) {
+    if (check(type)) {
+        advance();
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static inline bool check(TokenType type) {
+    return parser.current.type == type;
+}
+
 static void consume(TokenType type, const char *message) {
     if (parser.current.type != type) {
         error_at_current(message);
@@ -376,10 +426,16 @@ void show_tokens(const char *src) {
  * 将目标源代码编译成字节码，写入到目标 chunk 中
  * */
 bool compile(const char *src, Chunk *chunk) {
+
     init_scanner(src);
     compiling_chunk = chunk;
-    advance();
-    expression();
+
+    advance(); // 初始移动，如此一来，prev为null，curr为第一个token
+
+    while (!match(TOKEN_EOF)) {
+        declaration();
+    }
+
     end_compiler();
     bool has_error = parser.has_error;
     parser.panic_mode = false;

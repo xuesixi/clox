@@ -10,8 +10,6 @@
 #include "stdarg.h"
 #include "debug.h"
 
-#define NEW_LINE() printf("\n")
-
 VM vm;
 
 static uint8_t read_byte();
@@ -239,8 +237,8 @@ static InterpretResult run() {
 
         switch (instruction) {
             case OP_RETURN: {
-                print_value(pop_stack());
-                NEW_LINE();
+//                print_value(pop_stack());
+//                NEW_LINE();
                 return INTERPRET_OK;
             }
             case OP_CONSTANT: {
@@ -300,6 +298,13 @@ static InterpretResult run() {
             case OP_NOT:
                 push_stack(bool_value(is_falsy(pop_stack())));
                 break;
+            case OP_PRINT:
+                print_value(pop_stack());
+                NEW_LINE();
+                break;
+            case OP_POP:
+                pop_stack();
+                break;
             default:
                 runtime_error("unrecognized instruction");
         }
@@ -331,7 +336,7 @@ Value pop_stack() {
 }
 
 /**
- * 先调用 comiple 将源代码编译成字节码，然后运行字节码
+ * 先调用 compile 将源代码编译成字节码，然后运行字节码
  * @return 执行结果（是否出错等）
  */
 InterpretResult interpret(const char *src) {

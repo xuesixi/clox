@@ -12,4 +12,6 @@
 #define IMPLEMENTATION_ERROR(msg) \
     fprintf(stderr, "Implement error: %s\nOccurred in file: %s, line: %d\n", msg, __FILE__, __LINE__)
 
+#define NEW_LINE() printf("\n")
+
 #endif
