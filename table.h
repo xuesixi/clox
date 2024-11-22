@@ -15,6 +15,8 @@ typedef struct Table{
 } Table;
 
 void init_table(Table *table);
+bool empty_entry(Entry *entry);
+Entry *find_entry(Table *table, String *key);
 void free_table(Table *table);
 Value table_get(Table *table, String *key);
 bool table_has(Table *table, String *key);

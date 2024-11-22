@@ -10,7 +10,7 @@
 
 typedef enum {
     OP_RETURN,
-    OP_CONSTANT,
+    OP_CONSTANT, // OP, index：向栈中添加常数const[index]
     OP_NEGATE,
     OP_ADD,
     OP_SUBTRACT,
@@ -26,6 +26,8 @@ typedef enum {
     OP_EQUAL,
     OP_PRINT,
     OP_POP,
+    OP_DEFINE_GLOBAL, // OP, index: 定义一个全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
+    OP_GET_GLOBAL, // OP, index: 向栈中添加一个全局变量的值，该变量名为const[index]之字符串
 } OpCode;
 
 typedef struct {

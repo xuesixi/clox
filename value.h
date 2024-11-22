@@ -17,7 +17,7 @@ typedef enum {
     VAL_REF,
 } ValueType;
 
-typedef struct {
+typedef struct Value{
     ValueType type;
     union {
         double decimal;

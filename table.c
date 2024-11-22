@@ -7,7 +7,7 @@
  * 判断一个entry是否为“空”：key为null，值为nil
  * @return 是否为空
  */
-static inline bool empty_entry(Entry *entry) {
+inline bool empty_entry(Entry *entry) {
     return entry->key == NULL && is_nil(entry->value);
 }
 
@@ -52,7 +52,7 @@ static void table_resize(Table *table) {
 /**
  * @return 如果key存在，返回对应的entry。如果不存在，返回第一个空位
  */
-static Entry *find_entry(Table *table, String *key) {
+Entry *find_entry(Table *table, String *key) {
     int index = key->hash % table->capacity;
     for (int i = 0; i < table->capacity; ++i) {
         int curr = (index + i) % table->capacity;

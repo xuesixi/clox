@@ -80,6 +80,8 @@ static void int_num();
 
 static void literal();
 
+static void variable();
+
 static void unary();
 
 static void grouping();
@@ -92,6 +94,14 @@ static void declaration();
 
 static void statement();
 
+static void var_declaration();
+
+static int parse_variable();
+
+static int identifier_constant(Token *name);
+
+static void named_variable(Token *name);
+
 static void print_statement();
 
 static void expression_statement();
@@ -100,58 +110,60 @@ static bool match(TokenType type);
 
 static bool check(TokenType type);
 
+static void synchronize();
+
 static int make_constant(Value value);
 
 //-------------------------------------------------------------------------
 
 ParseRule rules[] = {
         [TOKEN_LEFT_PAREN]    = {grouping, NULL, PREC_NONE},
-        [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_DOT]           = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_MINUS]         = {unary,    binary, PREC_TERM},
-        [TOKEN_PLUS]          = {NULL,     binary, PREC_TERM},
-        [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
-        [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
-        [TOKEN_PERCENT]       = {NULL,     binary, PREC_FACTOR},
-        [TOKEN_BANG]          = {unary,     NULL,   PREC_NONE},
-        [TOKEN_BANG_EQUAL]    = {NULL,     binary,   PREC_EQUALITY},
-        [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_EQUAL_EQUAL]   = {NULL,     binary,   PREC_EQUALITY},
-        [TOKEN_GREATER]       = {NULL,     binary,   PREC_COMPARISON},
-        [TOKEN_GREATER_EQUAL] = {NULL,     binary,   PREC_COMPARISON},
-        [TOKEN_LESS]          = {NULL,     binary,   PREC_COMPARISON},
-        [TOKEN_LESS_EQUAL]    = {NULL,     binary,   PREC_COMPARISON},
-        [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_STRING]        = {string,   NULL,   PREC_NONE},
+        [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
+        [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
+        [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_DOT]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
+        [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
+        [TOKEN_SEMICOLON]     = {NULL, NULL, PREC_NONE},
+        [TOKEN_SLASH]         = {NULL, binary, PREC_FACTOR},
+        [TOKEN_STAR]          = {NULL, binary, PREC_FACTOR},
+        [TOKEN_PERCENT]       = {NULL, binary, PREC_FACTOR},
+        [TOKEN_BANG]          = {unary, NULL, PREC_NONE},
+        [TOKEN_BANG_EQUAL]    = {NULL, binary, PREC_EQUALITY},
+        [TOKEN_EQUAL]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_EQUAL_EQUAL]   = {NULL, binary, PREC_EQUALITY},
+        [TOKEN_GREATER]       = {NULL, binary, PREC_COMPARISON},
+        [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
+        [TOKEN_LESS]          = {NULL, binary, PREC_COMPARISON},
+        [TOKEN_LESS_EQUAL]    = {NULL, binary, PREC_COMPARISON},
+        [TOKEN_IDENTIFIER]    = {variable, NULL, PREC_NONE},
+        [TOKEN_STRING]        = {string, NULL, PREC_NONE},
         [TOKEN_FLOAT]         = {float_num, NULL, PREC_NONE},
         [TOKEN_INT]           = {int_num, NULL, PREC_NONE},
-        [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
+        [TOKEN_AND]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_CLASS]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_ELSE]          = {NULL, NULL, PREC_NONE},
         [TOKEN_FALSE]         = {literal, NULL, PREC_NONE},
-        [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
+        [TOKEN_FOR]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_IF]            = {NULL, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
-        [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
+        [TOKEN_OR]            = {NULL, NULL, PREC_NONE},
+        [TOKEN_PRINT]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
+        [TOKEN_SUPER]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_THIS]          = {NULL, NULL, PREC_NONE},
         [TOKEN_TRUE]          = {literal, NULL, PREC_NONE},
-        [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE},
-        [TOKEN_EOF]           = {NULL,     NULL,   PREC_NONE},
+        [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
 
 static void string() {
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
-    Value value = ref_value((Object*) str);
+    Value value = ref_value((Object *) str);
     int index = make_constant(value);
     emit_two_bytes(OP_CONSTANT, index);
 }
@@ -177,7 +189,45 @@ static void parse_precedence(Precedence precedence) {
 }
 
 static void declaration() {
-    statement();
+    if (match(TOKEN_VAR)) {
+        var_declaration();
+    } else {
+        statement();
+    }
+    if (parser.panic_mode) {
+        synchronize();
+    }
+}
+
+static void var_declaration() {
+    // var num = 10;
+    int index = parse_variable();
+
+    if (match(TOKEN_EQUAL)) {
+        expression();
+    } else {
+        emit_byte(OP_NIL);
+    }
+    consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the var statement");
+    emit_two_bytes(OP_DEFINE_GLOBAL, index);
+}
+
+/**
+ * 解析一个标识符，将其添加为常数，返回其索引
+ * @return 索引
+ */
+static int parse_variable() {
+    consume(TOKEN_IDENTIFIER, "An identifier is expected here");
+    return identifier_constant(&parser.previous);
+}
+
+/**
+ * 将标识符token添加入常数中，然后返回其索引
+ * @return 常数中的索引
+ */
+static int identifier_constant(Token *name) {
+    String *str = string_copy(name->start, name->length);
+    return make_constant(ref_value((Object*)str));
 }
 
 static void statement() {
@@ -203,6 +253,15 @@ static void expression_statement() {
 
 static void expression() {
     parse_precedence(PREC_ASSIGNMENT);
+}
+
+static void variable() {
+    named_variable(&parser.previous);
+}
+
+static void named_variable(Token *name) {
+    int index = identifier_constant(name);
+    emit_two_bytes(OP_GET_GLOBAL, index);
 }
 
 /**
@@ -306,8 +365,9 @@ static void grouping() {
 }
 
 /**
- * 将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引
  * 该函数包装了 add_constant
+ * 将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引.
+ * @return 新增的常数的索引
  * */
 static int make_constant(Value value) {
     int index = add_constant(current_chunk(), value);
@@ -341,6 +401,11 @@ static inline void emit_byte(uint8_t byte) {
     write_chunk(current_chunk(), byte, parser.previous.line);
 }
 
+/**
+ * 匹配之后，指定类型的那个token成为prev
+ * @param type
+ * @return
+ */
 static bool match(TokenType type) {
     if (check(type)) {
         advance();
@@ -354,6 +419,12 @@ static inline bool check(TokenType type) {
     return parser.current.type == type;
 }
 
+/**
+ * 消费下一个指定类型的token。如果类型不匹配，则出现解析错误。
+ * 消费之后，指定类型的那个token成为prev
+ * @param type 指定类型
+ * @param message 错误消息
+ */
 static void consume(TokenType type, const char *message) {
     if (parser.current.type != type) {
         error_at_current(message);
@@ -374,6 +445,36 @@ static void advance() {
         } else {
             error_at_current(parser.current.start);
         }
+    }
+}
+
+/**
+ * 遇到解析错误后，试图移动到下一个可能正确的节点，继续解析。
+ * 节点有两种：
+ * 1. 以`;`标志的语句结束
+ * 2. 以`var`, `fun`, `class`等关键字标志的语句的开始。
+ */
+static void synchronize() {
+    parser.panic_mode = false;
+    while (!check(TOKEN_EOF)) {
+        if (parser.previous.type == TOKEN_SEMICOLON) {
+            return;
+        }
+        switch (parser.current.type) {
+            case TOKEN_CLASS:
+            case TOKEN_FUN:
+            case TOKEN_VAR:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_PRINT:
+            case TOKEN_RETURN:
+                return;
+            default:
+                /* nothing */
+                ;
+        }
+        advance();
     }
 }
 
@@ -437,6 +538,7 @@ bool compile(const char *src, Chunk *chunk) {
     }
 
     end_compiler();
+//    printf("chunk has %d bytes code\n", chunk->count);
     bool has_error = parser.has_error;
     parser.panic_mode = false;
     parser.has_error = false;

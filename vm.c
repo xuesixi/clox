@@ -61,7 +61,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 push_stack(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error("invalid binary operator");
+                IMPLEMENTATION_ERROR("invalid binary operator");
                 return;
         }
     } else if (is_int(a) && is_float(b)) {
@@ -217,9 +217,26 @@ static inline uint8_t read_byte() {
     return (*vm.ip++);
 }
 
+/**
+ * 将下一个字节解释为常数索引，返回其对应的常数值
+ * @return 下一个字节代表的常数
+ */
 static inline Value read_constant() {
     uint8_t index = read_byte();
     return vm.chunk->constants.values[index];
+}
+
+/**
+ * 将下一个字节解释为字符串常数索引，返回其对应的String
+ * @return 下一个字节代表的String
+ */
+static inline String *read_constant_string() {
+    Value value = read_constant();
+    if (!is_ref_of(value, OBJ_STRING)) {
+        IMPLEMENTATION_ERROR("trying to read a constant string, but the value is not a String");
+        return NULL;
+    }
+    return (String*)(as_ref(value));
 }
 
 /**
@@ -237,8 +254,6 @@ static InterpretResult run() {
 
         switch (instruction) {
             case OP_RETURN: {
-//                print_value(pop_stack());
-//                NEW_LINE();
                 return INTERPRET_OK;
             }
             case OP_CONSTANT: {
@@ -305,6 +320,22 @@ static InterpretResult run() {
             case OP_POP:
                 pop_stack();
                 break;
+            case OP_DEFINE_GLOBAL: {
+                String *name = read_constant_string();
+                table_set(&vm.globals, name, peek_stack(0));
+                pop_stack();
+                break;
+            }
+            case OP_GET_GLOBAL: {
+                String *name = read_constant_string();
+                Entry *entry = find_entry(&vm.globals, name);
+                if (empty_entry(entry)) {
+                    runtime_error("Accessing an undefined variable");
+                } else {
+                    push_stack(entry->value);
+                }
+                break;
+            }
             default:
                 runtime_error("unrecognized instruction");
         }
@@ -318,11 +349,13 @@ void init_VM() {
     reset_stack();
     vm.objects = NULL;
     init_table(&vm.string_table);
+    init_table(&vm.globals);
 }
 
 void free_VM() {
     free_all_objects();
     free_table(&vm.string_table);
+    free_table(&vm.globals);
 }
 
 void push_stack(Value value) {
