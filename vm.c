@@ -8,7 +8,6 @@
 #include "object.h"
 
 #include "stdarg.h"
-#include "stdio.h"
 #include "debug.h"
 
 #define NEW_LINE() printf("\n")
@@ -313,10 +312,12 @@ static InterpretResult run() {
 void init_VM() {
     reset_stack();
     vm.objects = NULL;
+    init_table(&vm.string_table);
 }
 
 void free_VM() {
     free_all_objects();
+    free_table(&vm.string_table);
 }
 
 void push_stack(Value value) {
@@ -330,8 +331,7 @@ Value pop_stack() {
 }
 
 /**
- * 将虚拟机要执行的代码块设定为目标代码块，然后执行之
- * @param chunk 要执行的代码快
+ * 先调用 comiple 将源代码编译成字节码，然后运行字节码
  * @return 执行结果（是否出错等）
  */
 InterpretResult interpret(const char *src) {

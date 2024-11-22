@@ -8,7 +8,6 @@
 
 #include "memory.h"
 #include "object.h"
-#include "stdio.h"
 
 static char *to_print_ref(Value value);
 
@@ -112,12 +111,17 @@ bool value_equal(Value a, Value b) {
         case VAL_NIL:
             return true;
         case VAL_REF:
-            return object_equal(as_ref(a), as_ref(b));
+//            return object_equal(as_ref(a), as_ref(b));
+            return as_ref(a) == as_ref(b);
         default:
             return true;
     }
 }
 
+/**
+ * 旧版的比较。由于interned string的实现，所有同值的String都具有相同的地址。
+ * 因此直接比较地址即可。
+ */
 bool object_equal(Object *a, Object *b) {
     if (a->type != b->type) {
         return false;

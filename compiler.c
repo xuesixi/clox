@@ -12,7 +12,6 @@
 #include "compiler.h"
 #include "object.h"
 #include "scanner.h"
-#include "stdio.h"
 #include "debug.h"
 #include "stdlib.h"
 
@@ -373,6 +372,9 @@ void show_tokens(const char *src) {
     }
 }
 
+/**
+ * 将目标源代码编译成字节码，写入到目标 chunk 中
+ * */
 bool compile(const char *src, Chunk *chunk) {
     init_scanner(src);
     compiling_chunk = chunk;

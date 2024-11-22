@@ -10,6 +10,7 @@ all: $(TARGET)
 run: $(TARGET)
 	@./$(TARGET)
 	@rm $(TARGET)
+	@rm *.o
 
 $(TARGET): $(OBJ)
 	@$(CC) $(OBJ) -o $(TARGET)

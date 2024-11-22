@@ -13,10 +13,11 @@ typedef struct Object{
     Object *next;
 } Object; 
 
-typedef struct {
+typedef struct String{
     Object object;
     int length;
-    char *chars;
+    const char *chars;
+    uint32_t hash;
 } String;
 
 bool is_ref_of(Value value, ObjectType type);
