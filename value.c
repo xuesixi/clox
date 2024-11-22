@@ -17,7 +17,7 @@ void init_ValueArray(ValueArray *array) {
     array->count = 0;
 }
 
-void write_ValueArray(ValueArray *array, Value value) {
+void append_ValueArray(ValueArray *array, Value value) {
     if (array->capacity < array->count + 1) {
         int oldCapacity = array->capacity;
         array->capacity = array->capacity < 8 ? 8 : 2 * array->capacity;

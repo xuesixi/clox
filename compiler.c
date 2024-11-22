@@ -185,9 +185,9 @@ static void parse_precedence(Precedence precedence) {
     while (precedence <= rules[parser.current.type].precedence) {
         // 之所以要使用 while 循环，是因为 infix 一般都不贪婪，但 parse_precedence 是贪婪的
         advance(); // 先 advance，因为 infix 函数一般假设操作符是 prev 而非 curr
-        rules[parser.previous.type].infix(can_assign);
+
+        rules[parser.previous.type].infix(can_assign); // 这里的can_assign似乎意义不大。多数infix用不到它。对于assign对来，它自己的prefix就会处理。
     }
-    // a + b = 1 + 2;
 }
 
 static void declaration() {

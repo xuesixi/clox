@@ -35,7 +35,7 @@ typedef struct {
 
 void init_ValueArray(ValueArray *array);
 
-void write_ValueArray(ValueArray *array, Value value);
+void append_ValueArray(ValueArray *array, Value value);
 
 void free_ValueArray(ValueArray *array);
 

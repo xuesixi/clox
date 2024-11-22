@@ -1,14 +1,15 @@
 #include "chunk.h"
 #include "vm.h"
 #include "stdlib.h"
+#include "readline/readline.h"
 
 
 static void repl() {
-    char line[1024];
     while (true) {
-        printf("> ");
-        if (fgets(line, sizeof(line), stdin)) {
+        char *line;
+        if ( (line = readline("> ")) != NULL) {
             interpret(line);
+            free(line);
         } else {
             printf("\n");
             break;

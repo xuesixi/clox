@@ -19,7 +19,7 @@ file: $(TARGET)
 	@rm *.o
 
 $(TARGET): $(OBJ)
-	@$(CC) $(OBJ) -o $(TARGET)
+	@$(CC) $(OBJ) -o $(TARGET) -l readline
 
 %.o: %.c
 	@$(CC) $(CFLAGS) -c $< -o $@

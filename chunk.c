@@ -49,6 +49,6 @@ void free_chunk(Chunk *c) {
  * @return 该常量在 chunk 中的 constants 中的索引。
  */
 int add_constant(Chunk *c, Value constant) {
-    write_ValueArray(&c->constants, constant);
+    append_ValueArray(&c->constants, constant);
     return c->constants.count - 1;
 }
