@@ -328,13 +328,23 @@ static InterpretResult run() {
             }
             case OP_GET_GLOBAL: {
                 String *name = read_constant_string();
-                Entry *entry = find_entry(&vm.globals, name);
-                if (empty_entry(entry)) {
-                    runtime_error("Accessing an undefined variable");
+                Value value;
+                if (table_get(&vm.globals, name, &value)) {
+                    push_stack(value);
                 } else {
-                    push_stack(entry->value);
+                    runtime_error("Accessing an undefined variable");
                 }
                 break;
+            }
+            case OP_SET_GLOBAL: {
+                String *name = read_constant_string();
+                if (table_set(&vm.globals, name, peek_stack(0)) ) {
+                    break;
+                } else {
+                    table_delete(&vm.globals, name);
+                    runtime_error("Setting an undefined global variable: %s", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
             }
             default:
                 runtime_error("unrecognized instruction");

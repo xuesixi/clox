@@ -7,7 +7,7 @@
  * 判断一个entry是否为“空”：key为null，值为nil
  * @return 是否为空
  */
-inline bool empty_entry(Entry *entry) {
+static inline bool empty_entry(Entry *entry) {
     return entry->key == NULL && is_nil(entry->value);
 }
 
@@ -52,7 +52,7 @@ static void table_resize(Table *table) {
 /**
  * @return 如果key存在，返回对应的entry。如果不存在，返回第一个空位
  */
-Entry *find_entry(Table *table, String *key) {
+static Entry *find_entry(Table *table, String *key) {
     int index = key->hash % table->capacity;
     for (int i = 0; i < table->capacity; ++i) {
         int curr = (index + i) % table->capacity;
@@ -73,13 +73,33 @@ inline bool table_has(Table *table, String *key) {
 }
 
 /**
- * @return value of nil when the key is not found
+ *
+ * @param table
+ * @param key
+ * @param value 如果存在该key，则将对应的值储存在这个参数值
+ * @return 是否存在该key
  */
-inline Value table_get(Table *table, String *key) {
-    return find_entry(table, key)->value;
+inline bool table_get(Table *table, String *key, Value *value) {
+    if (table->count == 0) {
+        return false;
+    }
+    Entry *entry = find_entry(table, key);
+    if (empty_entry(entry)) {
+        return false;
+    } else {
+        *value = entry->value;
+        return true;
+    }
 }
 
-void table_set(Table *table, String *key, Value value) {
+/**
+ *
+ * @param table
+ * @param key
+ * @param value
+ * @return true if modifying existing pair; false if adding new pari
+ */
+bool table_set(Table *table, String *key, Value value) {
 
     if (need_resize(table)) {
         table_resize(table);
@@ -98,15 +118,16 @@ void table_set(Table *table, String *key, Value value) {
                 mark->key = key;
                 mark->value = value;
             }
-            return;
+            return false;
         } else if(entry->key == key) {
             entry->value = value;
-            return;
+            return true;
         } else if (mark == NULL && del_mark(entry)) {
             mark = entry;
         }
     }
     IMPLEMENTATION_ERROR("table_set() does not find empty spot");
+    return false;
 }
 
 Value table_delete(Table *table, String *key) {
