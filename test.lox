@@ -1,5 +1,5 @@
-var a = 1;
-var b = 2;
-var c = 2;
-var d = 3;
-a * b = c + d;
+var num = 10;
+print num + 1;
+var age = num + 2;
+print age;
+print "num";

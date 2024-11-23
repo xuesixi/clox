@@ -2,6 +2,7 @@
 #include "vm.h"
 #include "stdlib.h"
 #include "readline/readline.h"
+#include "readline/history.h"
 
 
 static void repl() {
@@ -9,6 +10,7 @@ static void repl() {
         char *line;
         if ( (line = readline("> ")) != NULL) {
             interpret(line);
+            add_history(line);
             free(line);
         } else {
             printf("\n");

@@ -6,12 +6,15 @@
 
 #include "memory.h"
 
+static void init_constant(Chunk *chunk);
+
 void init_chunk(Chunk *c) {
     c->capacity = 0;
     c->count = 0;
     c->code = NULL;
     c->lines = NULL;
     init_ValueArray(&c->constants);
+    init_constant(c);
 }
 
 int compute_new_capacity(Chunk *c) {
@@ -43,12 +46,51 @@ void free_chunk(Chunk *c) {
 }
 
 /**
+ * 少部分常数会被预先加载到constants。
+ * @param value
+ * @return 如果value被预先加载，返回其索引，否则返回-1
+ */
+int constant_mapping(Value value) {
+    if (is_int(value) && as_int(value) <= 8) {
+        return as_int(value);
+    } else if (is_float(value)) {
+        double v = as_float(value);
+        if (v == 1.0) {
+            return 9;
+        } else if (v == 2.0) {
+            return 10;
+        } else if (v == 0.5) {
+            return 11;
+        } else if (v == 0.0) {
+            return 12;
+        }
+    }
+    return -1;
+}
+
+static void init_constant(Chunk *chunk) {
+    add_constant(chunk, int_value(0));
+    add_constant(chunk, int_value(1));
+    add_constant(chunk, int_value(2));
+    add_constant(chunk, int_value(3));
+    add_constant(chunk, int_value(4));
+    add_constant(chunk, int_value(5));
+    add_constant(chunk, int_value(6));
+    add_constant(chunk, int_value(7));
+    add_constant(chunk, int_value(8));
+    add_constant(chunk, float_value(1.0));
+    add_constant(chunk, float_value(2.0));
+    add_constant(chunk, float_value(0.5));
+    add_constant(chunk, float_value(0.0));
+}
+
+/**
  * 往指定 chunk 中写入一个常量
  * @param c 指定的 chunk
  * @param constant 常量
  * @return 该常量在 chunk 中的 constants 中的索引。
  */
-int add_constant(Chunk *c, Value constant) {
+inline int add_constant(Chunk *c, Value constant) {
     append_ValueArray(&c->constants, constant);
     return c->constants.count - 1;
 }

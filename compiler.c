@@ -12,14 +12,16 @@
 #include "compiler.h"
 #include "object.h"
 #include "scanner.h"
+#include "table.h"
 #include "debug.h"
 #include "stdlib.h"
 
-typedef struct {
+typedef struct Parser{
     Token previous;
     Token current;
     bool has_error;
     bool panic_mode;
+    Table lexeme_table;
 } Parser;
 
 typedef enum {
@@ -386,17 +388,29 @@ static void grouping(bool can_assign) {
 
 /**
  * 该函数包装了 add_constant
- * 将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引.
- * @return 新增的常数的索引
+ * 如果value属于预先装载值，那么直接返回其对应的索引。
+ * 如果value属于String，如果该值已存在于lexeme_table中，则返回其索引。
+ * 如果不存在，则用add_constant添加后，也将其存入lexeme_table中。
+ * 若都不是，则将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引.
+ * @return 常数的索引
  * */
-static inline int make_constant(Value value) {
+static int make_constant(Value value) {
+    int cache = constant_mapping(value);
+    if (cache != -1) {
+        return cache;
+    }
+    if (is_ref_of(value, OBJ_STRING)) {
+        Value str_index;
+        if (table_get(&parser.lexeme_table, as_string(value), &str_index) ) {
+            return as_int(str_index);
+        } else {
+            str_index = int_value(add_constant(current_chunk(), value));
+            table_set(&parser.lexeme_table, as_string(value), str_index);
+            return as_int(str_index);
+        }
+    }
     int index = add_constant(current_chunk(), value);
-//    if (index > UINT8_MAX) {
-//        error_at_previous("Too many constants for a chunk");
-//        return index;
-//    } else {
-        return index;
-//    }
+    return index;
 }
 
 static void end_compiler() {
@@ -568,6 +582,7 @@ void show_tokens(const char *src) {
 bool compile(const char *src, Chunk *chunk) {
 
     init_scanner(src);
+    init_table(&parser.lexeme_table);
     compiling_chunk = chunk;
 
     advance(); // 初始移动，如此一来，prev为null，curr为第一个token
@@ -581,5 +596,6 @@ bool compile(const char *src, Chunk *chunk) {
     bool has_error = parser.has_error;
     parser.panic_mode = false;
     parser.has_error = false;
+    free_table(&parser.lexeme_table);
     return !has_error;
 }
