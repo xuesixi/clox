@@ -11,6 +11,7 @@
 typedef enum OpCode{
     OP_RETURN,
     OP_CONSTANT, // OP, index：向栈中添加常数const[index]
+    OP_CONSTANT2,
     OP_NEGATE,
     OP_ADD,
     OP_SUBTRACT,

@@ -16,6 +16,7 @@ static uint8_t read_byte();
 static bool is_falsy(Value value);
 static void reset_stack();
 static Value read_constant();
+static inline Value read_constant2();
 static InterpretResult run();
 static void show_stack();
 static Value peek_stack(int distance);
@@ -226,6 +227,12 @@ static inline Value read_constant() {
     return vm.chunk->constants.values[index];
 }
 
+static inline Value read_constant2() {
+    uint8_t indices[2] = {read_byte(), read_byte()};
+    uint16_t index = * ((uint16_t*) indices);
+    return vm.chunk->constants.values[index];
+}
+
 /**
  * 将下一个字节解释为字符串常数索引，返回其对应的String
  * @return 下一个字节代表的String
@@ -258,6 +265,11 @@ static InterpretResult run() {
             }
             case OP_CONSTANT: {
                 Value value = read_constant();
+                push_stack(value);
+                break;
+            }
+            case OP_CONSTANT2: {
+                Value value = read_constant2();
                 push_stack(value);
                 break;
             }

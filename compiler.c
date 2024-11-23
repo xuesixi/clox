@@ -68,6 +68,8 @@ static void emit_byte(uint8_t byte);
 
 static void emit_two_bytes(uint8_t byte1, uint8_t byte2);
 
+static void emit_constant(int index);
+
 static void end_compiler();
 
 static void parse_precedence(Precedence precedence);
@@ -165,7 +167,8 @@ static void string(bool can_assign) {
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
     Value value = ref_value((Object *) str);
     int index = make_constant(value);
-    emit_two_bytes(OP_CONSTANT, index);
+    emit_constant(index);
+//    emit_two_bytes(OP_CONSTANT, index);
 }
 
 /**
@@ -348,13 +351,15 @@ static void unary(bool can_assign) {
 static void float_num(bool can_assign) {
     double value = strtod(parser.previous.start, NULL);
     int index = make_constant(float_value(value));
-    emit_two_bytes(OP_CONSTANT, index);
+    emit_constant(index);
+//    emit_two_bytes(OP_CONSTANT, index);
 }
 
 static void int_num(bool can_assign) {
     int value = (int) strtol(parser.previous.start, NULL, 10);
     int index = make_constant(int_value(value));
-    emit_two_bytes(OP_CONSTANT, index);
+//    emit_two_bytes(OP_CONSTANT, index);
+    emit_constant(index);
 }
 
 static void literal(bool can_assign) {
@@ -384,14 +389,14 @@ static void grouping(bool can_assign) {
  * 将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引.
  * @return 新增的常数的索引
  * */
-static int make_constant(Value value) {
+static inline int make_constant(Value value) {
     int index = add_constant(current_chunk(), value);
-    if (index > UINT8_MAX) {
-        error_at_previous("Too many constants for a chunk");
-        return 0;
-    } else {
+//    if (index > UINT8_MAX) {
+//        error_at_previous("Too many constants for a chunk");
+//        return index;
+//    } else {
         return index;
-    }
+//    }
 }
 
 static void end_compiler() {
@@ -406,6 +411,25 @@ static void end_compiler() {
 static inline void emit_two_bytes(uint8_t byte1, uint8_t byte2) {
     emit_byte(byte1);
     emit_byte(byte2);
+}
+
+/**
+ * 根据给定的index产生OP_CONSTANT或者OP_CONSTANT2指令
+ * @param index
+ */
+static void emit_constant(int index) {
+    if (index < UINT8_MAX) {
+        emit_two_bytes(OP_CONSTANT, index);
+    } else if (index < UINT16_MAX) {
+        uint16_t u16_index = index;
+        uint8_t *addr = (uint8_t*)&u16_index;
+        uint8_t i0 = addr[0];
+        uint8_t i1 = addr[1];
+        emit_byte(OP_CONSTANT2);
+        emit_two_bytes(i0, i1);
+    } else {
+        error_at_previous("Too many constants for a chunk");
+    }
 }
 
 static Chunk *current_chunk() {
