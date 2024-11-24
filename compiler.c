@@ -55,6 +55,7 @@ typedef struct ParseRule{
 typedef struct Local {
     Token name;
     int depth;
+    bool is_const;
 } Local;
 
 typedef struct Scope {
@@ -71,9 +72,9 @@ static inline bool lexeme_equal(Token *a, Token *b);
 
 static inline void begin_scope();
 
-static void declare_local();
+static void declare_local(bool is_const);
 
-static int resolve_local(Scope *scope, Token *token);
+static int resolve_local(Scope *scope, Token *token, bool *is_const);
 
 static inline void end_scope();
 
@@ -127,7 +128,9 @@ static void statement();
 
 static void var_declaration();
 
-static int parse_var_declaration();
+static void const_declaration();
+
+static int parse_var_declaration(bool is_const);
 
 static int identifier_constant(Token *name);
 
@@ -228,6 +231,8 @@ static void parse_precedence(Precedence precedence) {
 static void declaration() {
     if (match(TOKEN_VAR)) {
         var_declaration();
+    } else if (match(TOKEN_CONST)) {
+        const_declaration();
     } else {
         statement();
     }
@@ -238,7 +243,7 @@ static void declaration() {
 
 static void var_declaration() {
 
-    int index = parse_var_declaration();
+    int index = parse_var_declaration(false);
 
     if (match(TOKEN_EQUAL)) {
 
@@ -256,12 +261,27 @@ static void var_declaration() {
     // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
 }
 
+static void const_declaration() {
+
+    int index = parse_var_declaration(true);
+    consume(TOKEN_EQUAL, "A const variable must be initialized");
+    expression();
+    consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the const statement");
+
+    if (current_scope->depth == 0) {
+        emit_two_bytes(OP_DEFINE_GLOBAL_CONST, index);
+    } else {
+        current_scope->locals[current_scope->count - 1].depth = current_scope->depth;
+    }
+    // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
+}
+
 /**
  * clox中，当一个语句（statement）执行完毕后，它必然会消耗掉期间产生的所有栈元素。
  * 本地变量的申明是唯一的可以产生“超单一语句”的栈元素的语句。它会在block结束后被全部清除。
  * 因为本地变量是唯一可以长时间存在的元素，一个本地变量在locals中的索引必然就是它在stack中的索引。
  */
-static void declare_local() {
+static void declare_local(bool is_const) {
     if (current_scope->count >= STACK_MAX) {
         error_at_previous("too many local variables");
         return;
@@ -283,7 +303,7 @@ static void declare_local() {
     // 添加新的local变量
     Local *local = current_scope->locals + current_scope->count;
     local->name = parser.previous;
-//    local->depth = current_scope->depth;
+    local->is_const = is_const;
     local->depth = -1; // 在完成初始化之后，再设置为正确值。这是为了防止初始化中用到自己，比如`var num = num + 10;`
     current_scope->count++;
 }
@@ -295,7 +315,7 @@ static void declare_local() {
  * @param token 要检查的变量名
  * @return 该变量在local变量表的位置（同时也是vm的栈中的索引）
  */
-static int resolve_local(Scope *scope, Token *token) {
+static int resolve_local(Scope *scope, Token *token, bool *is_const) {
     for (int i = scope->count - 1; i >= 0; i--) {
         Local *curr = scope->locals + i;
         if (lexeme_equal(token, &curr->name)) {
@@ -303,6 +323,9 @@ static int resolve_local(Scope *scope, Token *token) {
                 error_at_previous("cannot use a variable in its own initialization");
                 return -1;
             } else{
+                if (is_const != NULL) {
+                    *is_const = curr->is_const;
+                }
                 return i;
             }
         }
@@ -314,12 +337,12 @@ static int resolve_local(Scope *scope, Token *token) {
  * 解析一个标识符，如果是全局变量，则将标识符添加为常量。如果是局部变量，申明之
  * @return 如果是全局变量，返回索引。否则，返回-1
  */
-static inline int parse_var_declaration() {
+static inline int parse_var_declaration(bool is_const) {
     consume(TOKEN_IDENTIFIER, "An identifier is expected here");
 
     if (current_scope->depth > 0) {
         // 如果是local
-        declare_local();
+        declare_local(is_const);
         return -1;
     } else {
         // 否则是global
@@ -410,13 +433,18 @@ static inline void variable(bool can_assign) {
 static void named_variable(Token *name, bool can_assign) {
     int set_op = OP_SET_LOCAL;
     int get_op = OP_GET_LOCAL;
-    int index = resolve_local(current_scope, name);
+    bool is_const;
+    int index = resolve_local(current_scope, name, &is_const);
     if (index == -1) {
         index = identifier_constant(name);
         set_op = OP_SET_GLOBAL;
         get_op = OP_GET_GLOBAL;
     }
     if (can_assign && match(TOKEN_EQUAL)) {
+        if (is_const) {
+            error_at_previous("cannot re-assign a const variable");
+            return;
+        }
         // 如果是赋值语句，则先解析后面的值表达式。
         expression();
         emit_two_bytes(set_op, index);

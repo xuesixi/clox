@@ -341,6 +341,13 @@ static InterpretResult run() {
                 pop_stack();
                 break;
             }
+            case OP_DEFINE_GLOBAL_CONST: {
+                String *name = read_constant_string();
+                table_set(&vm.globals, name, peek_stack(0));
+                table_set(&vm.const_table, name, bool_value(true));
+                pop_stack();
+                break;
+            }
             case OP_GET_GLOBAL: {
                 String *name = read_constant_string();
                 Value value;
@@ -354,6 +361,10 @@ static InterpretResult run() {
             }
             case OP_SET_GLOBAL: {
                 String *name = read_constant_string();
+                if (table_has(&vm.const_table, name)) {
+                    runtime_error("The const variable %s cannot be re-assigned", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
                 if (table_set(&vm.globals, name, peek_stack(0)) ) {
                     break;
                 } else {
@@ -386,12 +397,14 @@ void init_VM() {
     vm.objects = NULL;
     init_table(&vm.string_table);
     init_table(&vm.globals);
+    init_table(&vm.const_table);
 }
 
 void free_VM() {
     free_all_objects();
     free_table(&vm.string_table);
     free_table(&vm.globals);
+    free_table(&vm.const_table);
 }
 
 inline void push_stack(Value value) {

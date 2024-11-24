@@ -8,14 +8,15 @@
 #include "chunk.h"
 #include "table.h"
 
-typedef struct {
+typedef struct VM{
     Chunk *chunk;
     uint8_t *ip;
     Value stack[STACK_MAX];
     Value *stack_top;
-    Object *objects;
-    Table string_table;
-    Table globals;
+    Object *objects; // 所有object的值
+    Table string_table; // 同名的String只会创建一次。
+    Table globals; // 储存所有全局变量
+    Table const_table;  // 储存所有const的全局变量。(const的全局变量会同时存在与globals和const_table中）
 } VM ;
 
 typedef enum {

@@ -18,13 +18,13 @@ typedef enum {
 } ValueType;
 
 typedef struct Value{
-    ValueType type;
     union {
         double decimal;
         int integer;
         bool boolean;
         Object *reference;
     } as;
+    ValueType type;
 } Value;
 
 typedef struct {

@@ -22,7 +22,7 @@ void append_ValueArray(ValueArray *array, Value value) {
         int oldCapacity = array->capacity;
         array->capacity = array->capacity < 8 ? 8 : 2 * array->capacity;
         array->values =
-            GROW_ARRAY(Value, array->values, oldCapacity, array->capacity);
+                GROW_ARRAY(Value, array->values, oldCapacity, array->capacity);
     }
 
     array->values[array->count] = value;
@@ -78,23 +78,23 @@ inline Object *as_ref(Value value) {
 }
 
 inline Value bool_value(bool value) {
-    return (Value){.type = VAL_BOOL, .as = {.boolean = value}};
+    return (Value) {.type = VAL_BOOL, .as = {.boolean = value}};
 }
 
 inline Value float_value(double value) {
-    return (Value){.type = VAL_FLOAT, .as = {.decimal = value}};
+    return (Value) {.type = VAL_FLOAT, .as = {.decimal = value}};
 }
 
 inline Value int_value(int value) {
-    return (Value){.type = VAL_INT, .as = {.integer = value}};
+    return (Value) {.type = VAL_INT, .as = {.integer = value}};
 }
 
 inline Value nil_value() {
-    return (Value){.type = VAL_NIL, .as = {}};
+    return (Value) {.type = VAL_NIL, .as = {}};
 }
 
 inline Value ref_value(Object *value) {
-    return (Value){.type = VAL_REF, .as = {.reference = value}};
+    return (Value) {.type = VAL_REF, .as = {.reference = value}};
 }
 
 bool value_equal(Value a, Value b) {
@@ -128,8 +128,8 @@ bool object_equal(Object *a, Object *b) {
     }
     switch (a->type) {
         case OBJ_STRING: {
-            String *a_str = (String *)a;
-            String *b_str = (String *)b;
+            String *a_str = (String *) a;
+            String *b_str = (String *) b;
             return a_str->length == b_str->length &&
                    memcmp(a_str->chars, b_str->chars, a_str->length) == 0;
         }
