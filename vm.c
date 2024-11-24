@@ -347,7 +347,8 @@ static InterpretResult run() {
                 if (table_get(&vm.globals, name, &value)) {
                     push_stack(value);
                 } else {
-                    runtime_error("Accessing an undefined variable");
+                    runtime_error("Accessing an undefined variable: %s", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
             }
@@ -357,7 +358,7 @@ static InterpretResult run() {
                     break;
                 } else {
                     table_delete(&vm.globals, name);
-                    runtime_error("Setting an undefined global variable: %s", name->chars);
+                    runtime_error("Setting an undefined variable: %s", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
             }
@@ -418,11 +419,43 @@ InterpretResult interpret(const char *src) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    vm.chunk = &chunk;
-    vm.ip = chunk.code;
-
-    InterpretResult result = run();
+    InterpretResult result = run_chunk(&chunk);
     free_chunk(&chunk);
     return result;
+}
+
+/**
+ * 目前还没写好。因为chunk内部是code指针
+ * @param src
+ * @param path
+ * @return
+ */
+InterpretResult produce(const char *src, const char *path) {
+    FILE *file = fopen(path, "wb");
+    if (file == NULL) {
+        printf("Error when opening the file: %s\n", path);
+        return INTERPRET_PRODUCE_ERROR;
+    }
+    Chunk chunk;
+    init_chunk(&chunk);
+    if (!compile(src, &chunk)) {
+        free_chunk(&chunk);
+        return INTERPRET_COMPILE_ERROR;
+    }
+    unsigned long result = fwrite(&chunk, sizeof(Chunk), 1, file);
+    fclose(file);
+    free_chunk(&chunk);
+    if (result == 1) {
+        return INTERPRET_OK;
+    } else {
+        printf("Error when writing to the file: %s\n", path);
+        return INTERPRET_PRODUCE_ERROR;
+    }
+}
+
+InterpretResult run_chunk(Chunk *chunk) {
+    vm.chunk = chunk;
+    vm.ip = chunk->code;
+    return run();
 }
 

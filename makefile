@@ -6,6 +6,9 @@ TARGET = main.out
 
 all: $(TARGET)
 
+$(TARGET): $(OBJ)
+	@$(CC) $(OBJ) -o $(TARGET) -l readline
+
 .PHONY: run
 run: $(TARGET)
 	@./$(TARGET)
@@ -17,9 +20,6 @@ file: $(TARGET)
 	@./$(TARGET) test.lox
 	@rm $(TARGET)
 	@rm *.o
-
-$(TARGET): $(OBJ)
-	@$(CC) $(OBJ) -o $(TARGET) -l readline
 
 %.o: %.c
 	@$(CC) $(CFLAGS) -c $< -o $@

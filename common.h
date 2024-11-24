@@ -7,6 +7,7 @@
 #include "assert.h"
 #include "stdio.h"
 
+#define STACK_MAX 256
 #define DEBUG_TRACE_EXECUTION
 #define DEBUG_SHOW_COMPILED_RESULT
 

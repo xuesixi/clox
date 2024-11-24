@@ -67,7 +67,13 @@ Parser parser;
 Chunk *compiling_chunk;
 Scope *current_scope;
 
+static inline bool lexeme_equal(Token *a, Token *b);
+
 static inline void begin_scope();
+
+static void declare_local();
+
+static int resolve_local(Scope *scope, Token *token);
 
 static inline void end_scope();
 
@@ -250,8 +256,13 @@ static void var_declaration() {
     // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
 }
 
+/**
+ * clox中，当一个语句（statement）执行完毕后，它必然会消耗掉期间产生的所有栈元素。
+ * 本地变量的申明是唯一的可以产生“超单一语句”的栈元素的语句。它会在block结束后被全部清除。
+ * 因为本地变量是唯一可以长时间存在的元素，一个本地变量在locals中的索引必然就是它在stack中的索引。
+ */
 static void declare_local() {
-    if (current_scope->count >= 256) {
+    if (current_scope->count >= STACK_MAX) {
         error_at_previous("too many local variables");
         return;
     }
