@@ -25,12 +25,12 @@ $(TARGET): $(OBJ)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 debug: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET)
+	@$(CC) -g $(OBJ) -o $(TARGET) -l readline
 	@lldb $(TARGET)
 	@trash-put *.dSYM
 
 clion_debug: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET)
+	@$(CC) -g $(OBJ) -o $(TARGET) -l readline
 
 .PHONY: clean
 clean:

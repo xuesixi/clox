@@ -326,6 +326,9 @@ static InterpretResult run() {
                 push_stack(bool_value(is_falsy(pop_stack())));
                 break;
             case OP_PRINT:
+#ifdef DEBUG_TRACE_EXECUTION
+                printf(">>> ");
+#endif
                 print_value(pop_stack());
                 NEW_LINE();
                 break;
@@ -358,6 +361,16 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
             }
+            case OP_GET_LOCAL: {
+                int index = read_byte();
+                push_stack(vm.stack[index]);
+                break;
+            }
+            case OP_SET_LOCAL: {
+                int index = read_byte();
+                vm.stack[index] = peek_stack(0);
+                break;
+            }
             default:
                 runtime_error("unrecognized instruction");
         }
@@ -380,18 +393,20 @@ void free_VM() {
     free_table(&vm.globals);
 }
 
-void push_stack(Value value) {
+inline void push_stack(Value value) {
     * vm.stack_top = value;
     vm.stack_top++;
 }
 
-Value pop_stack() {
+inline Value pop_stack() {
     vm.stack_top--;
     return *(vm.stack_top);
 }
 
 /**
- * 先调用 compile 将源代码编译成字节码，然后运行字节码
+ * 先调用 compile 将源代码编译成字节码，然后运行字节码.
+ * 在repl中，每一次输入都将执行该函数.
+ * Chunk会在该函数内部产生、消失
  * @return 执行结果（是否出错等）
  */
 InterpretResult interpret(const char *src) {

@@ -13,6 +13,7 @@
 #include "object.h"
 #include "scanner.h"
 #include "table.h"
+#include "string.h"
 #include "debug.h"
 #include "stdlib.h"
 
@@ -41,18 +42,38 @@ typedef enum {
 typedef void (*ParserFunction)(bool can_assign);
 
 /**
- * prefix: 当作为第一个 token 的时候的解析函数
- * infix: 当作为第二个 token 的时候的解析函数
+ * prefix: 当作为第一个 token 的时候的解析函数.
+ * infix: 当作为第二个 token 的时候的解析函数。在调用该函数时，该token处于prev的位置。
  * precedence：infix 的优先级
  */
-typedef struct {
+typedef struct ParseRule{
     ParserFunction prefix;
     ParserFunction infix;
     Precedence precedence;
 } ParseRule;
 
+typedef struct Local {
+    Token name;
+    int depth;
+} Local;
+
+typedef struct Scope {
+    Local locals[UINT8_MAX + 1];
+    int count;
+    int depth;
+} Scope;
+
 Parser parser;
 Chunk *compiling_chunk;
+Scope *current_scope;
+
+static inline void begin_scope();
+
+static inline void end_scope();
+
+static inline void block_statement();
+
+static void init_scope(Scope *scope);
 
 static void error_at(Token *token, const char *message);
 
@@ -100,7 +121,7 @@ static void statement();
 
 static void var_declaration();
 
-static int parse_variable();
+static int parse_var_declaration();
 
 static int identifier_constant(Token *name);
 
@@ -165,12 +186,15 @@ ParseRule rules[] = {
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
 
+static inline bool lexeme_equal(Token *a, Token *b) {
+    return a->length == b->length && memcmp(a->start, b->start, a->length) == 0;
+}
+
 static void string(bool can_assign) {
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
     Value value = ref_value((Object *) str);
     int index = make_constant(value);
     emit_constant(index);
-//    emit_two_bytes(OP_CONSTANT, index);
 }
 
 /**
@@ -207,32 +231,96 @@ static void declaration() {
 }
 
 static void var_declaration() {
-    // var num = 10;
-    int index = parse_variable();
+
+    int index = parse_var_declaration();
 
     if (match(TOKEN_EQUAL)) {
+
         expression();
     } else {
         emit_byte(OP_NIL);
     }
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the var statement");
-    emit_two_bytes(OP_DEFINE_GLOBAL, index);
+
+    if (current_scope->depth == 0) {
+        emit_two_bytes(OP_DEFINE_GLOBAL, index);
+    } else {
+        current_scope->locals[current_scope->count - 1].depth = current_scope->depth;
+    }
+    // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
+}
+
+static void declare_local() {
+    if (current_scope->count >= 256) {
+        error_at_previous("too many local variables");
+        return;
+    }
+
+    Token *token = &parser.previous;
+
+    // 检查同一层scope中是否存在同名的变量
+    for (int i = current_scope->count - 1; i >= 0; i--) {
+        Local *curr = current_scope->locals + i;
+        if (curr->depth < current_scope->depth) {
+            break;
+        } else if (lexeme_equal(&curr->name, token)) {
+            error_at_previous("You cannot re-declare a local variable");
+            return;
+        }
+    }
+
+    // 添加新的local变量
+    Local *local = current_scope->locals + current_scope->count;
+    local->name = parser.previous;
+//    local->depth = current_scope->depth;
+    local->depth = -1; // 在完成初始化之后，再设置为正确值。这是为了防止初始化中用到自己，比如`var num = num + 10;`
+    current_scope->count++;
 }
 
 /**
- * 解析一个标识符，将其添加为常数，返回其索引
- * @return 索引
+ * 给定一个token，判断它在local变量表中的位置。
+ * 该函数从后往前检查，因此后申明的变量会覆盖前申明的同名变量。
+ * 如果不存在，返回-1
+ * @param token 要检查的变量名
+ * @return 该变量在local变量表的位置（同时也是vm的栈中的索引）
  */
-static int parse_variable() {
+static int resolve_local(Scope *scope, Token *token) {
+    for (int i = scope->count - 1; i >= 0; i--) {
+        Local *curr = scope->locals + i;
+        if (lexeme_equal(token, &curr->name)) {
+            if (curr->depth == -1) {
+                error_at_previous("cannot use a variable in its own initialization");
+                return -1;
+            } else{
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
+/**
+ * 解析一个标识符，如果是全局变量，则将标识符添加为常量。如果是局部变量，申明之
+ * @return 如果是全局变量，返回索引。否则，返回-1
+ */
+static inline int parse_var_declaration() {
     consume(TOKEN_IDENTIFIER, "An identifier is expected here");
-    return identifier_constant(&parser.previous);
+
+    if (current_scope->depth > 0) {
+        // 如果是local
+        declare_local();
+        return -1;
+    } else {
+        // 否则是global
+        return identifier_constant(&parser.previous);
+    }
 }
 
 /**
  * 将标识符token添加入常数中，然后返回其索引
  * @return 常数中的索引
  */
-static int identifier_constant(Token *name) {
+static inline int identifier_constant(Token *name) {
     String *str = string_copy(name->start, name->length);
     return make_constant(ref_value((Object*)str));
 }
@@ -240,43 +328,89 @@ static int identifier_constant(Token *name) {
 static void statement() {
     if (match(TOKEN_PRINT)) {
         print_statement();
+    }else if(match(TOKEN_LEFT_BRACE)) {
+        begin_scope();
+        block_statement();
+        end_scope();
     } else {
         expression_statement();
     }
 }
 
-static void print_statement() {
+static inline void begin_scope() {
+    current_scope->depth ++;
+}
+
+/**
+ * 当离开scope的时候，把所有当前scope的local变量移除
+ */
+static inline void end_scope() {
+    current_scope->depth --;
+
+    while (current_scope->count > 0) {
+        // 当前顶层的那个local
+        Local *curr = current_scope->locals + current_scope->count - 1;
+
+        // 如果这个local的层级更深，那么我们需要将其移除
+        if (curr->depth > current_scope->depth) {
+            emit_byte(OP_POP);
+            current_scope->count--;
+        } else {
+            break;
+        }
+    }
+}
+
+static void block_statement() {
+    while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
+        declaration();
+    }
+    consume(TOKEN_RIGHT_BRACE, "A block should terminate with a }");
+}
+
+static inline void print_statement() {
     expression();
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminated the statement");
     emit_byte(OP_PRINT);
 }
 
-static void expression_statement() {
+static inline void expression_statement() {
     expression();
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminated the statement");
     emit_byte(OP_POP);
 }
 
-static void expression() {
+static inline void expression() {
     parse_precedence(PREC_ASSIGNMENT);
 }
 
 /**
  * 标识符的前缀解析函数
  */
-static void variable(bool can_assign) {
+static inline void variable(bool can_assign) {
     named_variable(&parser.previous, can_assign);
 }
 
+/**
+ * 解析global/local变量的get/set
+ * @param name
+ * @param can_assign
+ */
 static void named_variable(Token *name, bool can_assign) {
-    // a + b = 2 * 1
-    int index = identifier_constant(name);
+    int set_op = OP_SET_LOCAL;
+    int get_op = OP_GET_LOCAL;
+    int index = resolve_local(current_scope, name);
+    if (index == -1) {
+        index = identifier_constant(name);
+        set_op = OP_SET_GLOBAL;
+        get_op = OP_GET_GLOBAL;
+    }
     if (can_assign && match(TOKEN_EQUAL)) {
         // 如果是赋值语句，则先解析后面的值表达式。
         expression();
-        emit_two_bytes(OP_SET_GLOBAL, index);
+        emit_two_bytes(set_op, index);
     } else {
-        emit_two_bytes(OP_GET_GLOBAL, index);
+        emit_two_bytes(get_op, index);
     }
 }
 
@@ -350,17 +484,15 @@ static void unary(bool can_assign) {
     }
 }
 
-static void float_num(bool can_assign) {
+static inline void float_num(bool can_assign) {
     double value = strtod(parser.previous.start, NULL);
     int index = make_constant(float_value(value));
     emit_constant(index);
-//    emit_two_bytes(OP_CONSTANT, index);
 }
 
-static void int_num(bool can_assign) {
+static inline void int_num(bool can_assign) {
     int value = (int) strtol(parser.previous.start, NULL, 10);
     int index = make_constant(int_value(value));
-//    emit_two_bytes(OP_CONSTANT, index);
     emit_constant(index);
 }
 
@@ -381,7 +513,7 @@ static void literal(bool can_assign) {
     }
 }
 
-static void grouping(bool can_assign) {
+static inline void grouping(bool can_assign) {
     expression();
     consume(TOKEN_RIGHT_PAREN, "missing expected )");
 }
@@ -415,7 +547,7 @@ static int make_constant(Value value) {
 
 static void end_compiler() {
     emit_byte(OP_RETURN);
-#ifdef DEBUG_PRINT_CODE
+#ifdef DEBUG_SHOW_COMPILED_RESULT
     if (!parser.has_error) {
         disassemble_chunk(current_chunk(), "disassembling the compiling result");
     }
@@ -459,7 +591,7 @@ static inline void emit_byte(uint8_t byte) {
  * @param type
  * @return 是否匹配
  */
-static bool match(TokenType type) {
+static inline bool match(TokenType type) {
     if (check(type)) {
         advance();
         return true;
@@ -478,7 +610,7 @@ static inline bool check(TokenType type) {
  * @param type 指定类型
  * @param message 错误消息
  */
-static void consume(TokenType type, const char *message) {
+static inline void consume(TokenType type, const char *message) {
     if (parser.current.type != type) {
         error_at_current(message);
     } else {
@@ -550,7 +682,7 @@ static void error_at(Token *token, const char *message) {
     } else if (token->type == TOKEN_ERROR) {
 
     } else {
-        fprintf(stderr, " at %.*s", token->length, token->start);
+        fprintf(stderr, " at [ %.*s ]", token->length, token->start);
     }
     fprintf(stderr, ": %s\n", message);
     parser.has_error = true;
@@ -576,6 +708,12 @@ void show_tokens(const char *src) {
     }
 }
 
+static void init_scope(Scope *scope) {
+    scope->depth = 0;
+    scope->count = 0;
+    current_scope = scope;
+}
+
 /**
  * 将目标源代码编译成字节码，写入到目标 chunk 中
  * */
@@ -584,6 +722,8 @@ bool compile(const char *src, Chunk *chunk) {
     init_scanner(src);
     init_table(&parser.lexeme_table);
     compiling_chunk = chunk;
+    Scope scope;
+    init_scope(&scope);
 
     advance(); // 初始移动，如此一来，prev为null，curr为第一个token
 
@@ -592,7 +732,6 @@ bool compile(const char *src, Chunk *chunk) {
     }
 
     end_compiler();
-//    printf("chunk has %d bytes code\n", chunk->count);
     bool has_error = parser.has_error;
     parser.panic_mode = false;
     parser.has_error = false;
