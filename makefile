@@ -15,6 +15,9 @@ run: $(TARGET)
 	@rm $(TARGET)
 	@rm *.o
 
+
+f: file
+
 .PHONY: file
 file: $(TARGET)
 	@./$(TARGET) test.lox

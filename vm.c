@@ -395,6 +395,13 @@ static InterpretResult run() {
                 }
                 break;
             }
+            case OP_JUMP_IF_TRUE: {
+                uint16_t offset = read_uint16();
+                if (!is_falsy(peek_stack(0))) {
+                    vm.ip += offset;
+                }
+                break;
+            }
             case OP_JUMP: {
                 uint16_t offset = read_uint16();
                 vm.ip += offset;

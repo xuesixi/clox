@@ -1,13 +1,5 @@
 var num = 10;
-const name = "andalusia";
 
-// hhoh
-if (num == 1) {
-    print "one";
-} else if (num == 2) {
-    print "two";
-} else {
-    print "other";
+if (num == 9 or num % 2 == 0 ) {
+    print "9 or even!";
 }
-
-print name + " is " + num;

@@ -124,6 +124,10 @@ static void binary(bool can_assign);
 
 static void string(bool can_assign);
 
+static void and(bool can_assign);
+
+static void or(bool can_assign);
+
 static void declaration();
 
 static void statement();
@@ -183,7 +187,7 @@ ParseRule rules[] = {
         [TOKEN_STRING]        = {string, NULL, PREC_NONE},
         [TOKEN_FLOAT]         = {float_num, NULL, PREC_NONE},
         [TOKEN_INT]           = {int_num, NULL, PREC_NONE},
-        [TOKEN_AND]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_AND]           = {NULL, and, PREC_AND},
         [TOKEN_CLASS]         = {NULL, NULL, PREC_NONE},
         [TOKEN_ELSE]          = {NULL, NULL, PREC_NONE},
         [TOKEN_FALSE]         = {literal, NULL, PREC_NONE},
@@ -191,7 +195,7 @@ ParseRule rules[] = {
         [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
         [TOKEN_IF]            = {NULL, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
-        [TOKEN_OR]            = {NULL, NULL, PREC_NONE},
+        [TOKEN_OR]            = {NULL, or, PREC_OR},
         [TOKEN_PRINT]         = {NULL, NULL, PREC_NONE},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
         [TOKEN_SUPER]         = {NULL, NULL, PREC_NONE},
@@ -530,6 +534,26 @@ static void named_variable(Token *name, bool can_assign) {
     } else {
         emit_two_bytes(get_op, index);
     }
+}
+
+static void and(bool can_assign) {
+    // 1 and 2 and 3
+    int to_end = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
+
+    // 这里（包括下面的or）不用+1也可以。
+    // 如果+1，那么这个解析是不贪婪的，但本函数的调用者parse_precedence仍然会通过while循环解析后面的and。
+    // 如果没有+1，那么这个解析本身是贪婪的。
+    // 两者的结果是一样的。
+    parse_precedence(PREC_AND + 1);
+    patch_jump(to_end);
+}
+
+static void or(bool can_assign) {
+    int to_end = emit_jump(OP_JUMP_IF_TRUE);
+    emit_byte(OP_POP);
+    parse_precedence(PREC_OR + 1);
+    patch_jump(to_end);
 }
 
 /**
