@@ -1,9 +1,13 @@
-const pi = 3.14;
-{
-    var pi = 3;
-    pi = "anda";
-    {
-        var num = 10 + 2;
-        print num;
-    }
+var num = 10;
+const name = "andalusia";
+
+// hhoh
+if (num == 1) {
+    print "one";
+} else if (num == 2) {
+    print "two";
+} else {
+    print "other";
 }
+
+print name + " is " + num;

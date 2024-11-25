@@ -154,7 +154,8 @@ void table_add_all(Table *from, Table *to) {
 String *table_find_string(Table *table, const char *name, int length, uint32_t hash) {
     int index = hash % table->capacity;
     for (int i = 0; i < table->capacity; ++i) {
-        Entry *entry = table->backing + i + index;
+        int curr = (i + index) % table->capacity;
+        Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             return NULL;
         }

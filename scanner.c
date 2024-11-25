@@ -160,7 +160,7 @@ static void skip_whitespace() {
                     while (peek() != '\n' && !is_end()) {
                         advance();
                     }
-                    return;
+                    continue;
                 } else {
                     return;
                 }

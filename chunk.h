@@ -10,8 +10,8 @@
 
 typedef enum OpCode{
     OP_RETURN,
-    OP_CONSTANT, // OP, index：向栈中添加常数const[index]
-    OP_CONSTANT2, // OP, i0, i1: 将i0和i1组合成index，将const[index]置于栈顶。
+    OP_CONSTANT, // OP, index：将const[index]置于栈顶
+    OP_CONSTANT2, // OP, index16: 将const[index16]置于栈顶。
     OP_NEGATE,
     OP_ADD,
     OP_SUBTRACT,
@@ -33,6 +33,8 @@ typedef enum OpCode{
     OP_SET_GLOBAL, // OP, index: 为一个全局变量赋值为栈顶的值。变量名为const[index]。不消耗栈顶的值。
     OP_GET_LOCAL, // OP, index: 将stack[index]的值置入栈顶
     OP_SET_LOCAL, // op, index: 将栈顶的值赋值给stack[index]。不消耗栈顶的值。
+    OP_JUMP_IF_FALSE, // op, offset16: 如果栈顶的值是false，那么ip += offset16。不消耗栈顶的值
+    OP_JUMP, // op, offset16: 无条件跳转：ip += offset16
 } OpCode;
 
 typedef struct Chunk{
@@ -48,5 +50,6 @@ void write_chunk(Chunk *c, uint8_t data, int line);
 void free_chunk(Chunk *c);
 int constant_mapping(Value value);
 int add_constant(Chunk *c, Value constant);
+uint16_t u8_to_u16(uint8_t i0, uint8_t i1);
 
 #endif  // CLOX_CHUNK_H

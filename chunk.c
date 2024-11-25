@@ -6,7 +6,32 @@
 
 #include "memory.h"
 
-static void init_constant(Chunk *chunk);
+static void init_constant(Chunk *chunk) {
+    add_constant(chunk, int_value(0));
+    add_constant(chunk, int_value(1));
+    add_constant(chunk, int_value(2));
+    add_constant(chunk, int_value(3));
+    add_constant(chunk, int_value(4));
+    add_constant(chunk, int_value(5));
+    add_constant(chunk, int_value(6));
+    add_constant(chunk, int_value(7));
+    add_constant(chunk, int_value(8));
+    add_constant(chunk, float_value(1.0));
+    add_constant(chunk, float_value(2.0));
+    add_constant(chunk, float_value(0.5));
+    add_constant(chunk, float_value(0.0));
+}
+
+/**
+ *
+ * @param i0 [7,0]
+ * @param i1 [15,8]
+ * @return
+ */
+inline uint16_t u8_to_u16(uint8_t i0, uint8_t i1) {
+    uint16_t value = (((uint16_t)i1) << 8) + i0;
+    return value;
+}
 
 void init_chunk(Chunk *c) {
     c->capacity = 0;
@@ -66,22 +91,6 @@ int constant_mapping(Value value) {
         }
     }
     return -1;
-}
-
-static void init_constant(Chunk *chunk) {
-    add_constant(chunk, int_value(0));
-    add_constant(chunk, int_value(1));
-    add_constant(chunk, int_value(2));
-    add_constant(chunk, int_value(3));
-    add_constant(chunk, int_value(4));
-    add_constant(chunk, int_value(5));
-    add_constant(chunk, int_value(6));
-    add_constant(chunk, int_value(7));
-    add_constant(chunk, int_value(8));
-    add_constant(chunk, float_value(1.0));
-    add_constant(chunk, float_value(2.0));
-    add_constant(chunk, float_value(0.5));
-    add_constant(chunk, float_value(0.0));
 }
 
 /**

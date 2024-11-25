@@ -98,6 +98,8 @@ static void emit_byte(uint8_t byte);
 
 static void emit_two_bytes(uint8_t byte1, uint8_t byte2);
 
+static void emit_uint16(uint16_t value);
+
 static void emit_constant(int index);
 
 static void end_compiler();
@@ -125,6 +127,12 @@ static void string(bool can_assign);
 static void declaration();
 
 static void statement();
+
+static void if_statement();
+
+static void patch_jump(int from);
+
+static int emit_jump(uint8_t jump_op);
 
 static void var_declaration();
 
@@ -366,9 +374,80 @@ static void statement() {
         begin_scope();
         block_statement();
         end_scope();
+    } else if (match(TOKEN_IF)) {
+        if_statement();
     } else {
         expression_statement();
     }
+}
+
+/**
+ * 生成一个jump指令。后面两个操作数是占位符。
+ * @param jump_op jump的类型
+ * @return 最后一个操作数的索引 + 1
+ */
+static int emit_jump(uint8_t jump_op) {
+    emit_byte(jump_op); // 0
+    emit_byte(0xff);// 1
+    emit_byte(0xff); // 2
+    return current_chunk()->count; // 3
+}
+
+/**
+ * 修改from处的jump指令的offset，使其指向本处。
+ * 跳转后的下一个指令是该函数后面的那一个指令。把该函数当成跳转的标签即可。
+ * 那个jump指令的op的索引是from-3
+ * @param from
+ */
+static void patch_jump(int from) {
+    uint16_t diff = current_chunk()->count - from;
+    uint8_t i0 = diff & 0xff;
+    uint8_t i1 = (diff >> 8) & 0xff;
+    current_chunk()->code[from - 2] = i0;
+    current_chunk()->code[from - 1] = i1;
+}
+
+/**
+ * condition
+ *
+ * jump to [else] if false
+ * pop condition
+ *
+ * then:
+ *     ...
+ *     jump to [after]
+ *
+ * else:
+ *     pop condition
+ *     ...
+ *
+ * after:
+ */
+static void if_statement() {
+    consume(TOKEN_LEFT_PAREN, "A ( is expected after if");
+    expression(); // condition
+    consume(TOKEN_RIGHT_PAREN, "A ) is expected after if");
+
+    // jump to else if false
+    int to_else = emit_jump(OP_JUMP_IF_FALSE);
+
+    // pop
+    emit_byte(OP_POP);
+    statement();
+    // jump to after
+    int to_after = emit_jump(OP_JUMP);
+
+    //: else
+    // pop
+    patch_jump(to_else);
+    emit_byte(OP_POP);
+
+    if (match(TOKEN_ELSE)) {
+        statement();
+    }
+
+    // after
+    patch_jump(to_after);
 }
 
 static inline void begin_scope() {
@@ -599,6 +678,17 @@ static inline void emit_two_bytes(uint8_t byte1, uint8_t byte2) {
 }
 
 /**
+ * 给定一个uint16的值，emit两个对应的uint8：i0，i1。
+ * [7, 0]为i0，[15, 8]为i1
+ * @param value
+ */
+static void emit_uint16(uint16_t value) {
+    uint8_t i0 = value & 0xff;
+    uint8_t i1 = (value >> 8) & 0xff;
+    emit_two_bytes(i0, i1);
+}
+
+/**
  * 根据给定的index产生OP_CONSTANT或者OP_CONSTANT2指令
  * @param index
  */
@@ -606,12 +696,8 @@ static void emit_constant(int index) {
     if (index < UINT8_MAX) {
         emit_two_bytes(OP_CONSTANT, index);
     } else if (index < UINT16_MAX) {
-        uint16_t u16_index = index;
-        uint8_t *addr = (uint8_t*)&u16_index;
-        uint8_t i0 = addr[0];
-        uint8_t i1 = addr[1];
         emit_byte(OP_CONSTANT2);
-        emit_two_bytes(i0, i1);
+        emit_uint16(index);
     } else {
         error_at_previous("Too many constants for a chunk");
     }

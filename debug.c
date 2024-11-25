@@ -25,13 +25,13 @@ static int simple_instruction(const char *name, int offset) {
 
 static int byte_instruction(const char *name, const Chunk *chunk, int offset) {
     uint8_t index = chunk->code[offset + 1];
-    printf("%-16s %4d\n", name, index);
+    printf("%-23s %4d\n", name, index);
     return offset + 2;
 }
 
 static int constant_instruction(const char *name, const Chunk *chunk, int offset) {
     uint8_t index = chunk->code[offset + 1];
-    printf("%-16s %4d -> ", name, index);
+    printf("%-23s %4d : ", name, index);
     Value value = chunk->constants.values[index];
     // print_value_with_type(value);
     print_value(value);
@@ -40,12 +40,21 @@ static int constant_instruction(const char *name, const Chunk *chunk, int offset
 }
 
 static int constant2_instruction(const char *name, const Chunk *chunk, int offset) {
-    uint8_t indices[2] = {chunk->code[offset + 1], chunk->code[offset + 2] };
-    int index = *(uint16_t*)indices;
-    printf("%-16s %4d -> ", name, index);
+    uint8_t i0 = chunk->code[offset + 1];
+    uint8_t i1 = chunk->code[offset + 2];
+    int index = u8_to_u16(i0, i1);
+    printf("%-23s %4d : ", name, index);
     Value value = chunk->constants.values[index];
     print_value(value);
     printf("\n");
+    return offset + 3;
+}
+
+static int jump_instruction(const char *name, const Chunk *chunk, int offset) {
+    uint8_t i0 = chunk->code[offset + 1];
+    uint8_t i1 = chunk->code[offset + 2];
+    int index = u8_to_u16(i0, i1);
+    printf("%-23s   -> %04d\n", name, offset + 3 + index);
     return offset + 3;
 }
 
@@ -100,6 +109,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("OP_POP", offset);
         case OP_DEFINE_GLOBAL:
             return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
+        case OP_DEFINE_GLOBAL_CONST:
+            return constant_instruction("OP_DEFINE_GLOBAL_CONST", chunk, offset);
         case OP_GET_GLOBAL:
             return constant_instruction("OP_GET_GLOBAL", chunk, offset);
         case OP_SET_GLOBAL:
@@ -108,6 +119,10 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return byte_instruction("OP_GET_LOCAL", chunk, offset);
         case OP_SET_LOCAL:
             return byte_instruction("OP_SET_LOCAL", chunk, offset);
+        case OP_JUMP:
+            return jump_instruction("OP_JUMP", chunk, offset);
+        case OP_JUMP_IF_FALSE:
+            return jump_instruction("OP_JUMP_IF_FALSE", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

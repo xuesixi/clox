@@ -4,7 +4,7 @@ SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 TARGET = main.out
 
-all: $(TARGET)
+all: run
 
 $(TARGET): $(OBJ)
 	@$(CC) $(OBJ) -o $(TARGET) -l readline
