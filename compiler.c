@@ -14,15 +14,18 @@
 #include "scanner.h"
 #include "table.h"
 #include "string.h"
-#include "debug.h"
 #include "stdlib.h"
+#include "debug.h"
 
 typedef struct Parser{
     Token previous;
     Token current;
     Table lexeme_table;
+    int break_point;
     int continue_point;
     int continue_point_depth;
+    int old_continue_point;
+    int old_continue_point_depth;
     bool has_error;
     bool panic_mode;
 } Parser;
@@ -69,6 +72,7 @@ typedef struct Scope {
 Parser parser;
 Chunk *compiling_chunk;
 Scope *current_scope;
+
 
 static inline bool lexeme_equal(Token *a, Token *b);
 
@@ -227,6 +231,19 @@ ParseRule rules[] = {
 static inline bool lexeme_equal(Token *a, Token *b) {
     return a->length == b->length && memcmp(a->start, b->start, a->length) == 0;
 }
+
+static inline void save_continue_point() {
+    parser.old_continue_point = parser.continue_point;
+    parser.old_continue_point_depth = parser.continue_point_depth;
+    parser.continue_point = current_chunk()->count;
+    parser.continue_point_depth = current_scope->depth;
+}
+
+static inline void restore_continue_point() {
+    parser.continue_point = parser.old_continue_point;
+    parser.continue_point_depth = parser.old_continue_point_depth;
+}
+
 
 static void string(bool can_assign) {
     (void )can_assign;
@@ -499,39 +516,80 @@ static void loop_back(int start) {
     emit_two_bytes(i0, i1);
 }
 
+/**
+ * 
+ * continue point:
+ * condition:
+ *     expression
+ *     if false, jump -> end
+ * 
+ * body:
+ *     pop condition
+ *     statement
+ *     jump -> condition
+ * 
+ * end:
+ *     pop condition
+ * */
 static void while_statement() {
     consume(TOKEN_LEFT_PAREN, "A ( is expected after while");
-    int start = current_chunk()->count;
 
-    int old_continue_point = parser.continue_point;
-    int old_continue_point_depth = parser.continue_point_depth;
-    parser.continue_point = start;
+    save_continue_point();
+    int condition = current_chunk()->count;
 
-    expression(); // condition
+    // condition:
+    expression(); 
     consume(TOKEN_RIGHT_PAREN, "A ) is expected after while");
     int to_end = emit_jump(OP_JUMP_IF_FALSE);
 
+    // body: 
     emit_byte(OP_POP);
     statement();
 
-    loop_back(start);
+    loop_back(condition);
+
+    // end: 
     patch_jump(to_end);
     emit_byte(OP_POP);
-    parser.continue_point = old_continue_point;
-    parser.continue_point_depth = old_continue_point_depth;
+
+    restore_continue_point();
 }
 
+/**
+ * jump -> start
+ * 
+ * temp:
+ *     jump -> end
+ * 
+ * start:
+ *     expression_0
+ * 
+ * case 1:
+ *     expression_1
+ *     if not equal, jump -> case 2
+ *     pop expression_1
+ *     pop expression_0
+ *     statement...
+ *     jump -> temp
+ * 
+ * case 2:
+ *     pop expression_1
+ *     expression_2
+ *     if not equal, jump -> default
+ *     pop expression_2
+ *     pop expression_0
+ *     statement...
+ *     jump -> temp
+ * 
+ * default:
+ *     pop expression_2
+ *     pop exression_1
+ *     statement....
+ * 
+ * end:
+ * 
+ * */
 static void switch_statement() {
-    /* switch (num) {
-        case 3:
-            ...
-        case 4:
-            ...
-        case 5:
-            ...
-        default:
-            ...
-    } */
     consume(TOKEN_LEFT_PAREN, "A ( is expected after switch");
 
     int start = emit_jump(OP_JUMP);
@@ -545,10 +603,10 @@ static void switch_statement() {
 
     consume(TOKEN_RIGHT_PAREN, "A ) is expected after switch");
     consume(TOKEN_LEFT_BRACE, "A { is expected after switch");
-    int prev = -1;
+    int bridge = -1;
     while (!check(TOKEN_EOF) && match(TOKEN_CASE)) {
-        if (prev != -1) {
-            patch_jump(prev);
+        if (bridge != -1) {
+            patch_jump(bridge);
             emit_byte(OP_POP);
         }
         if (match(TOKEN_NIL) || match(TOKEN_FALSE) || match(TOKEN_TRUE)) {
@@ -564,45 +622,62 @@ static void switch_statement() {
             return;
         }
         consume(TOKEN_COLON, "A : is needed after each case");
-        prev = emit_jump(OP_JUMP_IF_NOT_EQUAL);
+        bridge = emit_jump(OP_JUMP_IF_NOT_EQUAL);
         emit_byte(OP_POP);
         emit_byte(OP_POP);
 
-        while (!check(TOKEN_EOF) && !check(TOKEN_CASE) && !check(TOKEN_DEFAULT)) {
+        while (!check(TOKEN_EOF) && !check(TOKEN_CASE) && !check(TOKEN_DEFAULT) && !check(TOKEN_RIGHT_BRACE)) {
             statement();
         }
         loop_back(temp);
     }
 
+    patch_jump(bridge);
+    emit_byte(OP_POP);
+
+    // if the switch statement has no any cases, we only have one expression to pop
+    // otherwise, we need to pop two
+    if (bridge != -1) {
+        emit_byte(OP_POP);
+    }
+
     if (match(TOKEN_DEFAULT)) {
         consume(TOKEN_COLON, "A : is needed after each case");
-        patch_jump(prev);
-        emit_byte(OP_POP);
-        emit_byte(OP_POP);
         while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
             statement();
         }
-    } else {
-        patch_jump(prev);
     }
 
     patch_jump(to_end);
     consume(TOKEN_RIGHT_BRACE, "A } is expected after switch");
 }
 
+/*
+ * for (initialize condition increment) statement
+ * 
+ * initialize
+ * 
+ * condition: 
+ *     expression
+ *     if false, jump -> end
+ *     jump -> body
+ * 
+ * continue_point:
+ *
+ * increment:
+ *     exression
+ *     pop increment expression
+ *     jump -> condition
+ * 
+ * body:
+ *     pop condition
+ *     statement
+ *     jump -> increment
+ * 
+ * end:
+ *     pop condition
+ */
 static void for_statement() {
-    // for (var i = 0; i < 10; i = i + 1) {}
-    /**
-     * for (initialize condition increment) statement
-     *
-     * {
-     *      initialize
-     *      while (condition) {
-     *          statement
-     *          increment
-     *      }
-     * }
-     */
 
     consume(TOKEN_LEFT_PAREN, "A ( is expected after for");
     begin_scope();
@@ -620,7 +695,7 @@ static void for_statement() {
 
     // condition
     if (!match(TOKEN_SEMICOLON)) {
-        expression(); // not expression_statement() because we want to key the condition code
+        expression(); // not expression_statement() because we want to keep the condition code
         consume(TOKEN_SEMICOLON, "the for initializer needs a ;");
     } else {
         emit_byte(OP_TRUE);
@@ -631,25 +706,31 @@ static void for_statement() {
 
     int increment = current_chunk()->count;
 
+    save_continue_point();
+
+    // increment
     if (!match(TOKEN_RIGHT_PAREN)) {
-        expression(); // increment
+        expression(); 
         emit_byte(OP_POP);
         consume(TOKEN_RIGHT_PAREN, "A ) is expected after for");
     }
 
     loop_back(condition);
 
+    // body
     patch_jump(to_body);
     emit_byte(OP_POP);
-
     statement();
-
     loop_back(increment);
 
+    // end
     patch_jump(to_end);
     emit_byte(OP_POP);
 
+    restore_continue_point();
+
     end_scope();
+
 }
 
 static inline void begin_scope() {
@@ -657,7 +738,7 @@ static inline void begin_scope() {
 }
 
 /**
- * 清除所有比to层级更深的local变量
+ * 清除所有比to层级更深的local变量。对于每一个被清除的local变量，产生一个POP指令
  * */
 static void clear_scope(int to) {
     while (current_scope->count > 0) {
@@ -674,7 +755,10 @@ static void clear_scope(int to) {
     }
 }
 
-static void emit_clear_but_keep_local(int to) {
+/**
+ * 对于每一个比to层级更深的变量，产生一个POP指令。但该函数不会修改count
+ * */
+static void emit_pops_to_clear(int to) {
     Local *curr = current_scope->locals + current_scope->count - 1;
     while (curr >= current_scope->locals) {
         // 如果这个local的层级更深，那么我们需要将其移除
@@ -693,8 +777,7 @@ static void parse_continue(bool can_assign) {
         error_at_previous("cannot use continue outside of a loop");
         return;
     }
-    // current_scope->depth = parser.continue_point_depth;
-    emit_clear_but_keep_local(parser.continue_point_depth);
+    emit_pops_to_clear(parser.continue_point_depth);
     emit_goto(parser.continue_point);
 }
 
@@ -706,18 +789,6 @@ static void end_scope() {
     current_scope->depth --;
 
     clear_scope(current_scope->depth);
-    // while (current_scope->count > 0) {
-    //     // 当前顶层的那个local
-    //     Local *curr = current_scope->locals + current_scope->count - 1;
-
-    //     // 如果这个local的层级更深，那么我们需要将其移除
-    //     if (curr->depth > current_scope->depth) {
-    //         emit_byte(OP_POP);
-    //         current_scope->count--;
-    //     } else {
-    //         break;
-    //     }
-    // }
 }
 
 static void block_statement() {
@@ -1181,6 +1252,7 @@ bool compile(const char *src, Chunk *chunk) {
     init_scanner(src);
     init_table(&parser.lexeme_table);
     parser.continue_point = -1;
+    parser.break_point = -1;
     compiling_chunk = chunk;
     Scope scope;
     init_scope(&scope);
