@@ -13,6 +13,7 @@
  * @param byte_size 新的空间大小，以字节为单位
  * */
 void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
+    (void )old_size;
     if (new_byte_size == 0) {
         free(ptr);
         return NULL;

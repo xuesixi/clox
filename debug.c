@@ -58,6 +58,14 @@ static int jump_instruction(const char *name, const Chunk *chunk, int offset) {
     return offset + 3;
 }
 
+static int jump_back_instruction(const char *name, const Chunk *chunk, int offset) {
+    uint8_t i0 = chunk->code[offset + 1];
+    uint8_t i1 = chunk->code[offset + 2];
+    int index = u8_to_u16(i0, i1);
+    printf("%-23s   -> %04d\n", name, offset + 3 - index);
+    return offset + 3;
+}
+
 /**
  * 给定一个 offset，将对应的 instruction 的信息打印
  * @return 下一个 instruction 的 offset
@@ -125,6 +133,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return jump_instruction("OP_JUMP_IF_FALSE", chunk, offset);
         case OP_JUMP_IF_TRUE:
             return jump_instruction("OP_JUMP_IF_TRUE", chunk, offset);
+        case op_JUMP_BACK:
+            return jump_back_instruction("OP_JUMP_BACK", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

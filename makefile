@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -Wformat -g
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
-TARGET = main.out
+TARGET = clox
 
 all: run
 

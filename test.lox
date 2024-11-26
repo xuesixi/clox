@@ -1,5 +1,6 @@
-var num = 10;
+var num = 3;
 
-if (num == 9 or num % 2 == 0 ) {
-    print "9 or even!";
+while (num > 0) {
+    print num;
+    num = num - 1;
 }

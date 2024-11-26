@@ -33,6 +33,15 @@ inline uint16_t u8_to_u16(uint8_t i0, uint8_t i1) {
     return value;
 }
 
+/**
+ * @param i0 [7,0]
+ * @param i1 [15,8]
+ */
+inline void u16_to_u8(uint16_t value, uint8_t *i0, uint8_t *i1) {
+    *i0 = value & 0xff;
+    *i1 = (value >> 8) & 0xff;
+}
+
 void init_chunk(Chunk *c) {
     c->capacity = 0;
     c->count = 0;

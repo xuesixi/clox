@@ -134,6 +134,10 @@ static void statement();
 
 static void if_statement();
 
+static void emit_loop(int start);
+
+static void while_statement();
+
 static void patch_jump(int from);
 
 static int emit_jump(uint8_t jump_op);
@@ -212,6 +216,7 @@ static inline bool lexeme_equal(Token *a, Token *b) {
 }
 
 static void string(bool can_assign) {
+    (void )can_assign;
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
     Value value = ref_value((Object *) str);
     int index = make_constant(value);
@@ -380,6 +385,8 @@ static void statement() {
         end_scope();
     } else if (match(TOKEN_IF)) {
         if_statement();
+    } else if (match(TOKEN_WHILE)) {
+        while_statement();
     } else {
         expression_statement();
     }
@@ -405,8 +412,8 @@ static int emit_jump(uint8_t jump_op) {
  */
 static void patch_jump(int from) {
     uint16_t diff = current_chunk()->count - from;
-    uint8_t i0 = diff & 0xff;
-    uint8_t i1 = (diff >> 8) & 0xff;
+    uint8_t i0, i1;
+    u16_to_u8(diff, &i0, &i1);
     current_chunk()->code[from - 2] = i0;
     current_chunk()->code[from - 1] = i1;
 }
@@ -452,6 +459,29 @@ static void if_statement() {
 
     // after
     patch_jump(to_after);
+}
+
+static void emit_loop(int start) {
+    emit_byte(op_JUMP_BACK);
+    int diff = current_chunk()->count - start + 2;
+    uint8_t i0, i1;
+    u16_to_u8(diff, &i0, &i1);
+    emit_two_bytes(i0, i1);
+}
+
+static void while_statement() {
+    consume(TOKEN_LEFT_PAREN, "A ( is expected after while");
+    int start = current_chunk()->count;
+    expression(); // condition
+    consume(TOKEN_RIGHT_PAREN, "A ) is expected after while");
+    int to_end = emit_jump(OP_JUMP_IF_FALSE);
+
+    emit_byte(OP_POP);
+    statement();
+
+    emit_loop(start);
+    patch_jump(to_end);
+    emit_byte(OP_POP);
 }
 
 static inline void begin_scope() {
@@ -537,22 +567,26 @@ static void named_variable(Token *name, bool can_assign) {
 }
 
 static void and(bool can_assign) {
-    // 1 and 2 and 3
+    (void )can_assign;
     int to_end = emit_jump(OP_JUMP_IF_FALSE);
     emit_byte(OP_POP);
 
-    // 这里（包括下面的or）不用+1也可以。
-    // 如果+1，那么这个解析是不贪婪的，但本函数的调用者parse_precedence仍然会通过while循环解析后面的and。
-    // 如果没有+1，那么这个解析本身是贪婪的。
-    // 两者的结果是一样的。
-    parse_precedence(PREC_AND + 1);
+    parse_precedence(PREC_AND);
     patch_jump(to_end);
 }
 
 static void or(bool can_assign) {
+    (void )can_assign;
     int to_end = emit_jump(OP_JUMP_IF_TRUE);
     emit_byte(OP_POP);
-    parse_precedence(PREC_OR + 1);
+
+    // 这里（包括上面的and）parse_precedence的优先级+1也可以，但要慢得多。
+    // 如果+1，那么这个解析是不贪婪的，但本函数的调用者parse_precedence仍然会通过while循环解析后面的or
+    // 如此一来，如果是 `1 or 2 or 3`的表达式，就会变成`(1 or 2) or 3`.
+    // 该语句会被计算两次：第一次得到(1 or 2)为true，第二次得到`(1 or 2) or 3`为true。
+    // 如果没有+1，那么这个解析本身是贪婪的，`1 or 2 or 3`会变成`1 or (2 or 3)`
+    // 这种情况下，一旦知道1是true，后面的`(2 or 3)`就不需要判断了
+    parse_precedence(PREC_OR );
     patch_jump(to_end);
 }
 
@@ -563,6 +597,7 @@ static void or(bool can_assign) {
  *
  */
 static void binary(bool can_assign) {
+    (void )can_assign;
     TokenType type = parser.previous.type;
     ParseRule *rule = &rules[type];
     parse_precedence(rule->precedence + 1); // parse the right operand
@@ -612,6 +647,7 @@ static void binary(bool can_assign) {
  * 一元操作符表达式
  */
 static void unary(bool can_assign) {
+    (void )can_assign;
     TokenType operator = parser.previous.type;
     parse_precedence(PREC_UNARY);
     switch (operator) {
@@ -627,18 +663,21 @@ static void unary(bool can_assign) {
 }
 
 static inline void float_num(bool can_assign) {
+    (void )can_assign;
     double value = strtod(parser.previous.start, NULL);
     int index = make_constant(float_value(value));
     emit_constant(index);
 }
 
 static inline void int_num(bool can_assign) {
+    (void )can_assign;
     int value = (int) strtol(parser.previous.start, NULL, 10);
     int index = make_constant(int_value(value));
     emit_constant(index);
 }
 
 static void literal(bool can_assign) {
+    (void )can_assign;
     switch (parser.previous.type) {
         case TOKEN_NIL:
             emit_byte(OP_NIL);
@@ -656,6 +695,7 @@ static void literal(bool can_assign) {
 }
 
 static inline void grouping(bool can_assign) {
+    (void )can_assign;
     expression();
     consume(TOKEN_RIGHT_PAREN, "missing expected )");
 }

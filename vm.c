@@ -407,6 +407,11 @@ static InterpretResult run() {
                 vm.ip += offset;
                 break;
             }
+            case op_JUMP_BACK: {
+                uint16_t offset = read_uint16();
+                vm.ip -= offset;
+                break;
+            }
             default:
                 runtime_error("unrecognized instruction");
         }

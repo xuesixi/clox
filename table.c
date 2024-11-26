@@ -69,6 +69,9 @@ static Entry *find_entry(Table *table, String *key) {
 }
 
 inline bool table_has(Table *table, String *key) {
+    if (table->count == 0) {
+        return false;
+    }
     return !empty_entry(find_entry(table, key));
 }
 
@@ -152,6 +155,9 @@ void table_add_all(Table *from, Table *to) {
 }
 
 String *table_find_string(Table *table, const char *name, int length, uint32_t hash) {
+    if (table->count == 0) {
+        return NULL;
+    }
     int index = hash % table->capacity;
     for (int i = 0; i < table->capacity; ++i) {
         int curr = (i + index) % table->capacity;
