@@ -22,6 +22,7 @@ typedef struct Parser{
     Token current;
     Table lexeme_table;
     int break_point;
+    int old_break_point;
     int continue_point;
     int continue_point_depth;
     int old_continue_point;
@@ -134,6 +135,8 @@ static void string(bool can_assign);
 
 static void parse_continue(bool can_assign);
 
+static void parse_break(bool can_assign);
+
 static void and(bool can_assign);
 
 static void or(bool can_assign);
@@ -224,6 +227,7 @@ ParseRule rules[] = {
         [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
         [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
         [TOKEN_CONTINUE]      = {parse_continue, NULL, PREC_NONE},
+        [TOKEN_BREAK]         = {parse_break, NULL, PREC_NONE},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
@@ -242,6 +246,16 @@ static inline void save_continue_point() {
 static inline void restore_continue_point() {
     parser.continue_point = parser.old_continue_point;
     parser.continue_point_depth = parser.old_continue_point_depth;
+}
+
+static inline void save_break_point() {
+    parser.old_break_point = parser.break_point;
+    parser.break_point = current_chunk()->count;
+    // printf("the breka point is %d\n", parser.break_point);
+}
+
+static inline void restore_break_point() {
+    parser.break_point = parser.old_break_point;
 }
 
 
@@ -517,10 +531,12 @@ static void loop_back(int start) {
 }
 
 /**
+ * start:
  * 
  * continue point:
  * condition:
  *     expression
+ * break point:
  *     if false, jump -> end
  * 
  * body:
@@ -540,6 +556,7 @@ static void while_statement() {
     // condition:
     expression(); 
     consume(TOKEN_RIGHT_PAREN, "A ) is expected after while");
+    save_break_point();
     int to_end = emit_jump(OP_JUMP_IF_FALSE);
 
     // body: 
@@ -553,6 +570,7 @@ static void while_statement() {
     emit_byte(OP_POP);
 
     restore_continue_point();
+    restore_break_point();
 }
 
 /**
@@ -655,10 +673,12 @@ static void switch_statement() {
 /*
  * for (initialize condition increment) statement
  * 
+ * begin_scope
  * initialize
  * 
  * condition: 
  *     expression
+ * break point:
  *     if false, jump -> end
  *     jump -> body
  * 
@@ -676,6 +696,8 @@ static void switch_statement() {
  * 
  * end:
  *     pop condition
+ * 
+ * end_scope
  */
 static void for_statement() {
 
@@ -701,6 +723,7 @@ static void for_statement() {
         emit_byte(OP_TRUE);
     }
 
+    save_break_point();
     int to_end = emit_jump(OP_JUMP_IF_FALSE);
     int to_body = emit_jump(OP_JUMP);
 
@@ -728,6 +751,7 @@ static void for_statement() {
     emit_byte(OP_POP);
 
     restore_continue_point();
+    restore_break_point();
 
     end_scope();
 
@@ -769,6 +793,17 @@ static void emit_pops_to_clear(int to) {
             break;
         }
     }
+}
+
+static void parse_break(bool can_assign) {
+    (void) can_assign;
+    if (parser.break_point < 0) {
+        error_at_previous("cannot use break outside of a loop");
+        return;
+    }
+    emit_pops_to_clear(parser.continue_point_depth);
+    emit_byte(OP_FALSE);
+    emit_goto(parser.break_point);
 }
 
 static void parse_continue(bool can_assign) {
