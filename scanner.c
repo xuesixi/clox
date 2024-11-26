@@ -46,7 +46,24 @@ static Token error_token(const char *message);
 
 //-----------------------------------------------------------
 
+
+static bool is_keyword(int start, int length, const char *rest) {
+    if (scanner.current - scanner.start != start + length) {
+        return false;
+    }
+    if (memcmp(scanner.start + start, rest, length) == 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 static TokenType check_keyword(int start, int length, const char *rest, TokenType type){
+    if (is_keyword(start, length, rest)) {
+        return type;
+    } else {
+        return TOKEN_IDENTIFIER;
+    }
     if (scanner.current - scanner.start != start + length) {
         return TOKEN_IDENTIFIER;
     }
@@ -57,14 +74,24 @@ static TokenType check_keyword(int start, int length, const char *rest, TokenTyp
     }
 }
 
+
 static TokenType identifier_type() {
     switch (scanner.start[0]) {
         case 'a': return check_keyword(1, 2, "nd", TOKEN_AND);
+        case 'b': return check_keyword(1, 4, "reak", TOKEN_BREAK);
         case 'c':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
                     case 'l': return check_keyword(2, 3, "ass", TOKEN_CLASS);
-                    case 'o': return check_keyword(2, 3, "nst", TOKEN_CONST);
+                    case 'o': {
+                        if (is_keyword(2, 3, "nst")) {
+                            return TOKEN_CONST;
+                        } else if (is_keyword(2, 6, "ntinue")) {
+                            return TOKEN_CONTINUE;
+                        } else {
+                            return TOKEN_IDENTIFIER;
+                        }
+                    }
                     case 'a': return check_keyword(2, 2, "se", TOKEN_CASE);
                 }
             }

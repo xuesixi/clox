@@ -1,14 +1,17 @@
-var i = "buz";
 
-switch (i) {
-    case "moria":
-        print "moria";
-    case "buz":
-        print "buz";
-    case "huhu":
-        print "huhu";
-    default:
-        print "default!";
+var num = 0;
+while (num < 10) {
+    var age = 3;
+    {
+        var an = 20;
+        if (num == 5) {
+            num += 2;
+            print "doing continue with an: " + an;
+            continue;
+        }
+    }
+    print "num is " + num;
+    print "age is " + age;
+    num += 1;
 }
-print "end";
 

@@ -1,7 +1,7 @@
 #include "chunk.h"
-#include "vm.h"
-#include "stdlib.h"
 #include "readline/readline.h"
+#include "stdlib.h"
+#include "vm.h"
 
 bool REPL;
 
@@ -21,7 +21,6 @@ static void repl() {
 }
 
 static char *read_file(const char *path) {
-
     FILE *file = fopen(path, "r");
     assert(file != NULL);
 
@@ -65,17 +64,18 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
     }
 }
 
-//static void run_bytecode(const char *bytecode_path) {
-//    FILE *file = fopen(bytecode_path, "rb");
-//}
+// static void run_bytecode(const char *bytecode_path) {
+//     FILE *file = fopen(bytecode_path, "rb");
+// }
 
 int main(int argc, const char **argv) {
+
     init_VM();
     if (argc == 1) {
         repl();
     } else if (argc == 2) {
         run_file(argv[1]);
-    } else if(argc == 3) {
+    } else if (argc == 3) {
         produce_bytecode(argv[1], argv[2]);
     } else {
         fprintf(stderr, "no arg to start REPL, one arg to run a file!\n");
@@ -83,4 +83,3 @@ int main(int argc, const char **argv) {
 
     free_VM();
 }
-

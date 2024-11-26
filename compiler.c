@@ -20,9 +20,11 @@
 typedef struct Parser{
     Token previous;
     Token current;
+    Table lexeme_table;
+    int continue_point;
+    int continue_point_depth;
     bool has_error;
     bool panic_mode;
-    Table lexeme_table;
 } Parser;
 
 typedef enum {
@@ -78,6 +80,8 @@ static int resolve_local(Scope *scope, Token *token, bool *is_const);
 
 static inline void end_scope();
 
+static void clear_scope(int to);
+
 static inline void block_statement();
 
 static void init_scope(Scope *scope);
@@ -124,6 +128,8 @@ static void binary(bool can_assign);
 
 static void string(bool can_assign);
 
+static void parse_continue(bool can_assign);
+
 static void and(bool can_assign);
 
 static void or(bool can_assign);
@@ -145,6 +151,8 @@ static void switch_statement();
 static void patch_jump(int from);
 
 static int emit_jump(uint8_t jump_op);
+
+static void emit_goto(int dest);
 
 static void var_declaration();
 
@@ -211,6 +219,7 @@ ParseRule rules[] = {
         [TOKEN_TRUE]          = {literal, NULL, PREC_NONE},
         [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
         [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_CONTINUE]      = {parse_continue, NULL, PREC_NONE},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
@@ -412,6 +421,19 @@ static int emit_jump(uint8_t jump_op) {
     return current_chunk()->count; // 3
 }
 
+static void emit_goto(int dest) {
+    int current_position = current_chunk()->count + 3;
+    // printf("curr is %d, goto destination is %d\n", current_position, dest);
+    int diff = dest - current_position;
+    if (diff > 0 ) {
+        emit_byte(OP_JUMP);
+        emit_uint16(diff);
+    } else if (diff < 0 ){
+        emit_byte(OP_JUMP_BACK);
+        emit_uint16(-diff);
+    }
+}
+
 /**
  * 修改from处的jump指令的offset，使其指向本处。
  * 跳转后的下一个指令是该函数后面的那一个指令。把该函数当成跳转的标签即可。
@@ -480,6 +502,11 @@ static void loop_back(int start) {
 static void while_statement() {
     consume(TOKEN_LEFT_PAREN, "A ( is expected after while");
     int start = current_chunk()->count;
+
+    int old_continue_point = parser.continue_point;
+    int old_continue_point_depth = parser.continue_point_depth;
+    parser.continue_point = start;
+
     expression(); // condition
     consume(TOKEN_RIGHT_PAREN, "A ) is expected after while");
     int to_end = emit_jump(OP_JUMP_IF_FALSE);
@@ -490,6 +517,8 @@ static void while_statement() {
     loop_back(start);
     patch_jump(to_end);
     emit_byte(OP_POP);
+    parser.continue_point = old_continue_point;
+    parser.continue_point_depth = old_continue_point_depth;
 }
 
 static void switch_statement() {
@@ -628,23 +657,67 @@ static inline void begin_scope() {
 }
 
 /**
- * 当离开scope的时候，把所有当前scope的local变量移除
- */
-static inline void end_scope() {
-    current_scope->depth --;
-
+ * 清除所有比to层级更深的local变量
+ * */
+static void clear_scope(int to) {
     while (current_scope->count > 0) {
         // 当前顶层的那个local
         Local *curr = current_scope->locals + current_scope->count - 1;
 
         // 如果这个local的层级更深，那么我们需要将其移除
-        if (curr->depth > current_scope->depth) {
+        if (curr->depth > to) {
             emit_byte(OP_POP);
             current_scope->count--;
         } else {
             break;
         }
     }
+}
+
+static void emit_clear_but_keep_local(int to) {
+    Local *curr = current_scope->locals + current_scope->count - 1;
+    while (curr >= current_scope->locals) {
+        // 如果这个local的层级更深，那么我们需要将其移除
+        if (curr->depth > to) {
+            emit_byte(OP_POP);
+            curr --;
+        } else {
+            break;
+        }
+    }
+}
+
+static void parse_continue(bool can_assign) {
+    (void) can_assign;
+    if (parser.continue_point < 0) {
+        error_at_previous("cannot use continue outside of a loop");
+        return;
+    }
+    // current_scope->depth = parser.continue_point_depth;
+    emit_clear_but_keep_local(parser.continue_point_depth);
+    emit_goto(parser.continue_point);
+}
+
+
+/**
+ * 当离开scope的时候，把所有当前scope的local变量移除
+ */
+static void end_scope() {
+    current_scope->depth --;
+
+    clear_scope(current_scope->depth);
+    // while (current_scope->count > 0) {
+    //     // 当前顶层的那个local
+    //     Local *curr = current_scope->locals + current_scope->count - 1;
+
+    //     // 如果这个local的层级更深，那么我们需要将其移除
+    //     if (curr->depth > current_scope->depth) {
+    //         emit_byte(OP_POP);
+    //         current_scope->count--;
+    //     } else {
+    //         break;
+    //     }
+    // }
 }
 
 static void block_statement() {
@@ -941,9 +1014,11 @@ static inline void emit_two_bytes(uint8_t byte1, uint8_t byte2) {
  * [7, 0]为i0，[15, 8]为i1
  * @param value
  */
-static void emit_uint16(uint16_t value) {
-    uint8_t i0 = value & 0xff;
-    uint8_t i1 = (value >> 8) & 0xff;
+static inline void emit_uint16(uint16_t value) {
+    uint8_t i0, i1;
+    u16_to_u8(value, &i0, &i1);
+    // uint8_t i0 = value & 0xff;
+    // uint8_t i1 = (value >> 8) & 0xff;
     emit_two_bytes(i0, i1);
 }
 
@@ -1105,6 +1180,7 @@ bool compile(const char *src, Chunk *chunk) {
 
     init_scanner(src);
     init_table(&parser.lexeme_table);
+    parser.continue_point = -1;
     compiling_chunk = chunk;
     Scope scope;
     init_scope(&scope);
