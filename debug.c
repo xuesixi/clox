@@ -133,8 +133,10 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return jump_instruction("OP_JUMP_IF_FALSE", chunk, offset);
         case OP_JUMP_IF_TRUE:
             return jump_instruction("OP_JUMP_IF_TRUE", chunk, offset);
-        case op_JUMP_BACK:
+        case OP_JUMP_BACK:
             return jump_back_instruction("OP_JUMP_BACK", chunk, offset);
+        case OP_JUMP_IF_NOT_EQUAL:
+            return jump_instruction("OP_JUMP_IF_NOT_EQUAL", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

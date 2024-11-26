@@ -1,4 +1,14 @@
-var i = 10;
-print i += 3;
-print i;
+var i = "buz";
+
+switch (i) {
+    case "moria":
+        print "moria";
+    case "buz":
+        print "buz";
+    case "huhu":
+        print "huhu";
+    default:
+        print "default!";
+}
+print "end";
 

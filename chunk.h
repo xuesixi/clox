@@ -35,8 +35,9 @@ typedef enum OpCode{
     OP_SET_LOCAL, // op, index: 将栈顶的值赋值给stack[index]。不消耗栈顶的值。
     OP_JUMP_IF_FALSE, // op, offset16: 如果栈顶的值是false，那么ip += offset16。不消耗栈顶的值
     OP_JUMP_IF_TRUE, // op, offset16: 如果栈顶的值是true, 那么ip += offset16。不消耗栈顶的值
-    op_JUMP_BACK, // op, offset16: ip -= offset16. 不消耗栈顶的值
+    OP_JUMP_BACK, // op, offset16: ip -= offset16. 不消耗栈顶的值
     OP_JUMP, // op, offset16: 无条件跳转：ip += offset16
+    OP_JUMP_IF_NOT_EQUAL, // op, offset16: 如果栈顶的两个值不相等，则跳转
 } OpCode;
 
 typedef struct Chunk{

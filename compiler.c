@@ -134,11 +134,13 @@ static void statement();
 
 static void if_statement();
 
-static void emit_loop(int start);
+static void loop_back(int start);
 
 static void while_statement();
 
 static void for_statement();
+
+static void switch_statement();
 
 static void patch_jump(int from);
 
@@ -391,6 +393,8 @@ static void statement() {
         while_statement();
     } else if (match(TOKEN_FOR)){
         for_statement();
+    }else if (match(TOKEN_SWITCH)){
+        switch_statement();
     } else {
         expression_statement();
     }
@@ -465,8 +469,8 @@ static void if_statement() {
     patch_jump(to_after);
 }
 
-static void emit_loop(int start) {
-    emit_byte(op_JUMP_BACK);
+static void loop_back(int start) {
+    emit_byte(OP_JUMP_BACK);
     int diff = current_chunk()->count - start + 2;
     uint8_t i0, i1;
     u16_to_u8(diff, &i0, &i1);
@@ -483,9 +487,78 @@ static void while_statement() {
     emit_byte(OP_POP);
     statement();
 
-    emit_loop(start);
+    loop_back(start);
     patch_jump(to_end);
     emit_byte(OP_POP);
+}
+
+static void switch_statement() {
+    /* switch (num) {
+        case 3:
+            ...
+        case 4:
+            ...
+        case 5:
+            ...
+        default:
+            ...
+    } */
+    consume(TOKEN_LEFT_PAREN, "A ( is expected after switch");
+
+    int start = emit_jump(OP_JUMP);
+
+    int temp = current_chunk()->count;
+    int to_end = emit_jump(OP_JUMP);
+
+    patch_jump(start);
+
+    expression();
+
+    consume(TOKEN_RIGHT_PAREN, "A ) is expected after switch");
+    consume(TOKEN_LEFT_BRACE, "A { is expected after switch");
+    int prev = -1;
+    while (!check(TOKEN_EOF) && match(TOKEN_CASE)) {
+        if (prev != -1) {
+            patch_jump(prev);
+            emit_byte(OP_POP);
+        }
+        if (match(TOKEN_NIL) || match(TOKEN_FALSE) || match(TOKEN_TRUE)) {
+            literal(false);
+        } else if (match(TOKEN_FLOAT)) {
+            float_num(false);
+        } else if (match(TOKEN_INT)) {
+            int_num(false);
+        } else if (match(TOKEN_STRING)) {
+            string(false);
+        } else {
+            error_at_current("only constant values can be used as switch cases");
+            return;
+        }
+        consume(TOKEN_COLON, "A : is needed after each case");
+        prev = emit_jump(OP_JUMP_IF_NOT_EQUAL);
+        emit_byte(OP_POP);
+        emit_byte(OP_POP);
+
+        while (!check(TOKEN_EOF) && !check(TOKEN_CASE) && !check(TOKEN_DEFAULT)) {
+            statement();
+        }
+        loop_back(temp);
+    }
+
+    if (match(TOKEN_DEFAULT)) {
+        consume(TOKEN_COLON, "A : is needed after each case");
+        patch_jump(prev);
+        emit_byte(OP_POP);
+        emit_byte(OP_POP);
+        while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
+            statement();
+        }
+    } else {
+        patch_jump(prev);
+    }
+
+    patch_jump(to_end);
+    consume(TOKEN_RIGHT_BRACE, "A } is expected after switch");
 }
 
 static void for_statement() {
@@ -535,14 +608,14 @@ static void for_statement() {
         consume(TOKEN_RIGHT_PAREN, "A ) is expected after for");
     }
 
-    emit_loop(condition);
+    loop_back(condition);
 
     patch_jump(to_body);
     emit_byte(OP_POP);
 
     statement();
 
-    emit_loop(increment);
+    loop_back(increment);
 
     patch_jump(to_end);
     emit_byte(OP_POP);
