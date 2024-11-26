@@ -604,6 +604,64 @@ static inline void variable(bool can_assign) {
     named_variable(&parser.previous, can_assign);
 }
 
+static void arithmetic_equal(OpCode set_op, OpCode get_op, int index) {
+    switch (parser.previous.type) {
+        case TOKEN_EQUAL: {
+            expression();
+            emit_two_bytes(set_op, index);
+            break;
+        }
+        case TOKEN_PLUS_EQUAL: {
+            expression();
+            emit_two_bytes(get_op, index);
+            emit_byte(OP_ADD);
+            emit_two_bytes(set_op, index);
+            break;
+        }
+        case TOKEN_MINUS_EQUAL: {
+            expression();
+            emit_two_bytes(get_op, index);
+            emit_byte(OP_SUBTRACT);
+            emit_two_bytes(set_op, index);
+            break;
+        }
+        case TOKEN_STAR_EQUAL: {
+            expression();
+            emit_two_bytes(get_op, index);
+            emit_byte(OP_MULTIPLY);
+            emit_two_bytes(set_op, index);
+            break;
+        }
+        case TOKEN_SLASH_EQUAL: {
+            expression();
+            emit_two_bytes(get_op, index);
+            emit_byte(OP_DIVIDE);
+            emit_two_bytes(set_op, index);
+            break;
+        }
+        case TOKEN_PERCENT_EQUAL: {
+            expression();
+            emit_two_bytes(get_op, index);
+            emit_byte(OP_MOD);
+            emit_two_bytes(set_op, index);
+            break;
+        }
+        default:
+            IMPLEMENTATION_ERROR("this should not happen");
+            return;
+    }
+
+}
+
+static inline bool match_assign() {
+    return match(TOKEN_EQUAL)
+           || match(TOKEN_PLUS_EQUAL)
+           || match(TOKEN_MINUS_EQUAL)
+           || match(TOKEN_STAR_EQUAL)
+           || match(TOKEN_SLASH_EQUAL)
+           || match(TOKEN_PERCENT_EQUAL);
+}
+
 /**
  * 解析global/local变量的get/set
  * @param name
@@ -612,21 +670,19 @@ static inline void variable(bool can_assign) {
 static void named_variable(Token *name, bool can_assign) {
     int set_op = OP_SET_LOCAL;
     int get_op = OP_GET_LOCAL;
-    bool is_const;
+    bool is_const = false;
     int index = resolve_local(current_scope, name, &is_const);
     if (index == -1) {
         index = identifier_constant(name);
         set_op = OP_SET_GLOBAL;
         get_op = OP_GET_GLOBAL;
     }
-    if (can_assign && match(TOKEN_EQUAL)) {
+    if (can_assign && match_assign()) {
         if (is_const) {
             error_at_previous("cannot re-assign a const variable");
             return;
         }
-        // 如果是赋值语句，则先解析后面的值表达式。
-        expression();
-        emit_two_bytes(set_op, index);
+        arithmetic_equal(set_op, get_op, index);
     } else {
         emit_two_bytes(get_op, index);
     }

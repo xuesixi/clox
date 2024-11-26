@@ -1,4 +1,4 @@
-const age = 5;
-for (var i = 0; i < 3; i = i + 1) {
-    print i + age;
-}
+var i = 10;
+print i += 3;
+print i;
+
