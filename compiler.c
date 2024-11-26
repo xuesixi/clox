@@ -138,6 +138,8 @@ static void emit_loop(int start);
 
 static void while_statement();
 
+static void for_statement();
+
 static void patch_jump(int from);
 
 static int emit_jump(uint8_t jump_op);
@@ -387,6 +389,8 @@ static void statement() {
         if_statement();
     } else if (match(TOKEN_WHILE)) {
         while_statement();
+    } else if (match(TOKEN_FOR)){
+        for_statement();
     } else {
         expression_statement();
     }
@@ -482,6 +486,68 @@ static void while_statement() {
     emit_loop(start);
     patch_jump(to_end);
     emit_byte(OP_POP);
+}
+
+static void for_statement() {
+    // for (var i = 0; i < 10; i = i + 1) {}
+    /**
+     * for (initialize condition increment) statement
+     *
+     * {
+     *      initialize
+     *      while (condition) {
+     *          statement
+     *          increment
+     *      }
+     * }
+     */
+
+    consume(TOKEN_LEFT_PAREN, "A ( is expected after for");
+    begin_scope();
+
+    // initialize
+    if (match(TOKEN_SEMICOLON)) {
+
+    } else if (match(TOKEN_VAR)) {
+        var_declaration();
+    } else {
+        expression_statement();
+    }
+
+    int condition = current_chunk()->count;
+
+    // condition
+    if (!match(TOKEN_SEMICOLON)) {
+        expression(); // not expression_statement() because we want to key the condition code
+        consume(TOKEN_SEMICOLON, "the for initializer needs a ;");
+    } else {
+        emit_byte(OP_TRUE);
+    }
+
+    int to_end = emit_jump(OP_JUMP_IF_FALSE);
+    int to_body = emit_jump(OP_JUMP);
+
+    int increment = current_chunk()->count;
+
+    if (!match(TOKEN_RIGHT_PAREN)) {
+        expression(); // increment
+        emit_byte(OP_POP);
+        consume(TOKEN_RIGHT_PAREN, "A ) is expected after for");
+    }
+
+    emit_loop(condition);
+
+    patch_jump(to_body);
+    emit_byte(OP_POP);
+
+    statement();
+
+    emit_loop(increment);
+
+    patch_jump(to_end);
+    emit_byte(OP_POP);
+
+    end_scope();
 }
 
 static inline void begin_scope() {

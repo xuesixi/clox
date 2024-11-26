@@ -1,6 +1,4 @@
-var num = 3;
-
-while (num > 0) {
-    print num;
-    num = num - 1;
+const age = 5;
+for (var i = 0; i < 3; i = i + 1) {
+    print i + age;
 }
