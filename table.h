@@ -8,11 +8,27 @@ typedef struct Entry {
     Value value;
 } Entry;
 
-typedef struct Table{
+typedef struct Table {
     int count;
     int capacity;
     Entry *backing;
 } Table;
+
+typedef struct MapEntry {
+    void *key;
+    void *value;
+} MapEntry;
+
+typedef int (*HashFunction)(void *key); ;
+typedef bool (*EqualityFunction)(void *a, void *b);
+
+typedef struct Map {
+    int count;
+    int capacity;
+    HashFunction hash;
+    EqualityFunction equal;
+    MapEntry *backing;
+} Map;
 
 void init_table(Table *table);
 void free_table(Table *table);
@@ -22,5 +38,13 @@ bool table_set(Table *table, String *key, Value value);
 Value table_delete(Table *table, String *key);
 void table_add_all(Table *from, Table *to);
 String *table_find_string(Table *table, const char *name, int length, uint32_t hash);
+
+void init_map(Map *map, HashFunction hash, EqualityFunction equal);
+void free_map(Map *map);
+void *map_get(Map *map, void *key);
+bool map_set(Map *map, void *key, void *value);
+void *map_delete(Map *map, void *key);
+int int_hash(void *p);
+int int_equal(void *a, void *b);
 
 #endif

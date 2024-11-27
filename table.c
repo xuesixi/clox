@@ -82,7 +82,7 @@ inline bool table_has(Table *table, String *key) {
  * @param value 如果存在该key，则将对应的值储存在这个参数值
  * @return 是否存在该key
  */
-inline bool table_get(Table *table, String *key, Value *value) {
+bool table_get(Table *table, String *key, Value *value) {
     if (table->count == 0) {
         return false;
     }
@@ -100,7 +100,7 @@ inline bool table_get(Table *table, String *key, Value *value) {
  * @param table
  * @param key
  * @param value
- * @return true if modifying existing pair; false if adding new pari
+ * @return true if modifying existing pair; false if adding new entry
  */
 bool table_set(Table *table, String *key, Value value) {
 
@@ -184,4 +184,151 @@ void init_table(Table *table) {
 void free_table(Table *table) {
     FREE_ARRAY(Entry, table->backing, table->capacity);
     init_table(table);
+}
+
+void init_map(Map *map, HashFunction hash, EqualityFunction equal) {
+    map->backing = NULL;
+    map->capacity = 0;
+    map->count = 0;
+    map->hash = hash;
+    map->equal = equal;
+}
+
+void free_map(Map *map) {
+    map->backing = NULL;
+    map->capacity = 0;
+    map->count = 0;
+}
+
+static inline bool map_empty_entry(MapEntry *entry) {
+    return entry->key == NULL && entry->value == NULL;
+}
+
+static inline bool map_del_mark(MapEntry *entry) {
+    // null key && non-null value -> del
+    // not del -> non-null key || null value
+    return entry->key == NULL && entry->value != NULL;
+}
+
+static inline bool map_need_resize(Map *map) {
+    return map->count + 1 >= map->capacity * 0.75;
+}
+
+static void map_resize(Map *map) {
+    int old_capacity = map->capacity;
+    int new_capacity = old_capacity < 11 ? 11 : old_capacity * 2 + 1;
+    MapEntry *old_backing = map->backing;
+    MapEntry *new_backing = ALLOCATE(MapEntry, new_capacity);
+    for (int i = 0; i < new_capacity; i++) {
+        new_backing[i].key = NULL;
+        new_backing[i].value = NULL;
+    }
+
+    map->capacity = new_capacity;
+    map->backing = new_backing;
+    map->count = 0;
+    for (int i = 0; i < old_capacity; i ++) {
+        MapEntry *entry = old_backing + i;
+        if (entry->key != NULL) {
+            map_set(map, entry->key, entry->value);
+        }
+    }
+    FREE_ARRAY(MapEntry, old_backing, old_capacity);
+}
+
+/**
+ * 如果不存在，则返回空entry（key，value均为null）。否则返回对应的entry.
+ * 
+ * */
+static MapEntry *map_find_entry(Map *map, void *key) {
+    int index = map->hash(key);
+    for (int i = 0; i < map->capacity; i ++) {
+        int curr = (index + i) % (map->capacity);
+        MapEntry *entry = map->backing + curr;
+        if (map_empty_entry(entry)) {
+            return entry;
+        }
+        if (entry->key != NULL && map->equal(entry->key, key)) {
+            return entry;
+        }
+    }
+    IMPLEMENTATION_ERROR("map_find_entry() does not find empty entry spot and returns NULL");
+    return NULL;
+}
+
+/**
+ * @return NULL if not found
+ * */
+void *map_get(Map *map, void *key) {
+    if (map->count == 0) {
+        return NULL;
+    }
+    MapEntry *entry = map_find_entry(map, key);
+    if (map_empty_entry(entry)) {
+        return NULL;
+    } else {
+        return entry->value;
+    }
+}
+
+/**
+ *
+ * @param map
+ * @param key
+ * @param value
+ * @return true if modifying existing pair; false if adding new entry
+ */
+bool map_set(Map *map, void *key, void *value) {
+    if (map_need_resize(map)) {
+        map_resize(map);
+    }
+
+    MapEntry *del = NULL;
+    int index = map->hash(key);
+    for (int i = 0; i < map->capacity; i ++ ) {
+        int curr = (index + i) % map->capacity;
+        MapEntry *entry = map->backing + curr;
+        if (map_empty_entry(entry)) {
+            if (del == NULL) {
+                entry->key = key;
+                entry->value = value;
+                map->count ++;
+            } else {
+                del->key = key;
+                del->value = value;
+            }
+            return false;
+        } else if (map_del_mark(entry)){
+            del = entry;
+        } else if (map->equal(entry->key, key)) {
+            entry->value = value;
+            return true;
+        }
+    }
+    IMPLEMENTATION_ERROR("map_set() does not find empty spot");
+    return false;
+}
+
+void *map_delete(Map *map, void *key) {
+    if (map->count == 0) {
+        return NULL;
+    }
+    MapEntry *entry = map_find_entry(map, key);
+    if (map_empty_entry(entry)) {
+        return NULL;
+    } else {
+        entry->key = NULL;
+        void *result = entry->value;
+        entry->value = (void *)10086; // this is consider DEL mark
+        return result;
+    }
+}
+
+int int_hash(void *p) {
+    int num = *(int*)p;
+    return num * 2654435761 % (INT32_MAX);
+}
+
+int int_equal(void *a, void *b) {
+    return *(int*)a == *(int*)b;
 }
