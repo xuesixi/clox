@@ -1,13 +1,20 @@
+# huhu declare
 var huhu = 10;
 var num = 10;
 
+# for loop
+# for loop two
 for (var i = 0; i < 10; i += 1) {
-    # start
+    # get pow
     var pow = i * 2 + 1;
+    # print pow
     print pow;
+    # if pow
     if (pow % 3 == 0) {
         print "3 divides it";
     }
+    # start
 }
 
+# end print
 print "end";

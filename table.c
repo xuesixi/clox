@@ -195,6 +195,7 @@ void init_map(Map *map, HashFunction hash, EqualityFunction equal) {
 }
 
 void free_map(Map *map) {
+    FREE_ARRAY(MapEntry, map->backing, map->capacity);
     map->backing = NULL;
     map->capacity = 0;
     map->count = 0;
@@ -319,16 +320,16 @@ void *map_delete(Map *map, void *key) {
     } else {
         entry->key = NULL;
         void *result = entry->value;
-        entry->value = (void *)10086; // this is consider DEL mark
+        entry->value = (void *)10086; // this is considered DEL mark
         return result;
     }
 }
 
 int int_hash(void *p) {
-    int num = *(int*)p;
+    int num = (int) p;
     return num * 2654435761 % (INT32_MAX);
 }
 
-int int_equal(void *a, void *b) {
-    return *(int*)a == *(int*)b;
+bool int_equal(void *a, void *b) {
+    return (int) a == (int) b;
 }

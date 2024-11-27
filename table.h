@@ -14,6 +14,9 @@ typedef struct Table {
     Entry *backing;
 } Table;
 
+/**
+ * 值得注意的是，中无论是key还是value都是指针，其所有权在外部，不在Map中。
+ */
 typedef struct MapEntry {
     void *key;
     void *value;
@@ -21,6 +24,7 @@ typedef struct MapEntry {
 
 typedef int (*HashFunction)(void *key); ;
 typedef bool (*EqualityFunction)(void *a, void *b);
+
 
 typedef struct Map {
     int count;
@@ -45,6 +49,6 @@ void *map_get(Map *map, void *key);
 bool map_set(Map *map, void *key, void *value);
 void *map_delete(Map *map, void *key);
 int int_hash(void *p);
-int int_equal(void *a, void *b);
+bool int_equal(void *a, void *b);
 
 #endif

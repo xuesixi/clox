@@ -177,6 +177,17 @@ static Token string_token() {
     }
 }
 
+static Token label_token() {
+    while (true) {
+        while (peek() != '\n' && !is_end()) {
+            advance();
+        }
+        if (peek() == '\n') {
+            return make_token(TOKEN_LABEL);
+        }
+    }
+}
+
 static void skip_whitespace() {
     while (true) {
         char c = peek();
@@ -309,6 +320,8 @@ Token scan_token() {
             return make_token(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
         case '"':
             return string_token();
+        case '#':
+            return label_token();
         default:
             return error_token("Unrecognized character!");
     }

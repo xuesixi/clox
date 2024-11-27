@@ -12,7 +12,6 @@ $(TARGET): $(OBJ)
 run: $(TARGET)
 	@./$(TARGET) -ds
 	@rm $(TARGET)
-	@rm *.o
 
 
 f: file
@@ -21,7 +20,6 @@ f: file
 file: $(TARGET)
 	@./$(TARGET) -ds test.lox
 	@rm $(TARGET)
-	@rm *.o
 
 %.o: %.c
 	@$(CC) $(CFLAGS) -c $< -o $@

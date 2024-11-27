@@ -3,7 +3,6 @@
 //
 
 #include "debug.h"
-//#include "assert.h"
 
 /**
  *
@@ -50,19 +49,17 @@ static int constant2_instruction(const char *name, const Chunk *chunk, int offse
     return offset + 3;
 }
 
-static int jump_instruction(const char *name, const Chunk *chunk, int offset) {
+static int jump_instruction(const char *name, const Chunk *chunk, int offset, bool forward) {
     uint8_t i0 = chunk->code[offset + 1];
     uint8_t i1 = chunk->code[offset + 2];
     int index = u8_to_u16(i0, i1);
-    printf("%-23s   -> %04d\n", name, offset + 3 + index);
-    return offset + 3;
-}
-
-static int jump_back_instruction(const char *name, const Chunk *chunk, int offset) {
-    uint8_t i0 = chunk->code[offset + 1];
-    uint8_t i1 = chunk->code[offset + 2];
-    int index = u8_to_u16(i0, i1);
-    printf("%-23s   -> %04d\n", name, offset + 3 - index);
+    int target = forward ? offset + 3 + index : offset + 3 - index;
+    char *label = map_get(&label_map, (void*)(target + 1));
+    if (label != NULL) {
+        printf("%-23s   -> %04d: %s\n", name, target, label);
+    } else {
+        printf("%-23s   -> %04d\n", name, target);
+    }
     return offset + 3;
 }
 
@@ -71,7 +68,16 @@ static int jump_back_instruction(const char *name, const Chunk *chunk, int offse
  * @return 下一个 instruction 的 offset
  */
 int disassemble_instruction(Chunk *chunk, int offset) {
+
+    char *label = map_get(&label_map, (void*)(offset + 1)); // +1 是为了防止索引0被当成NULL。见label_statement()
+    if (label != NULL) {
+        printf("%s: \n", label);
+    }
+
+    // code index
     printf("%04d ", offset);
+
+    // print line number
     if (offset > 0 && chunk->lines[offset] == chunk->lines[offset-1]) {
         printf("   | ");
     }else {
@@ -128,19 +134,19 @@ int disassemble_instruction(Chunk *chunk, int offset) {
         case OP_SET_LOCAL:
             return byte_instruction("OP_SET_LOCAL", chunk, offset);
         case OP_JUMP:
-            return jump_instruction("OP_JUMP", chunk, offset);
+            return jump_instruction("OP_JUMP", chunk, offset, true);
         case OP_JUMP_IF_FALSE:
-            return jump_instruction("OP_JUMP_IF_FALSE", chunk, offset);
+            return jump_instruction("OP_JUMP_IF_FALSE", chunk, offset, true);
         case OP_JUMP_IF_TRUE:
-            return jump_instruction("OP_JUMP_IF_TRUE", chunk, offset);
+            return jump_instruction("OP_JUMP_IF_TRUE", chunk, offset, true);
         case OP_JUMP_BACK:
-            return jump_back_instruction("OP_JUMP_BACK", chunk, offset);
+            return jump_instruction("OP_JUMP_BACK", chunk, offset, false);
         case OP_JUMP_IF_NOT_EQUAL:
-            return jump_instruction("OP_JUMP_IF_NOT_EQUAL", chunk, offset);
+            return jump_instruction("OP_JUMP_IF_NOT_EQUAL", chunk, offset, true);
         case OP_JUMP_IF_FALSE_POP:
-            return jump_instruction("OP_JUMP_IF_FALSE_POP", chunk, offset);
+            return jump_instruction("OP_JUMP_IF_FALSE_POP", chunk, offset, true);
         case OP_JUMP_IF_TRUE_POP:
-            return jump_instruction("OP_JUMP_IF_TRUE_POP", chunk, offset);
+            return jump_instruction("OP_JUMP_IF_TRUE_POP", chunk, offset, true);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

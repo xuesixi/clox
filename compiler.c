@@ -10,6 +10,7 @@
  * */
 
 #include "compiler.h"
+#include "memory.h"
 #include "object.h"
 #include "scanner.h"
 #include "table.h"
@@ -21,6 +22,7 @@ typedef struct Parser{
     Token previous;
     Token current;
     Table lexeme_table;
+    // Map label_map;
     int break_point;
     int old_break_point;
     int continue_point;
@@ -71,6 +73,7 @@ typedef struct Scope {
 } Scope;
 
 Parser parser;
+Map label_map;
 Chunk *compiling_chunk;
 Scope *current_scope;
 
@@ -136,6 +139,8 @@ static void string(bool can_assign);
 static void parse_continue(bool can_assign);
 
 static void parse_break(bool can_assign);
+
+static void label_statement();
 
 static void and(bool can_assign);
 
@@ -228,6 +233,7 @@ ParseRule rules[] = {
         [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
         [TOKEN_CONTINUE]      = {parse_continue, NULL, PREC_NONE},
         [TOKEN_BREAK]         = {parse_break, NULL, PREC_NONE},
+        [TOKEN_LABEL]         = {NULL, NULL, PREC_NONE},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
@@ -289,11 +295,28 @@ static void parse_precedence(Precedence precedence) {
     }
 }
 
+/**
+ * 如果SHOW_COMPILE_RESULT选项被激活，我们会用label_map记录遇到的标签对应的字节码的索引的值。
+ * 在debug.c中，如果一个字节码索引有对应的标签，我们会在展示汇编时把标签也打印出来。
+ * 这里map_set中的索引有+1，这是为了防止索引0被当成NULL。在debug中也有同样的+1；
+ */
+static void label_statement() {
+    if (SHOW_COMPILE_RESULT) {
+        Token label = parser.previous;
+        char *text = ALLOCATE(char, label.length + 1);
+        memcpy(text, label.start, label.length);
+        text[label.length] = '\0';
+        map_set(&label_map, (void *) (current_chunk()->count + 1), text);
+    }
+}
+
 static void declaration() {
     if (match(TOKEN_VAR)) {
         var_declaration();
     } else if (match(TOKEN_CONST)) {
         const_declaration();
+    } else if (match(TOKEN_LABEL)) {
+        label_statement();
     } else {
         statement();
     }
@@ -1272,9 +1295,9 @@ static void init_scope(Scope *scope) {
  * 将目标源代码编译成字节码，写入到目标 chunk 中
  * */
 bool compile(const char *src, Chunk *chunk) {
-
     init_scanner(src);
     init_table(&parser.lexeme_table);
+    init_map(&label_map, int_hash, int_equal);
     parser.continue_point = -1;
     parser.break_point = -1;
     compiling_chunk = chunk;
@@ -1292,5 +1315,6 @@ bool compile(const char *src, Chunk *chunk) {
     parser.panic_mode = false;
     parser.has_error = false;
     free_table(&parser.lexeme_table);
+    free_map(&label_map);
     return !has_error;
 }
