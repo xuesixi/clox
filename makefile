@@ -4,14 +4,13 @@ SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 TARGET = clox
 
-all: run
-
 $(TARGET): $(OBJ)
 	@$(CC) $(OBJ) -o $(TARGET) -l readline
+	@rm $(OBJ)
 
 .PHONY: run
 run: $(TARGET)
-	@./$(TARGET)
+	@./$(TARGET) -ds
 	@rm $(TARGET)
 	@rm *.o
 
@@ -20,7 +19,7 @@ f: file
 
 .PHONY: file
 file: $(TARGET)
-	@./$(TARGET) test.lox
+	@./$(TARGET) -ds test.lox
 	@rm $(TARGET)
 	@rm *.o
 

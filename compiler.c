@@ -1094,11 +1094,9 @@ static int make_constant(Value value) {
 
 static void end_compiler() {
     emit_byte(OP_RETURN);
-#ifdef DEBUG_SHOW_COMPILED_RESULT
-    if (!parser.has_error) {
+    if (SHOW_COMPILE_RESULT && !parser.has_error) {
         disassemble_chunk(current_chunk(), "disassembling the compiling result");
     }
-#endif
 }
 
 static inline void emit_two_bytes(uint8_t byte1, uint8_t byte2) {

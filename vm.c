@@ -259,10 +259,10 @@ static inline String *read_constant_string() {
  */
 static InterpretResult run() {
     while (true) {
-#ifdef DEBUG_TRACE_EXECUTION
-        show_stack();
-        disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
-#endif
+        if (TRACE_EXECUTION) {
+            show_stack();
+            disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+        }
         uint8_t instruction = read_byte();
 
         switch (instruction) {
@@ -333,9 +333,9 @@ static InterpretResult run() {
                 push_stack(bool_value(is_falsy(pop_stack())));
                 break;
             case OP_PRINT:
-#ifdef DEBUG_TRACE_EXECUTION
-                printf(">>> ");
-#endif
+                if (TRACE_EXECUTION) {
+                    printf(">>> ");
+                }
                 print_value(pop_stack());
                 NEW_LINE();
                 break;

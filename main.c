@@ -1,9 +1,12 @@
 #include "chunk.h"
 #include "readline/readline.h"
 #include "stdlib.h"
+#include <unistd.h>
 #include "vm.h"
 
 bool REPL;
+bool SHOW_COMPILE_RESULT = false;
+bool TRACE_EXECUTION = false;
 
 static void repl() {
     REPL = true;
@@ -51,6 +54,7 @@ static void run_file(const char *path) {
     }
 }
 
+/*
 static void produce_bytecode(const char *code_path, const char *result_path) {
     char *src = read_file(code_path);
     InterpretResult result = produce(src, result_path);
@@ -63,23 +67,40 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
         printf("good\n");
     }
 }
+*/
 
 // static void run_bytecode(const char *bytecode_path) {
 //     FILE *file = fopen(bytecode_path, "rb");
 // }
 
-int main(int argc, const char **argv) {
+/**
+ * clox
+ * clox file
+ * */
+int main(int argc, char * const argv[]) {
 
     init_VM();
-    if (argc == 1) {
+    char *options = "ds";
+    char op;
+    while ( (op = getopt(argc, argv, options)) != -1) {
+        switch (op) {
+        case 'd':
+            TRACE_EXECUTION = true;
+            break;
+        case 's':
+            SHOW_COMPILE_RESULT = true;
+            break;
+        default:
+            printf("Invalid option %c\n", op);
+            printf("-s: show the compile result\n");
+            printf("-d: trace the execution\n");
+        }
+     } 
+     if (optind < argc) {
+        run_file(argv[optind]);
+     } else {
         repl();
-    } else if (argc == 2) {
-        run_file(argv[1]);
-    } else if (argc == 3) {
-        produce_bytecode(argv[1], argv[2]);
-    } else {
-        fprintf(stderr, "no arg to start REPL, one arg to run a file!\n");
-    }
+     }
 
     free_VM();
 }
