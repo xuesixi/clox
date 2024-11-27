@@ -3,12 +3,12 @@
 //
 
 #include "vm.h"
+
 #include "compiler.h"
+#include "debug.h"
 #include "memory.h"
 #include "object.h"
-
 #include "stdarg.h"
-#include "debug.h"
 
 VM vm;
 
@@ -28,9 +28,10 @@ static void binary_number_op(Value a, Value b, char operator);
    ------------------下面是静态函数定义----------------------- */
 
 static void binary_number_op(Value a, Value b, char operator) {
-    if (operator == '+' &&  (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
+    if (operator==
+        '+' &&(is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
         String *str = string_concat(a, b);
-        push_stack(ref_value(& str->object));
+        push_stack(ref_value(&str->object));
         return;
     }
     if (!is_number(a) || !is_number(b)) {
@@ -245,10 +246,11 @@ static inline Value read_constant2() {
 static inline String *read_constant_string() {
     Value value = read_constant();
     if (!is_ref_of(value, OBJ_STRING)) {
-        IMPLEMENTATION_ERROR("trying to read a constant string, but the value is not a String");
+        IMPLEMENTATION_ERROR(
+            "trying to read a constant string, but the value is not a String");
         return NULL;
     }
-    return (String*)(as_ref(value));
+    return (String *)(as_ref(value));
 }
 
 /**
@@ -257,7 +259,6 @@ static inline String *read_constant_string() {
  */
 static InterpretResult run() {
     while (true) {
-
 #ifdef DEBUG_TRACE_EXECUTION
         show_stack();
         disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
@@ -287,7 +288,8 @@ static InterpretResult run() {
                     push_stack(float_value(-as_float(pop_stack())));
                     break;
                 } else {
-                    runtime_error("the value of type: %d is cannot be negated", value.type);
+                    runtime_error("the value of type: %d is cannot be negated",
+                                  value.type);
                     return INTERPRET_RUNTIME_ERROR;
                 }
             }
@@ -359,7 +361,8 @@ static InterpretResult run() {
                 if (table_get(&vm.globals, name, &value)) {
                     push_stack(value);
                 } else {
-                    runtime_error("Accessing an undefined variable: %s", name->chars);
+                    runtime_error("Accessing an undefined variable: %s",
+                                  name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
@@ -367,14 +370,16 @@ static InterpretResult run() {
             case OP_SET_GLOBAL: {
                 String *name = read_constant_string();
                 if (table_has(&vm.const_table, name)) {
-                    runtime_error("The const variable %s cannot be re-assigned", name->chars);
+                    runtime_error("The const variable %s cannot be re-assigned",
+                                  name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                if (table_set(&vm.globals, name, peek_stack(0)) ) {
+                if (table_set(&vm.globals, name, peek_stack(0))) {
                     break;
                 } else {
                     table_delete(&vm.globals, name);
-                    runtime_error("Setting an undefined variable: %s", name->chars);
+                    runtime_error("Setting an undefined variable: %s",
+                                  name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
             }
@@ -412,17 +417,32 @@ static InterpretResult run() {
                 vm.ip -= offset;
                 break;
             }
-            case OP_JUMP_IF_NOT_EQUAL:  {
+            case OP_JUMP_IF_NOT_EQUAL: {
                 uint16_t offset = read_uint16();
                 Value b = peek_stack(0);
                 Value a = peek_stack(1);
-                if (!value_equal(a,b)) {
+                if (!value_equal(a, b)) {
                     vm.ip += offset;
                 }
                 break;
             }
-            default:
+            case OP_JUMP_IF_FALSE_POP: {
+                uint16_t offset = read_uint16();
+                if (is_falsy(pop_stack())) {
+                    vm.ip += offset;
+                }
+                break;
+            }
+            case OP_JUMP_IF_TRUE_POP: {
+                uint16_t offset = read_uint16();
+                if (!is_falsy(pop_stack())) {
+                    vm.ip += offset;
+                }
+                break;
+            }
+            default: {
                 runtime_error("unrecognized instruction");
+            }
         }
     }
 }
@@ -446,7 +466,7 @@ void free_VM() {
 }
 
 inline void push_stack(Value value) {
-    * vm.stack_top = value;
+    *vm.stack_top = value;
     vm.stack_top++;
 }
 
@@ -509,4 +529,3 @@ InterpretResult run_chunk(Chunk *chunk) {
     vm.ip = chunk->code;
     return run();
 }
-

@@ -8,8 +8,8 @@
 #include "stdio.h"
 
 #define STACK_MAX 256
-// #define DEBUG_TRACE_EXECUTION
-// #define DEBUG_SHOW_COMPILED_RESULT
+#define DEBUG_TRACE_EXECUTION
+#define DEBUG_SHOW_COMPILED_RESULT
 
 #define IMPLEMENTATION_ERROR(msg) \
     fprintf(stderr, "Implement error: %s\nOccurred in file: %s, line: %d\n", msg, __FILE__, __LINE__)

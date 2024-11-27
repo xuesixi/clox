@@ -38,6 +38,8 @@ typedef enum OpCode{
     OP_JUMP_BACK, // op, offset16: ip -= offset16. 不消耗栈顶的值
     OP_JUMP, // op, offset16: 无条件跳转：ip += offset16
     OP_JUMP_IF_NOT_EQUAL, // op, offset16: 如果栈顶的两个值不相等，则跳转
+    OP_JUMP_IF_FALSE_POP,
+    OP_JUMP_IF_TRUE_POP,
 } OpCode;
 
 typedef struct Chunk{

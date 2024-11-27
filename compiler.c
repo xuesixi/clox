@@ -442,6 +442,7 @@ static void statement() {
 
 /**
  * 生成一个jump指令。后面两个操作数是占位符。
+ * 该函数需要配合patch_jump使用。
  * @param jump_op jump的类型
  * @return 最后一个操作数的索引 + 1
  */
@@ -467,7 +468,7 @@ static void emit_goto(int dest) {
 
 /**
  * 修改from处的jump指令的offset，使其指向本处。
- * 跳转后的下一个指令是该函数后面的那一个指令。把该函数当成跳转的标签即可。
+ * 跳转后, PC指向该函数后面的下一个命令。把该函数当成跳转的标签即可。
  * 那个jump指令的op的索引是from-3
  * @param from
  */
@@ -482,37 +483,32 @@ static void patch_jump(int from) {
 /**
  * condition
  *
- * jump to [else] if false
- * pop condition
+ * pop, if false, jump -> else
  *
  * then:
  *     ...
  *     jump to [after]
  *
  * else:
- *     pop condition
  *     ...
  *
  * after:
  */
 static void if_statement() {
     consume(TOKEN_LEFT_PAREN, "A ( is expected after if");
-    expression(); // condition
+    // condition
+    expression(); 
     consume(TOKEN_RIGHT_PAREN, "A ) is expected after if");
 
     // jump to else if false
-    int to_else = emit_jump(OP_JUMP_IF_FALSE);
+    int to_else = emit_jump(OP_JUMP_IF_FALSE_POP);
 
-    // pop
-    emit_byte(OP_POP);
     statement();
     // jump to after
     int to_after = emit_jump(OP_JUMP);
 
-    //: else
-    // pop
+    //else
     patch_jump(to_else);
-    emit_byte(OP_POP);
 
     if (match(TOKEN_ELSE)) {
         statement();
@@ -537,7 +533,7 @@ static void loop_back(int start) {
  * condition:
  *     expression
  * break point:
- *     if false, jump -> end
+ *     pop, if false, jump -> end
  * 
  * body:
  *     pop condition
@@ -545,7 +541,6 @@ static void loop_back(int start) {
  *     jump -> condition
  * 
  * end:
- *     pop condition
  * */
 static void while_statement() {
     consume(TOKEN_LEFT_PAREN, "A ( is expected after while");
@@ -557,17 +552,15 @@ static void while_statement() {
     expression(); 
     consume(TOKEN_RIGHT_PAREN, "A ) is expected after while");
     save_break_point();
-    int to_end = emit_jump(OP_JUMP_IF_FALSE);
+    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
 
     // body: 
-    emit_byte(OP_POP);
     statement();
 
     loop_back(condition);
 
     // end: 
     patch_jump(to_end);
-    emit_byte(OP_POP);
 
     restore_continue_point();
     restore_break_point();
@@ -679,7 +672,7 @@ static void switch_statement() {
  * condition: 
  *     expression
  * break point:
- *     if false, jump -> end
+ *     pop, if false, jump -> end
  *     jump -> body
  * 
  * continue_point:
@@ -724,7 +717,7 @@ static void for_statement() {
     }
 
     save_break_point();
-    int to_end = emit_jump(OP_JUMP_IF_FALSE);
+    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
     int to_body = emit_jump(OP_JUMP);
 
     int increment = current_chunk()->count;
@@ -742,13 +735,11 @@ static void for_statement() {
 
     // body
     patch_jump(to_body);
-    emit_byte(OP_POP);
     statement();
     loop_back(increment);
 
     // end
     patch_jump(to_end);
-    emit_byte(OP_POP);
 
     restore_continue_point();
     restore_break_point();
