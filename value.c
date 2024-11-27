@@ -168,7 +168,12 @@ void print_value(Value value) {
 char *to_print_chars(Value value) {
     char *buffer;
     if (is_float(value)) {
-        asprintf(&buffer, "%g", as_float(value));
+        double decimal = as_float(value);
+        if (decimal == (int ) decimal) {
+            asprintf(&buffer, "%.1f", decimal);
+        } else {
+            asprintf(&buffer, "%.10g", as_float(value));
+        }
     } else if (is_int(value)) {
         asprintf(&buffer, "%d", as_int(value));
     } else if (is_bool(value)) {
