@@ -7,9 +7,8 @@
 #include "assert.h"
 #include "stdio.h"
 
-#define STACK_MAX 256
-// #define DEBUG_TRACE_EXECUTION
-// #define DEBUG_SHOW_COMPILED_RESULT
+#define FRAME_MAX 64
+#define STACK_MAX (FRAME_MAX * UINT8_MAX)
 
 extern bool SHOW_COMPILE_RESULT;
 extern bool TRACE_EXECUTION;

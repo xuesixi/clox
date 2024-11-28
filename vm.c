@@ -12,8 +12,9 @@
 
 VM vm;
 
+static CallFrame *curr_frame();
 static uint8_t read_byte();
-static inline uint8_t read_byte();
+static uint16_t read_uint16();
 static bool is_falsy(Value value);
 static void reset_stack();
 static Value read_constant();
@@ -26,6 +27,10 @@ static void binary_number_op(Value a, Value b, char operator);
 
 /* ------------------上面是静态函数申明-----------------------
    ------------------下面是静态函数定义----------------------- */
+
+static inline CallFrame *curr_frame() {
+    return vm.frames + vm.frame_count - 1;
+}
 
 static void binary_number_op(Value a, Value b, char operator) {
     if (operator==
@@ -189,8 +194,9 @@ static bool is_falsy(Value value) {
     return false;
 }
 
-static void reset_stack() {
+static inline void reset_stack() {
     vm.stack_top = vm.stack;
+    vm.frame_count = 0;
 }
 
 static inline Value peek_stack(int distance) {
@@ -206,8 +212,9 @@ void runtime_error(const char *format, ...) {
     vfprintf(stderr, format, args);
     va_end(args);
     fputs("\n", stderr);
-    size_t index = vm.ip - vm.chunk->code - 1;
-    int line = vm.chunk->lines[index];
+    CallFrame *frame = curr_frame();
+    size_t index = frame->PC - frame->function->chunk.code - 1;
+    int line = frame->function->chunk.lines[index];
     fprintf(stderr, "[line %d] in script\n", line);
     reset_stack();
 }
@@ -217,7 +224,7 @@ void runtime_error(const char *format, ...) {
  * @return 下一个字节
  */
 static inline uint8_t read_byte() {
-    return (*vm.ip++);
+    return *curr_frame()->PC ++;
 }
 
 static inline uint16_t read_uint16() {
@@ -231,12 +238,11 @@ static inline uint16_t read_uint16() {
  * @return 下一个字节代表的常数
  */
 static inline Value read_constant() {
-    uint8_t index = read_byte();
-    return vm.chunk->constants.values[index];
+    return curr_frame()->function->chunk.constants.values[read_byte()];
 }
 
 static inline Value read_constant2() {
-    return vm.chunk->constants.values[read_uint16()];
+    return curr_frame()->function->chunk.constants.values[read_uint16()];
 }
 
 /**
@@ -258,10 +264,14 @@ static inline String *read_constant_string() {
  * @return 执行的结果
  */
 static InterpretResult run() {
+//    printf("\n");
+    NEW_LINE();
+    NEW_LINE();
     while (true) {
         if (TRACE_EXECUTION) {
             show_stack();
-            disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+            CallFrame *frame = curr_frame();
+            disassemble_instruction(& frame->function->chunk, (int)(frame->PC - frame->function->chunk.code));
         }
         uint8_t instruction = read_byte();
 
@@ -385,36 +395,36 @@ static InterpretResult run() {
             }
             case OP_GET_LOCAL: {
                 int index = read_byte();
-                push_stack(vm.stack[index]);
+                push_stack(curr_frame()->base[index]);
                 break;
             }
             case OP_SET_LOCAL: {
                 int index = read_byte();
-                vm.stack[index] = peek_stack(0);
+                curr_frame()->base[index] = peek_stack(0);
                 break;
             }
             case OP_JUMP_IF_FALSE: {
                 uint16_t offset = read_uint16();
                 if (is_falsy(peek_stack(0))) {
-                    vm.ip += offset;
+                    curr_frame()->PC += offset;
                 }
                 break;
             }
             case OP_JUMP_IF_TRUE: {
                 uint16_t offset = read_uint16();
                 if (!is_falsy(peek_stack(0))) {
-                    vm.ip += offset;
+                    curr_frame()->PC += offset;
                 }
                 break;
             }
             case OP_JUMP: {
                 uint16_t offset = read_uint16();
-                vm.ip += offset;
+                curr_frame()->PC += offset;
                 break;
             }
             case OP_JUMP_BACK: {
                 uint16_t offset = read_uint16();
-                vm.ip -= offset;
+                curr_frame()->PC -= offset;
                 break;
             }
             case OP_JUMP_IF_NOT_EQUAL: {
@@ -422,21 +432,21 @@ static InterpretResult run() {
                 Value b = peek_stack(0);
                 Value a = peek_stack(1);
                 if (!value_equal(a, b)) {
-                    vm.ip += offset;
+                    curr_frame()->PC += offset;
                 }
                 break;
             }
             case OP_JUMP_IF_FALSE_POP: {
                 uint16_t offset = read_uint16();
                 if (is_falsy(pop_stack())) {
-                    vm.ip += offset;
+                    curr_frame()->PC += offset;
                 }
                 break;
             }
             case OP_JUMP_IF_TRUE_POP: {
                 uint16_t offset = read_uint16();
                 if (!is_falsy(pop_stack())) {
-                    vm.ip += offset;
+                    curr_frame()->PC += offset;
                 }
                 break;
             }
@@ -463,6 +473,7 @@ void free_VM() {
     free_table(&vm.string_table);
     free_table(&vm.globals);
     free_table(&vm.const_table);
+    free_map(&label_map);
 }
 
 inline void push_stack(Value value) {
@@ -482,17 +493,19 @@ inline Value pop_stack() {
  * @return 执行结果（是否出错等）
  */
 InterpretResult interpret(const char *src) {
-    Chunk chunk;
-    init_chunk(&chunk);
 
-    if (!compile(src, &chunk)) {
-        free_chunk(&chunk);
+    LoxFunction *function = compile(src);
+    if (function == NULL) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    InterpretResult result = run_chunk(&chunk);
-    free_chunk(&chunk);
-    return result;
+    vm.frame_count++;
+    CallFrame *frame = curr_frame();
+    frame->function = function;
+    frame->base = vm.stack;
+    frame->PC = function->chunk.code;
+    push_stack(nil_value());
+    return run();
 }
 
 /**
@@ -509,7 +522,7 @@ InterpretResult produce(const char *src, const char *path) {
     }
     Chunk chunk;
     init_chunk(&chunk);
-    if (!compile(src, &chunk)) {
+    if (!compile(src)) {
         free_chunk(&chunk);
         return INTERPRET_COMPILE_ERROR;
     }
@@ -522,10 +535,4 @@ InterpretResult produce(const char *src, const char *path) {
         printf("Error when writing to the file: %s\n", path);
         return INTERPRET_PRODUCE_ERROR;
     }
-}
-
-InterpretResult run_chunk(Chunk *chunk) {
-    vm.chunk = chunk;
-    vm.ip = chunk->code;
-    return run();
 }

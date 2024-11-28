@@ -40,6 +40,12 @@ void free_object(Object *object) {
             re_allocate(object, sizeof(String), 0);
             break;
         }
+        case OBJ_FUNCTION: {
+            LoxFunction *function = (LoxFunction *) object;
+            free_chunk(& function->chunk);
+            re_allocate(object, sizeof(LoxFunction), 0);
+            break;
+        }
         default:
             return;
     }

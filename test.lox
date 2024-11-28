@@ -3,8 +3,7 @@ var huhu = 10;
 var num = 10;
 
 # for loop
-# for loop two
-for (var i = 0; i < 10; i += 1) {
+for (var i = 1; i < 10; i += 1) {
     # get pow
     var pow = i * 2 + 1;
     # print pow

@@ -71,6 +71,7 @@ int disassemble_instruction(Chunk *chunk, int offset) {
 
     char *label = map_get(&label_map, (void*)(offset + 1)); // +1 是为了防止索引0被当成NULL。见label_statement()
     if (label != NULL) {
+        NEW_LINE();
         printf("%s: \n", label);
     }
 

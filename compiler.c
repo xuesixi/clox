@@ -18,11 +18,10 @@
 #include "stdlib.h"
 #include "debug.h"
 
-typedef struct Parser{
+typedef struct Parser {
     Token previous;
     Token current;
     Table lexeme_table;
-    // Map label_map;
     int break_point;
     int old_break_point;
     int continue_point;
@@ -54,7 +53,7 @@ typedef void (*ParserFunction)(bool can_assign);
  * infix: 当作为第二个 token 的时候的解析函数。在调用该函数时，该token处于prev的位置。
  * precedence：infix 的优先级
  */
-typedef struct ParseRule{
+typedef struct ParseRule {
     ParserFunction prefix;
     ParserFunction infix;
     Precedence precedence;
@@ -66,15 +65,22 @@ typedef struct Local {
     bool is_const;
 } Local;
 
+typedef enum FunctionType {
+    TYPE_FUNCTION,
+    TYPE_SCRIPT,
+} FunctionType;
+
 typedef struct Scope {
     Local locals[UINT8_MAX + 1];
+    LoxFunction *function;
+    FunctionType functionType;
     int count;
     int depth;
 } Scope;
 
 Parser parser;
 Map label_map;
-Chunk *compiling_chunk;
+//Chunk *compiling_chunk;
 Scope *current_scope;
 
 
@@ -92,7 +98,7 @@ static void clear_scope(int to);
 
 static inline void block_statement();
 
-static void init_scope(Scope *scope);
+static void init_scope(Scope *scope, FunctionType type);
 
 static void error_at(Token *token, const char *message);
 
@@ -114,7 +120,7 @@ static void emit_uint16(uint16_t value);
 
 static void emit_constant(int index);
 
-static void end_compiler();
+static LoxFunction *end_compiler();
 
 static void parse_precedence(Precedence precedence);
 
@@ -266,7 +272,7 @@ static inline void restore_break_point() {
 
 
 static void string(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
     Value value = ref_value((Object *) str);
     int index = make_constant(value);
@@ -406,7 +412,7 @@ static int resolve_local(Scope *scope, Token *token, bool *is_const) {
             if (curr->depth == -1) {
                 error_at_previous("cannot use a variable in its own initialization");
                 return -1;
-            } else{
+            } else {
                 if (is_const != NULL) {
                     *is_const = curr->is_const;
                 }
@@ -440,13 +446,13 @@ static inline int parse_var_declaration(bool is_const) {
  */
 static inline int identifier_constant(Token *name) {
     String *str = string_copy(name->start, name->length);
-    return make_constant(ref_value((Object*)str));
+    return make_constant(ref_value((Object *) str));
 }
 
 static void statement() {
     if (match(TOKEN_PRINT)) {
         print_statement();
-    }else if(match(TOKEN_LEFT_BRACE)) {
+    } else if (match(TOKEN_LEFT_BRACE)) {
         begin_scope();
         block_statement();
         end_scope();
@@ -454,9 +460,9 @@ static void statement() {
         if_statement();
     } else if (match(TOKEN_WHILE)) {
         while_statement();
-    } else if (match(TOKEN_FOR)){
+    } else if (match(TOKEN_FOR)) {
         for_statement();
-    }else if (match(TOKEN_SWITCH)){
+    } else if (match(TOKEN_SWITCH)) {
         switch_statement();
     } else {
         expression_statement();
@@ -480,10 +486,10 @@ static void emit_goto(int dest) {
     int current_position = current_chunk()->count + 3;
     // printf("curr is %d, goto destination is %d\n", current_position, dest);
     int diff = dest - current_position;
-    if (diff > 0 ) {
+    if (diff > 0) {
         emit_byte(OP_JUMP);
         emit_uint16(diff);
-    } else if (diff < 0 ){
+    } else if (diff < 0) {
         emit_byte(OP_JUMP_BACK);
         emit_uint16(-diff);
     }
@@ -520,7 +526,7 @@ static void patch_jump(int from) {
 static void if_statement() {
     consume(TOKEN_LEFT_PAREN, "A ( is expected after if");
     // condition
-    expression(); 
+    expression();
     consume(TOKEN_RIGHT_PAREN, "A ) is expected after if");
 
     // jump to else if false
@@ -572,7 +578,7 @@ static void while_statement() {
     int condition = current_chunk()->count;
 
     // condition:
-    expression(); 
+    expression();
     consume(TOKEN_RIGHT_PAREN, "A ) is expected after while");
     save_break_point();
     int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
@@ -749,7 +755,7 @@ static void for_statement() {
 
     // increment
     if (!match(TOKEN_RIGHT_PAREN)) {
-        expression(); 
+        expression();
         emit_byte(OP_POP);
         consume(TOKEN_RIGHT_PAREN, "A ) is expected after for");
     }
@@ -772,7 +778,7 @@ static void for_statement() {
 }
 
 static inline void begin_scope() {
-    current_scope->depth ++;
+    current_scope->depth++;
 }
 
 /**
@@ -802,7 +808,7 @@ static void emit_pops_to_clear(int to) {
         // 如果这个local的层级更深，那么我们需要将其移除
         if (curr->depth > to) {
             emit_byte(OP_POP);
-            curr --;
+            curr--;
         } else {
             break;
         }
@@ -835,7 +841,7 @@ static void parse_continue(bool can_assign) {
  * 当离开scope的时候，把所有当前scope的local变量移除
  */
 static void end_scope() {
-    current_scope->depth --;
+    current_scope->depth--;
 
     clear_scope(current_scope->depth);
 }
@@ -955,7 +961,7 @@ static void named_variable(Token *name, bool can_assign) {
 }
 
 static void and(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     int to_end = emit_jump(OP_JUMP_IF_FALSE);
     emit_byte(OP_POP);
 
@@ -964,7 +970,7 @@ static void and(bool can_assign) {
 }
 
 static void or(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     int to_end = emit_jump(OP_JUMP_IF_TRUE);
     emit_byte(OP_POP);
 
@@ -974,7 +980,7 @@ static void or(bool can_assign) {
     // 该语句会被计算两次：第一次得到(1 or 2)为true，第二次得到`(1 or 2) or 3`为true。
     // 如果没有+1，那么这个解析本身是贪婪的，`1 or 2 or 3`会变成`1 or (2 or 3)`
     // 这种情况下，一旦知道1是true，后面的`(2 or 3)`就不需要判断了
-    parse_precedence(PREC_OR );
+    parse_precedence(PREC_OR);
     patch_jump(to_end);
 }
 
@@ -985,7 +991,7 @@ static void or(bool can_assign) {
  *
  */
 static void binary(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     TokenType type = parser.previous.type;
     ParseRule *rule = &rules[type];
     parse_precedence(rule->precedence + 1); // parse the right operand
@@ -1035,7 +1041,7 @@ static void binary(bool can_assign) {
  * 一元操作符表达式
  */
 static void unary(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     TokenType operator = parser.previous.type;
     parse_precedence(PREC_UNARY);
     switch (operator) {
@@ -1051,21 +1057,21 @@ static void unary(bool can_assign) {
 }
 
 static inline void float_num(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     double value = strtod(parser.previous.start, NULL);
     int index = make_constant(float_value(value));
     emit_constant(index);
 }
 
 static inline void int_num(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     int value = (int) strtol(parser.previous.start, NULL, 10);
     int index = make_constant(int_value(value));
     emit_constant(index);
 }
 
 static void literal(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     switch (parser.previous.type) {
         case TOKEN_NIL:
             emit_byte(OP_NIL);
@@ -1083,7 +1089,7 @@ static void literal(bool can_assign) {
 }
 
 static inline void grouping(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     expression();
     consume(TOKEN_RIGHT_PAREN, "missing expected )");
 }
@@ -1103,7 +1109,7 @@ static int make_constant(Value value) {
     }
     if (is_ref_of(value, OBJ_STRING)) {
         Value str_index;
-        if (table_get(&parser.lexeme_table, as_string(value), &str_index) ) {
+        if (table_get(&parser.lexeme_table, as_string(value), &str_index)) {
             return as_int(str_index);
         } else {
             str_index = int_value(add_constant(current_chunk(), value));
@@ -1115,11 +1121,15 @@ static int make_constant(Value value) {
     return index;
 }
 
-static void end_compiler() {
+static LoxFunction *end_compiler() {
     emit_byte(OP_RETURN);
+    LoxFunction *function = current_scope->function;
     if (SHOW_COMPILE_RESULT && !parser.has_error) {
-        disassemble_chunk(current_chunk(), "disassembling the compiling result");
+        disassemble_chunk(current_chunk(),
+                          function->name == NULL ?
+                          "<script>" : function->name->chars);
     }
+    return function;
 }
 
 static inline void emit_two_bytes(uint8_t byte1, uint8_t byte2) {
@@ -1156,7 +1166,7 @@ static void emit_constant(int index) {
 }
 
 static Chunk *current_chunk() {
-    return compiling_chunk;
+    return &current_scope->function->chunk;
 }
 
 static inline void emit_byte(uint8_t byte) {
@@ -1285,24 +1295,41 @@ void show_tokens(const char *src) {
     }
 }
 
-static void init_scope(Scope *scope) {
+/**
+ * 将指定的scope设置成current_scope，然后初始化之
+ */
+static void init_scope(Scope *scope, FunctionType type) {
+    scope->functionType = type;
+    scope->function = NULL;
     scope->depth = 0;
     scope->count = 0;
+    scope->function = new_function();
     current_scope = scope;
+
+    Local *local = &current_scope->locals[current_scope->count++];
+    local->depth = 0;
+    local->name.start = "";
+    local->name.length = 0;
+}
+
+static void init_parser(Parser *the_parser) {
+    init_table(&the_parser->lexeme_table);
+    the_parser->continue_point = -1;
+    the_parser->break_point = -1;
 }
 
 /**
- * 将目标源代码编译成字节码，写入到目标 chunk 中
+ * 将目标源代码编译成字节码
  * */
-bool compile(const char *src, Chunk *chunk) {
+LoxFunction *compile(const char *src) {
+
     init_scanner(src);
-    init_table(&parser.lexeme_table);
+    init_parser(&parser);
+
     init_map(&label_map, int_hash, int_equal);
-    parser.continue_point = -1;
-    parser.break_point = -1;
-    compiling_chunk = chunk;
+
     Scope scope;
-    init_scope(&scope);
+    init_scope(&scope, TYPE_SCRIPT);
 
     advance(); // 初始移动，如此一来，prev为null，curr为第一个token
 
@@ -1311,10 +1338,16 @@ bool compile(const char *src, Chunk *chunk) {
     }
 
     end_compiler();
+
     bool has_error = parser.has_error;
     parser.panic_mode = false;
     parser.has_error = false;
+
     free_table(&parser.lexeme_table);
-    free_map(&label_map);
-    return !has_error;
+
+    if (has_error) {
+        return NULL;
+    } else {
+        return current_scope->function;
+    }
 }

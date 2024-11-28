@@ -15,6 +15,10 @@ inline String *as_string(Value value) {
     return (String *)as_ref(value);
 }
 
+inline LoxFunction *as_function(Value value) {
+    return (LoxFunction *) as_ref(value);
+}
+
 /**
  * 从指定的 src 处产生一个新的 String。原 char*不会被修改。
  * */
@@ -68,6 +72,7 @@ String *string_concat(Value a, Value b) {
 
 /**
  * 分配指定字节大小的 Object。所有引用类型的对象都应该由此产生。
+ * 例如：`String *str = allocate_object(sizeof(String), OBJ_STRING);`
  * */
 Object *allocate_object(size_t size, ObjectType type) {
     Object *obj = re_allocate(NULL, 0, size);
@@ -84,4 +89,12 @@ static uint32_t chars_hash(const char *key, int length) {
         hash *= 16777619;
     }
     return hash;
+}
+
+LoxFunction *new_function() {
+    LoxFunction *function = (LoxFunction *) allocate_object(sizeof(LoxFunction), OBJ_FUNCTION);
+    function->name = NULL;
+    init_chunk(&function->chunk);
+    function->arity = 0;
+    return function;
 }

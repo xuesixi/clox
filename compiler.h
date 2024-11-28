@@ -6,8 +6,9 @@
 #define CLOX_COMPILER_H
 
 #include "chunk.h"
+#include "object.h"
 
-bool compile(const char* source, Chunk *chunk);
+LoxFunction *compile(const char* source);
 void show_tokens(const char *source);
 
 #endif //CLOX_COMPILER_H

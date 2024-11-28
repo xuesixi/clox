@@ -145,6 +145,13 @@ static char *to_print_ref(Value value) {
         case OBJ_STRING:
             asprintf(&buffer, "%s", as_string(value)->chars);
             break;
+        case OBJ_FUNCTION:
+            if (as_function(value)->name == NULL) {
+                asprintf(&buffer, "<script>");
+            } else {
+                asprintf(&buffer, "<function: %s>", as_function(value)->name->chars);
+            }
+            break;
         default:
             printf("error: encountering a value with unknown type: %d\n", type);
             break;
