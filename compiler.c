@@ -73,6 +73,7 @@ typedef enum FunctionType {
 typedef struct Scope {
     Local locals[UINT8_MAX + 1];
     LoxFunction *function;
+    struct Scope *enclosing;
     FunctionType functionType;
     int count;
     int depth;
@@ -83,12 +84,19 @@ Map label_map;
 //Chunk *compiling_chunk;
 Scope *current_scope;
 
+static int argument_list();
+
+static void call(bool can_assign);
 
 static inline bool lexeme_equal(Token *a, Token *b);
 
 static inline void begin_scope();
 
 static void declare_local(bool is_const);
+
+static inline void mark_initialized();
+
+static void function_statement(FunctionType type);
 
 static int resolve_local(Scope *scope, Token *token, bool *is_const);
 
@@ -98,7 +106,7 @@ static void clear_scope(int to);
 
 static inline void block_statement();
 
-static void init_scope(Scope *scope, FunctionType type);
+static void set_new_scope(Scope *scope, FunctionType type);
 
 static void error_at(Token *token, const char *message);
 
@@ -174,9 +182,11 @@ static void emit_goto(int dest);
 
 static void var_declaration();
 
+static void fun_declaration();
+
 static void const_declaration();
 
-static int parse_var_declaration(bool is_const);
+static int parse_identifier_declaration(bool is_const);
 
 static int identifier_constant(Token *name);
 
@@ -197,7 +207,7 @@ static int make_constant(Value value);
 //-------------------------------------------------------------------------
 
 ParseRule rules[] = {
-        [TOKEN_LEFT_PAREN]    = {grouping, NULL, PREC_NONE},
+        [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
@@ -263,7 +273,6 @@ static inline void restore_continue_point() {
 static inline void save_break_point() {
     parser.old_break_point = parser.break_point;
     parser.break_point = current_chunk()->count;
-    // printf("the breka point is %d\n", parser.break_point);
 }
 
 static inline void restore_break_point() {
@@ -323,20 +332,76 @@ static void declaration() {
         const_declaration();
     } else if (match(TOKEN_LABEL)) {
         label_statement();
+    } else if (match(TOKEN_FUN)){
+        fun_declaration();
     } else {
         statement();
     }
+
     if (parser.panic_mode) {
         synchronize();
     }
 }
 
+/**
+ * 让刚刚解析的那个本地变量标记为已初始化。
+ */
+static inline void mark_initialized() {
+    if (current_scope->depth > 0) {
+        current_scope->locals[current_scope->count - 1].depth = current_scope->depth;
+    }
+}
+
+static void function_statement(FunctionType type) {
+
+    // 函数具有新的scope
+    Scope scope;
+    set_new_scope(&scope, type);
+
+    begin_scope();
+
+    consume(TOKEN_LEFT_PAREN, "A ( is expected after function name");
+
+    // 参数列表
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            parse_identifier_declaration(false);
+            mark_initialized();
+            current_scope->function->arity ++;
+            if (current_scope->function->arity > 255) {
+                error_at_previous("cannot have more than 255 parameters");
+                return;
+            }
+        } while (match(TOKEN_COMMA));
+    }
+
+    consume(TOKEN_RIGHT_PAREN, "A ) is expected after parameters");
+    consume(TOKEN_LEFT_BRACE, "A { is expected to start the function body");
+
+    // 函数体
+    block_statement();
+
+    LoxFunction *function = end_compiler(); // 完成了函数的解析，返回上级
+
+    // 将这个函数作为一个常量储存起来
+    int index = make_constant(ref_value((Object*)function));
+    emit_constant(index);
+}
+
+static void fun_declaration() {
+    int index = parse_identifier_declaration(false);
+    mark_initialized(); // 将函数名立刻标记为已初始化。
+    function_statement(TYPE_FUNCTION);
+    if (current_scope->depth == 0) {
+        emit_two_bytes(OP_DEFINE_GLOBAL, index);
+    }
+}
+
 static void var_declaration() {
 
-    int index = parse_var_declaration(false);
+    int index = parse_identifier_declaration(false);
 
     if (match(TOKEN_EQUAL)) {
-
         expression();
     } else {
         emit_byte(OP_NIL);
@@ -346,14 +411,15 @@ static void var_declaration() {
     if (current_scope->depth == 0) {
         emit_two_bytes(OP_DEFINE_GLOBAL, index);
     } else {
-        current_scope->locals[current_scope->count - 1].depth = current_scope->depth;
+        mark_initialized();
     }
+
     // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
 }
 
 static void const_declaration() {
 
-    int index = parse_var_declaration(true);
+    int index = parse_identifier_declaration(true);
     consume(TOKEN_EQUAL, "A const variable must be initialized");
     expression();
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the const statement");
@@ -367,11 +433,16 @@ static void const_declaration() {
 }
 
 /**
+ * 将previous作为本地变量进行申明（检查不存在同层同名变量后，将其添加到locals中）。申明后，尚未标记初始化。
+ * @param is_const 是否为const变量
+ */
+static void declare_local(bool is_const) {
+/**
  * clox中，当一个语句（statement）执行完毕后，它必然会消耗掉期间产生的所有栈元素。
  * 本地变量的申明是唯一的可以产生“超单一语句”的栈元素的语句。它会在block结束后被全部清除。
  * 因为本地变量是唯一可以长时间存在的元素，一个本地变量在locals中的索引必然就是它在stack中的索引。
+ *
  */
-static void declare_local(bool is_const) {
     if (current_scope->count >= STACK_MAX) {
         error_at_previous("too many local variables");
         return;
@@ -403,6 +474,7 @@ static void declare_local(bool is_const) {
  * 该函数从后往前检查，因此后申明的变量会覆盖前申明的同名变量。
  * 如果不存在，返回-1
  * @param token 要检查的变量名
+ * @param is_cons 如果非NULL，那么找到的变量的is_const属性将会储存在其中
  * @return 该变量在local变量表的位置（同时也是vm的栈中的索引）
  */
 static int resolve_local(Scope *scope, Token *token, bool *is_const) {
@@ -424,10 +496,10 @@ static int resolve_local(Scope *scope, Token *token, bool *is_const) {
 }
 
 /**
- * 解析一个标识符，如果是全局变量，则将标识符添加为常量。如果是局部变量，申明之
+ * 解析一个标识符，如果是全局变量，则将标识符添加为常量。如果是局部变量，申明之（尚未初始化）
  * @return 如果是全局变量，返回索引。否则，返回-1
  */
-static inline int parse_var_declaration(bool is_const) {
+static inline int parse_identifier_declaration(bool is_const) {
     consume(TOKEN_IDENTIFIER, "An identifier is expected here");
 
     if (current_scope->depth > 0) {
@@ -777,6 +849,9 @@ static void for_statement() {
 
 }
 
+/**
+ * 层级 + 1
+ */
 static inline void begin_scope() {
     current_scope->depth++;
 }
@@ -846,6 +921,30 @@ static void end_scope() {
     clear_scope(current_scope->depth);
 }
 
+static int argument_list() {
+    int count = 0;
+    if (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_PAREN)) {
+        do {
+            if (count == 255) {
+                error_at_previous("Cannot have more than 255 arguments");
+            }
+            expression();
+            count ++;
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "A ) is expected to terminate the argument list");
+    return count;
+}
+
+static void call(bool can_assign) {
+    (void ) can_assign;
+    int arg_count = argument_list();
+    emit_two_bytes(OP_CALL, arg_count);
+}
+
+/**
+ * 在 { 已经被解析的情况下，一路解析完 }
+ */
 static void block_statement() {
     while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
         declaration();
@@ -1095,11 +1194,11 @@ static inline void grouping(bool can_assign) {
 }
 
 /**
- * 该函数包装了 add_constant
  * 如果value属于预先装载值，那么直接返回其对应的索引。
  * 如果value属于String，如果该值已存在于lexeme_table中，则返回其索引。
  * 如果不存在，则用add_constant添加后，也将其存入lexeme_table中。
  * 若都不是，则将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引.
+ * 该函数包装了 add_constant
  * @return 常数的索引
  * */
 static int make_constant(Value value) {
@@ -1121,14 +1220,16 @@ static int make_constant(Value value) {
     return index;
 }
 
+/**
+ * 将当前scope中的函数返回。切换回到上一层scope
+ */
 static LoxFunction *end_compiler() {
     emit_byte(OP_RETURN);
     LoxFunction *function = current_scope->function;
     if (SHOW_COMPILE_RESULT && !parser.has_error) {
-        disassemble_chunk(current_chunk(),
-                          function->name == NULL ?
-                          "<script>" : function->name->chars);
+        disassemble_chunk(current_chunk(), function->name == NULL ? "<script>" : function->name->chars);
     }
+    current_scope = current_scope->enclosing;
     return function;
 }
 
@@ -1165,10 +1266,17 @@ static void emit_constant(int index) {
     }
 }
 
-static Chunk *current_chunk() {
+/**
+ * 当前chunk，也就是当前scope的函数的chunk
+ * @return &current_scope->function->chunk;
+ */
+static inline Chunk *current_chunk() {
     return &current_scope->function->chunk;
 }
 
+/**
+ * 向当前 scope 的 function 的 chunk 中写入字节
+ */
 static inline void emit_byte(uint8_t byte) {
     write_chunk(current_chunk(), byte, parser.previous.line);
 }
@@ -1296,16 +1404,24 @@ void show_tokens(const char *src) {
 }
 
 /**
- * 将指定的scope设置成current_scope，然后初始化之
+ * 将指定的scope设置成current_scope，然后初始化之：
  */
-static void init_scope(Scope *scope, FunctionType type) {
+static void set_new_scope(Scope *scope, FunctionType type) {
+
     scope->functionType = type;
     scope->function = NULL;
     scope->depth = 0;
     scope->count = 0;
     scope->function = new_function();
+
+    if (type != TYPE_SCRIPT) {
+        scope->function->name = string_copy(parser.previous.start, parser.previous.length);
+    }
+
+    scope->enclosing = current_scope;
     current_scope = scope;
 
+    // 一个初始的占位符，代表当前scope的函数
     Local *local = &current_scope->locals[current_scope->count++];
     local->depth = 0;
     local->name.start = "";
@@ -1319,7 +1435,9 @@ static void init_parser(Parser *the_parser) {
 }
 
 /**
- * 将目标源代码编译成字节码
+ * 将目标源代码编译成字节码。
+ * 该函数会产生一个新的scope，然后再这个scope内部编译字节码。
+ * 返回该scope的function
  * */
 LoxFunction *compile(const char *src) {
 
@@ -1329,7 +1447,7 @@ LoxFunction *compile(const char *src) {
     init_map(&label_map, int_hash, int_equal);
 
     Scope scope;
-    init_scope(&scope, TYPE_SCRIPT);
+    set_new_scope(&scope, TYPE_SCRIPT);
 
     advance(); // 初始移动，如此一来，prev为null，curr为第一个token
 
@@ -1337,17 +1455,18 @@ LoxFunction *compile(const char *src) {
         declaration();
     }
 
-    end_compiler();
+    LoxFunction *function = end_compiler();
 
-    bool has_error = parser.has_error;
-    parser.panic_mode = false;
-    parser.has_error = false;
+//    bool has_error = parser.has_error;
+
+//    parser.panic_mode = false;
+//    parser.has_error = false;
 
     free_table(&parser.lexeme_table);
 
-    if (has_error) {
+    if (parser.has_error) {
         return NULL;
     } else {
-        return current_scope->function;
+        return function;
     }
 }

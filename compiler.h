@@ -9,6 +9,7 @@
 #include "object.h"
 
 LoxFunction *compile(const char* source);
-void show_tokens(const char *source);
+
+__attribute__((unused)) void show_tokens(const char *source);
 
 #endif //CLOX_COMPILER_H

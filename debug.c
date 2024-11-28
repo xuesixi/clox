@@ -15,6 +15,8 @@ void disassemble_chunk(Chunk *chunk, const char *name) {
     for (int offset = 0; offset < chunk->count; ) {
         offset = disassemble_instruction(chunk, offset);
     }
+    NEW_LINE();
+    NEW_LINE();
 }
 
 static int simple_instruction(const char *name, int offset) {

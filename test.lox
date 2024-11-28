@@ -1,19 +1,7 @@
 # huhu declare
-var huhu = 10;
-var num = 10;
-
-# for loop
-for (var i = 1; i < 10; i += 1) {
-    # get pow
-    var pow = i * 2 + 1;
-    # print pow
-    print pow;
-    # if pow
-    if (pow % 3 == 0) {
-        print "3 divides it";
-    }
-    # start
+fun hey() {
+    var name = "juju";
+    print "this is hey()";
 }
 
-# end print
-print "end";
+print hey;

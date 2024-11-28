@@ -10,8 +10,8 @@
 
 typedef struct CallFrame {
     LoxFunction *function;
-    uint8_t *PC;
-    Value *base;
+    uint8_t *PC; // program counter
+    Value *FP; // frame pointer. The start of the frame
 } CallFrame;
 
 typedef struct VM{
@@ -41,7 +41,7 @@ void free_VM();
 InterpretResult interpret(const char *src);
 InterpretResult produce(const char *src, const char *path);
 void runtime_error(const char *format, ...);
-void push_stack(Value value);
-Value pop_stack();
+void stack_push(Value value);
+Value stack_pop();
 
 #endif //CLOX_VM_H

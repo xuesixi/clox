@@ -36,7 +36,7 @@ static void binary_number_op(Value a, Value b, char operator) {
     if (operator==
         '+' &&(is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
         String *str = string_concat(a, b);
-        push_stack(ref_value(&str->object));
+        stack_push(ref_value(&str->object));
         return;
     }
     if (!is_number(a) || !is_number(b)) {
@@ -48,25 +48,25 @@ static void binary_number_op(Value a, Value b, char operator) {
         int b_v = as_int(b);
         switch (operator) {
             case '+':
-                push_stack(int_value(a_v + b_v));
+                stack_push(int_value(a_v + b_v));
                 break;
             case '-':
-                push_stack(int_value(a_v - b_v));
+                stack_push(int_value(a_v - b_v));
                 break;
             case '*':
-                push_stack(int_value(a_v * b_v));
+                stack_push(int_value(a_v * b_v));
                 break;
             case '/':
-                push_stack(int_value(a_v / b_v));
+                stack_push(int_value(a_v / b_v));
                 break;
             case '%':
-                push_stack(int_value(a_v % b_v));
+                stack_push(int_value(a_v % b_v));
                 break;
             case '>':
-                push_stack(bool_value(a_v > b_v));
+                stack_push(bool_value(a_v > b_v));
                 break;
             case '<':
-                push_stack(bool_value(a_v < b_v));
+                stack_push(bool_value(a_v < b_v));
                 break;
             default:
                 IMPLEMENTATION_ERROR("invalid binary operator");
@@ -77,22 +77,22 @@ static void binary_number_op(Value a, Value b, char operator) {
         double b_v = as_float(b);
         switch (operator) {
             case '+':
-                push_stack(float_value(a_v + b_v));
+                stack_push(float_value(a_v + b_v));
                 break;
             case '-':
-                push_stack(float_value(a_v - b_v));
+                stack_push(float_value(a_v - b_v));
                 break;
             case '*':
-                push_stack(float_value(a_v * b_v));
+                stack_push(float_value(a_v * b_v));
                 break;
             case '/':
-                push_stack(float_value(a_v / b_v));
+                stack_push(float_value(a_v / b_v));
                 break;
             case '>':
-                push_stack(bool_value(a_v > b_v));
+                stack_push(bool_value(a_v > b_v));
                 break;
             case '<':
-                push_stack(bool_value(a_v < b_v));
+                stack_push(bool_value(a_v < b_v));
                 break;
             default:
                 runtime_error("invalid binary operator");
@@ -103,22 +103,22 @@ static void binary_number_op(Value a, Value b, char operator) {
         int b_v = as_int(b);
         switch (operator) {
             case '+':
-                push_stack(float_value(a_v + b_v));
+                stack_push(float_value(a_v + b_v));
                 break;
             case '-':
-                push_stack(float_value(a_v - b_v));
+                stack_push(float_value(a_v - b_v));
                 break;
             case '*':
-                push_stack(float_value(a_v * b_v));
+                stack_push(float_value(a_v * b_v));
                 break;
             case '/':
-                push_stack(float_value(a_v / b_v));
+                stack_push(float_value(a_v / b_v));
                 break;
             case '>':
-                push_stack(bool_value(a_v > b_v));
+                stack_push(bool_value(a_v > b_v));
                 break;
             case '<':
-                push_stack(bool_value(a_v < b_v));
+                stack_push(bool_value(a_v < b_v));
                 break;
             default:
                 runtime_error("invalid binary operator");
@@ -129,22 +129,22 @@ static void binary_number_op(Value a, Value b, char operator) {
         double b_v = as_float(b);
         switch (operator) {
             case '+':
-                push_stack(float_value(a_v + b_v));
+                stack_push(float_value(a_v + b_v));
                 break;
             case '-':
-                push_stack(float_value(a_v - b_v));
+                stack_push(float_value(a_v - b_v));
                 break;
             case '*':
-                push_stack(float_value(a_v * b_v));
+                stack_push(float_value(a_v * b_v));
                 break;
             case '/':
-                push_stack(float_value(a_v / b_v));
+                stack_push(float_value(a_v / b_v));
                 break;
             case '>':
-                push_stack(bool_value(a_v > b_v));
+                stack_push(bool_value(a_v > b_v));
                 break;
             case '<':
-                push_stack(bool_value(a_v < b_v));
+                stack_push(bool_value(a_v < b_v));
                 break;
             default:
                 runtime_error("invalid binary operator");
@@ -157,8 +157,8 @@ static void binary_number_op(Value a, Value b, char operator) {
  * 处理二元操作符。两个出栈动作将由该函数执行
  * */
 static void binary_op(char operator) {
-    Value b = pop_stack();
-    Value a = pop_stack();
+    Value b = stack_pop();
+    Value a = stack_pop();
     switch (operator) {
         case '+':
         case '-':
@@ -220,7 +220,7 @@ void runtime_error(const char *format, ...) {
 }
 
 /**
- * 读取下一个字节，然后移动 ip
+ * 读取curr_frame的下一个字节，然后移动PC
  * @return 下一个字节
  */
 static inline uint8_t read_byte() {
@@ -260,13 +260,10 @@ static inline String *read_constant_string() {
 }
 
 /**
- * 遍历虚拟机的 chunk 中的每一个执行，执行之
+ * 遍历虚拟机的 curr_frame 的 chunk 中的每一个指令，执行之
  * @return 执行的结果
  */
 static InterpretResult run() {
-//    printf("\n");
-    NEW_LINE();
-    NEW_LINE();
     while (true) {
         if (TRACE_EXECUTION) {
             show_stack();
@@ -281,21 +278,21 @@ static InterpretResult run() {
             }
             case OP_CONSTANT: {
                 Value value = read_constant();
-                push_stack(value);
+                stack_push(value);
                 break;
             }
             case OP_CONSTANT2: {
                 Value value = read_constant2();
-                push_stack(value);
+                stack_push(value);
                 break;
             }
             case OP_NEGATE: {
                 Value value = peek_stack(0);
                 if (is_int(value)) {
-                    push_stack(int_value(-as_int(pop_stack())));
+                    stack_push(int_value(-as_int(stack_pop())));
                     break;
                 } else if (is_float(value)) {
-                    push_stack(float_value(-as_float(pop_stack())));
+                    stack_push(float_value(-as_float(stack_pop())));
                     break;
                 } else {
                     runtime_error("the value of type: %d is cannot be negated",
@@ -325,51 +322,51 @@ static InterpretResult run() {
                 binary_op('>');
                 break;
             case OP_EQUAL: {
-                Value b = pop_stack();
-                Value a = pop_stack();
-                push_stack(bool_value(value_equal(a, b)));
+                Value b = stack_pop();
+                Value a = stack_pop();
+                stack_push(bool_value(value_equal(a, b)));
                 break;
             }
             case OP_NIL:
-                push_stack(nil_value());
+                stack_push(nil_value());
                 break;
             case OP_TRUE:
-                push_stack(bool_value(true));
+                stack_push(bool_value(true));
                 break;
             case OP_FALSE:
-                push_stack(bool_value(false));
+                stack_push(bool_value(false));
                 break;
             case OP_NOT:
-                push_stack(bool_value(is_falsy(pop_stack())));
+                stack_push(bool_value(is_falsy(stack_pop())));
                 break;
             case OP_PRINT:
                 if (TRACE_EXECUTION) {
                     printf(">>> ");
                 }
-                print_value(pop_stack());
+                print_value(stack_pop());
                 NEW_LINE();
                 break;
             case OP_POP:
-                pop_stack();
+                stack_pop();
                 break;
             case OP_DEFINE_GLOBAL: {
                 String *name = read_constant_string();
                 table_set(&vm.globals, name, peek_stack(0));
-                pop_stack();
+                stack_pop();
                 break;
             }
             case OP_DEFINE_GLOBAL_CONST: {
                 String *name = read_constant_string();
                 table_set(&vm.globals, name, peek_stack(0));
                 table_set(&vm.const_table, name, bool_value(true));
-                pop_stack();
+                stack_pop();
                 break;
             }
             case OP_GET_GLOBAL: {
                 String *name = read_constant_string();
                 Value value;
                 if (table_get(&vm.globals, name, &value)) {
-                    push_stack(value);
+                    stack_push(value);
                 } else {
                     runtime_error("Accessing an undefined variable: %s",
                                   name->chars);
@@ -395,12 +392,12 @@ static InterpretResult run() {
             }
             case OP_GET_LOCAL: {
                 int index = read_byte();
-                push_stack(curr_frame()->base[index]);
+                stack_push(curr_frame()->FP[index]);
                 break;
             }
             case OP_SET_LOCAL: {
                 int index = read_byte();
-                curr_frame()->base[index] = peek_stack(0);
+                curr_frame()->FP[index] = peek_stack(0);
                 break;
             }
             case OP_JUMP_IF_FALSE: {
@@ -438,14 +435,14 @@ static InterpretResult run() {
             }
             case OP_JUMP_IF_FALSE_POP: {
                 uint16_t offset = read_uint16();
-                if (is_falsy(pop_stack())) {
+                if (is_falsy(stack_pop())) {
                     curr_frame()->PC += offset;
                 }
                 break;
             }
             case OP_JUMP_IF_TRUE_POP: {
                 uint16_t offset = read_uint16();
-                if (!is_falsy(pop_stack())) {
+                if (!is_falsy(stack_pop())) {
                     curr_frame()->PC += offset;
                 }
                 break;
@@ -476,12 +473,12 @@ void free_VM() {
     free_map(&label_map);
 }
 
-inline void push_stack(Value value) {
+inline void stack_push(Value value) {
     *vm.stack_top = value;
     vm.stack_top++;
 }
 
-inline Value pop_stack() {
+inline Value stack_pop() {
     vm.stack_top--;
     return *(vm.stack_top);
 }
@@ -502,9 +499,9 @@ InterpretResult interpret(const char *src) {
     vm.frame_count++;
     CallFrame *frame = curr_frame();
     frame->function = function;
-    frame->base = vm.stack;
+    frame->FP = vm.stack;
     frame->PC = function->chunk.code;
-    push_stack(nil_value());
+    stack_push(ref_value((Object *) function));
     return run();
 }
 
