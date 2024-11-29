@@ -27,7 +27,6 @@ static Value read_constant2();
 static InterpretResult run();
 static void show_stack();
 static Value peek_stack(int distance);
-static void binary_op(char operator);
 static void binary_number_op(Value a, Value b, char operator);
 static void call_value(Value value, int arg_count);
 static void runtime_error(const char *format, ...);
@@ -44,20 +43,6 @@ static inline CallFrame *curr_frame() {
 }
 
 static void binary_number_op(Value a, Value b, char operator) {
-    if (operator== '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
-        String *str = string_concat(a, b);
-        stack_push(ref_value(&str->object));
-        return;
-    }
-    if (!is_number(a) || !is_number(b)) {
-        char *a_text = to_print_chars(a);
-        char *b_text = to_print_chars(b);
-        runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
-        free(a_text);
-        free(b_text);
-        catch();
-        return;
-    }
     if (is_int(a) && is_int(b)) {
         int a_v = as_int(a);
         int b_v = as_int(b);
@@ -139,7 +124,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 runtime_error_and_jump("invalid binary operator");
                 return;
         }
-    } else {
+    } else if (is_float(a) && is_float(b)){
         double a_v = as_float(a);
         double b_v = as_float(b);
         switch (operator) {
@@ -165,28 +150,18 @@ static void binary_number_op(Value a, Value b, char operator) {
                 runtime_error_and_jump("invalid binary operator");
                 return;
         }
-    }
-}
-
-/**
- * 处理二元操作符。两个出栈动作将由该函数执行
- * */
-static void binary_op(char operator) {
-    Value b = stack_pop();
-    Value a = stack_pop();
-    switch (operator) {
-        case '+':
-        case '-':
-        case '*':
-        case '%':
-        case '/':
-        case '>':
-        case '<':
-            binary_number_op(a, b, operator);
-            break;
-        default:
-            printf("%c is not a valid binary operator\n", operator);
-            return;
+    } else if (operator== '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
+        String *str = string_concat(a, b);
+        stack_push(ref_value(&str->object));
+        return;
+    } else {
+        char *a_text = to_print_chars(a);
+        char *b_text = to_print_chars(b);
+        runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
+        free(a_text);
+        free(b_text);
+        catch();
+        return;
     }
 }
 
@@ -335,7 +310,6 @@ static InterpretResult run() {
         uint8_t instruction = read_byte();
         switch (instruction) {
             case OP_RETURN: {
-                //
                 Value result = stack_pop(); // 返回值
                 vm.stack_top = curr_frame()->FP;
                 vm.frame_count--;
@@ -367,27 +341,51 @@ static InterpretResult run() {
                     runtime_error_and_jump("the value of type: %d is cannot be negated", value.type);
                 }
             }
-            case OP_ADD:
-                binary_op('+');
+            case OP_ADD: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                binary_number_op(a, b, '+');
                 break;
-            case OP_SUBTRACT:
-                binary_op('-');
+            }
+            case OP_SUBTRACT: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                binary_number_op(a, b, '-');
                 break;
-            case OP_MULTIPLY:
-                binary_op('*');
+            }
+            case OP_MULTIPLY: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                binary_number_op(a, b, '*');
                 break;
-            case OP_DIVIDE:
-                binary_op('/');
+
+            }
+            case OP_DIVIDE: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                binary_number_op(a, b, '/');
                 break;
-            case OP_MOD:
-                binary_op('%');
+
+            }
+            case OP_MOD: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                binary_number_op(a, b, '%');
                 break;
-            case OP_LESS:
-                binary_op('<');
+
+            }
+            case OP_LESS: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                binary_number_op(a, b, '<');
                 break;
-            case OP_GREATER:
-                binary_op('>');
+            }
+            case OP_GREATER: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                binary_number_op(a, b, '>');
                 break;
+            }
             case OP_EQUAL: {
                 Value b = stack_pop();
                 Value a = stack_pop();
