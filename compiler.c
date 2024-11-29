@@ -1482,6 +1482,7 @@ LoxFunction *compile(const char *src) {
     free_table(&parser.lexeme_table);
 
     if (parser.has_error) {
+        parser.has_error = false;
         return NULL;
     } else {
         return function;
