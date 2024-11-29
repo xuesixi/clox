@@ -27,10 +27,12 @@ static void show_stack();
 static Value peek_stack(int distance);
 static void binary_op(char operator);
 static void binary_number_op(Value a, Value b, char operator);
-static bool call_value(Value value, int arg_count);
+static void call_value(Value value, int arg_count);
 static void runtime_error(const char *format, ...);
 void catch();
 void runtime_error_and_jump(const char *format, ...);
+static void stack_push(Value value);
+static Value stack_pop();
 
 /* ------------------上面是静态函数申明-----------------------
    ------------------下面是静态函数定义----------------------- */
@@ -51,6 +53,7 @@ static void binary_number_op(Value a, Value b, char operator) {
         runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
         free(a_text);
         free(b_text);
+        catch();
         return;
     }
     if (is_int(a) && is_int(b)) {
@@ -105,7 +108,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error("invalid binary operator");
+                runtime_error_and_jump("invalid binary operator");
                 return;
         }
     } else if (is_float(a) && is_int(b)) {
@@ -131,7 +134,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error("invalid binary operator");
+                runtime_error_and_jump("invalid binary operator");
                 return;
         }
     } else {
@@ -157,7 +160,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error("invalid binary operator");
+                runtime_error_and_jump("invalid binary operator");
                 return;
         }
     }
@@ -187,11 +190,19 @@ static void binary_op(char operator) {
 
 static void show_stack() {
     for (Value *i = vm.stack; i < vm.stack_top; i++) {
+        if (i == curr_frame()->FP) {
+            printf("\033[0;31m");
+            printf("|");
+            printf("\033[0m");
+        } else {
+            printf(" ");
+        }
         printf("[ ");
         print_value(*i);
         printf(" ]");
     }
     NEW_LINE();
+
 }
 
 static inline bool is_falsy(Value value) {
@@ -218,6 +229,7 @@ static inline Value peek_stack(int distance) {
  * 打印调用栈消息。清空栈。
  */
 void runtime_error(const char *format, ...) {
+    fputs("\nRuntime Error: ", stderr);
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -229,7 +241,7 @@ void runtime_error(const char *format, ...) {
         LoxFunction *function = frame->function;
         size_t index = frame->PC - frame->function->chunk.code - 1;
         int line = function->chunk.lines[index];
-        fprintf(stderr, "[line %d] in ", line);
+        fprintf(stderr, "at [line %d] in ", line);
         if (i == 0) {
             fprintf(stderr, "main()\n");
         } else {
@@ -240,10 +252,18 @@ void runtime_error(const char *format, ...) {
     reset_stack();
 }
 
+/**
+ * 跳转到错误处理处。
+ * 该函数只应该用在runtime_error()后面。
+ */
 inline void catch() {
     longjmp(error_buf, 1);
 }
 
+/**
+ * 输出错误消息（会自动添加换行符）
+ * 打印调用栈消息。清空栈。然后跳转至错误处理处
+ */
 void runtime_error_and_jump(const char *format, ...) {
     va_list args;
     va_start(args, format);
@@ -297,6 +317,12 @@ static inline String *read_constant_string() {
  * @return 执行的结果
  */
 static InterpretResult run() {
+
+    if (setjmp(error_buf)) {
+        //  运行时错误会跳转至这里
+        return INTERPRET_RUNTIME_ERROR;
+    }
+
     while (true) {
         if (TRACE_EXECUTION) {
             show_stack();
@@ -307,7 +333,7 @@ static InterpretResult run() {
         uint8_t instruction = read_byte();
         switch (instruction) {
             case OP_RETURN: {
-                Value result = stack_pop();
+                Value result = stack_pop(); // 返回值
                 vm.stack_top = curr_frame()->FP;
                 vm.frame_count--;
                 if (vm.frame_count == 0) {
@@ -336,8 +362,8 @@ static InterpretResult run() {
                     stack_push(float_value(-as_float(stack_pop())));
                     break;
                 } else {
-                    runtime_error("the value of type: %d is cannot be negated", value.type);
-                    return INTERPRET_RUNTIME_ERROR;
+                    runtime_error_and_jump("the value of type: %d is cannot be negated", value.type);
+//                    return INTERPRET_RUNTIME_ERROR;
                 }
             }
             case OP_ADD:
@@ -411,23 +437,23 @@ static InterpretResult run() {
                 if (table_get(&vm.globals, name, &value)) {
                     stack_push(value);
                 } else {
-                    runtime_error("Accessing an undefined variable: %s", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                    runtime_error_and_jump("Accessing an undefined variable: %s", name->chars);
+//                    return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
             }
             case OP_SET_GLOBAL: {
                 String *name = read_constant_string();
                 if (table_has(&vm.const_table, name)) {
-                    runtime_error("The const variable %s cannot be re-assigned", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                    runtime_error_and_jump("The const variable %s cannot be re-assigned", name->chars);
+//                    return INTERPRET_RUNTIME_ERROR;
                 }
                 if (table_set(&vm.globals, name, peek_stack(0))) {
                     break;
                 } else {
                     table_delete(&vm.globals, name);
-                    runtime_error("Setting an undefined variable: %s", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                    runtime_error_and_jump("Setting an undefined variable: %s", name->chars);
+//                    return INTERPRET_RUNTIME_ERROR;
                 }
             }
             case OP_GET_LOCAL: {
@@ -491,13 +517,11 @@ static InterpretResult run() {
                 // main, 999, sum, 1, 2
                 int count = read_byte();
                 Value callee = peek_stack(count);
-                if (! call_value(callee, count) ) {
-                    return INTERPRET_RUNTIME_ERROR;
-                }
+                call_value(callee, count);
                 break;
             }
             default: {
-                runtime_error("unrecognized instruction");
+                runtime_error_and_jump("unrecognized instruction");
                 break;
             }
         }
@@ -506,34 +530,31 @@ static InterpretResult run() {
 
 /**
  * 创建一个call frame。
+ * 如果value不是函数，或者参数数量不匹配，则出现runtime错误
  * @param value 要调用的函数
  * @param arg_count 传入的参数的个数
- * @return 如果value是合适的函数，且参数数量正确，返回true。否则是错误，返回false
  */
-static bool call_value(Value value, int arg_count) {
+static void call_value(Value value, int arg_count) {
     if (!is_ref_of(value, OBJ_FUNCTION)) {
         // runtime error
         char *name = to_print_chars(value);
         runtime_error("%s is not callable", name);
         free(name);
-        return false;
+        catch();
     }
     LoxFunction *function = as_function(value);
     if (function->arity != arg_count) {
         // runtime error
-        runtime_error("%s expects %d arguments, and got %d", function->name->chars, function->arity, arg_count);
-        return false;
+        runtime_error_and_jump("%s expects %d arguments, and got %d", function->name->chars, function->arity, arg_count);
     }
     if (vm.frame_count == FRAME_MAX) {
-        runtime_error("Stack overflow.");
-        return false;
+        runtime_error_and_jump("Stack overflow.");
     }
     vm.frame_count ++;
     CallFrame *frame = curr_frame();
     frame->FP = vm.stack_top - arg_count - 1;
     frame->PC = function->chunk.code;
     frame->function = function;
-    return true;
 }
 
 
@@ -548,6 +569,14 @@ void init_VM() {
     init_table(&vm.const_table);
 }
 
+/**
+ * 清除下列数据
+ * @par objects
+ * @par string_table
+ * @par globals
+ * @par const_table
+ * @par label_map
+ */
 void free_VM() {
     free_all_objects();
     free_table(&vm.string_table);
@@ -558,14 +587,14 @@ void free_VM() {
 
 /**
  * 将value置于stack_top处，然后自增stack_top
- * @param value
+ * @param value 想要添加的value
  */
-inline void stack_push(Value value) {
+static inline void stack_push(Value value) {
     *vm.stack_top = value;
     vm.stack_top++;
 }
 
-inline Value stack_pop() {
+static inline Value stack_pop() {
     vm.stack_top--;
     return *(vm.stack_top);
 }
@@ -589,6 +618,7 @@ InterpretResult interpret(const char *src) {
     frame->FP = vm.stack;
     frame->PC = function->chunk.code;
     stack_push(ref_value((Object *) function));
+
     return run();
 }
 

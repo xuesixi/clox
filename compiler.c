@@ -320,7 +320,7 @@ static void parse_precedence(Precedence precedence) {
  * 这里map_set中的索引有+1，这是为了防止索引0被当成NULL。在debug中也有同样的+1；
  */
 static void label_statement() {
-    if (SHOW_COMPILE_RESULT) {
+    if (SHOW_LABEL) {
         Token label = parser.previous;
         char *text = ALLOCATE(char, label.length + 1);
         memcpy(text, label.start, label.length);
@@ -701,7 +701,7 @@ static void while_statement() {
  * 
  * default:
  *     pop expression_2
- *     pop exression_1
+ *     pop expression_1
  *     statement....
  * 
  * end:
@@ -785,7 +785,7 @@ static void switch_statement() {
  * continue_point:
  *
  * increment:
- *     exression
+ *     expression
  *     pop increment expression
  *     jump -> condition
  * 

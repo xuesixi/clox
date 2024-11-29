@@ -12,6 +12,7 @@
 
 extern bool SHOW_COMPILE_RESULT;
 extern bool TRACE_EXECUTION;
+extern bool SHOW_LABEL;
 
 #define IMPLEMENTATION_ERROR(msg) \
     fprintf(stderr, "Implement error: %s\nOccurred in file: %s, line: %d\n", msg, __FILE__, __LINE__)

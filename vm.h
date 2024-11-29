@@ -32,7 +32,6 @@ typedef enum {
     INTERPRET_PRODUCE_ERROR,
 } InterpretResult;
 
-
 extern VM vm;
 extern bool REPL;
 
@@ -40,7 +39,5 @@ void init_VM();
 void free_VM();
 InterpretResult interpret(const char *src);
 InterpretResult produce(const char *src, const char *path);
-void stack_push(Value value);
-Value stack_pop();
 
 #endif //CLOX_VM_H

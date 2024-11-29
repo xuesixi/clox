@@ -7,7 +7,7 @@ fun hey(name) {
         return a + b;
     }
 
-    return add(false, 123);
+    return add(name, 123);
 }
 
 var name = "moria";
@@ -15,4 +15,6 @@ var name = "moria";
 var answer = hey(name);
 
 # print name
-print answer;
+for (var i = 0; i < 5; i+= 1) {
+    print answer;
+}

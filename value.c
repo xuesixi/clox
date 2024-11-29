@@ -111,7 +111,6 @@ bool value_equal(Value a, Value b) {
         case VAL_NIL:
             return true;
         case VAL_REF:
-//            return object_equal(as_ref(a), as_ref(b));
             return as_ref(a) == as_ref(b);
         default:
             return true;
@@ -199,24 +198,3 @@ char *to_print_chars(Value value) {
     }
     return buffer;
 }
-
-// void print_value_with_type(Value value) {
-//     if (is_float(value)) {
-//         printf("%g: float", as_float(value));
-//     } else if (is_int(value)) {
-//         printf("%d: int", as_int(value));
-//     } else if (is_bool(value)) {
-//         if (as_bool(value)) {
-//             printf("true");
-//         } else {
-//             printf("false");
-//         }
-//     } else if (is_nil(value)) {
-//         printf("nil");
-//     } else if (is_ref(value)) {
-//         print_ref(value);
-//     } else {
-//         printf("error: encountering a value with unknown type: %d\n",
-//                value.type);
-//     }
-// }

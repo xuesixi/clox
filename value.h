@@ -40,8 +40,6 @@ void append_ValueArray(ValueArray *array, Value value);
 void free_ValueArray(ValueArray *array);
 
 void print_value(Value value);
-// void print_value_with_type(Value value);
-// void print_ref(Value value);
 char *to_print_chars(Value value);
 
 bool is_bool(Value value);

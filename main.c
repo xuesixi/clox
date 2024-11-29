@@ -7,6 +7,8 @@
 bool REPL;
 bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
+bool SHOW_LABEL = false;
+
 
 static void repl() {
     REPL = true;
@@ -77,30 +79,33 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
  * clox
  * clox file
  * */
-int main(int argc, char * const argv[]) {
+int main(int argc, char *const argv[]) {
 
     init_VM();
-    char *options = "ds";
+    char *options = "dls";
     char op;
-    while ( (op = getopt(argc, argv, options)) != -1) {
+    while ((op = getopt(argc, argv, options)) != -1) {
         switch (op) {
-        case 'd':
-            TRACE_EXECUTION = true;
-            break;
-        case 's':
-            SHOW_COMPILE_RESULT = true;
-            break;
-        default:
-            printf("Invalid option %c\n", op);
-            printf("-s: show the compile result\n");
-            printf("-d: trace the execution\n");
+            case 'd':
+                TRACE_EXECUTION = true;
+                break;
+            case 's':
+                SHOW_COMPILE_RESULT = true;
+                break;
+            case 'l':
+                SHOW_LABEL = true;
+                break;
+            default:
+                printf("Invalid option %c\n", op);
+                printf("-s: show the compile result\n");
+                printf("-d: trace the execution\n");
         }
-     } 
-     if (optind < argc) {
+    }
+    if (optind < argc) {
         run_file(argv[optind]);
-     } else {
+    } else {
         repl();
-     }
+    }
 
     free_VM();
 }
