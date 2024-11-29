@@ -8,6 +8,7 @@
 typedef enum {
   OBJ_STRING,
   OBJ_FUNCTION,
+  OBJ_NATIVE,
 } ObjectType;
 
 typedef struct Object{
@@ -29,6 +30,13 @@ typedef struct LoxFunction {
     String *name;
 } LoxFunction;
 
+typedef Value (*NativeImplementation)(int count, Value *values);
+
+typedef struct NativeFunction {
+    Object object;
+    NativeImplementation impl;
+    String *name;
+} NativeFunction;
 
 bool is_ref_of(Value value, ObjectType type);
 String *as_string(Value value);
@@ -38,6 +46,8 @@ String *string_concat(Value a, Value b);
 
 Object *allocate_object(size_t size, ObjectType type);
 LoxFunction *new_function();
+NativeFunction *new_native(NativeImplementation impl, String *name);
 LoxFunction *as_function(Value value);
+NativeFunction *as_native(Value value);
 
 #endif

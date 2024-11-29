@@ -1,20 +1,15 @@
-# huhu declare
-fun hey(name) {
-    var greeting = "hello, ";
-    print greeting + name;
 
-    fun add(a, b) {
-        return a + b;
+var start = clock();
+fun fbnc(num) {
+    if (num < 2) {
+        return num;
+    } else {
+        return fbnc(num - 1) + fbnc(num-2);
     }
-
-    return add(name, 123);
 }
 
-var name = "moria";
-# function call
-var answer = hey(name);
+print fbnc(35);
 
-# print name
-for (var i = 0; i < 5; i+= 1) {
-    print answer;
-}
+print clock() - start;
+
+

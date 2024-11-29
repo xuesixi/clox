@@ -10,6 +10,8 @@
 #include "object.h"
 #include "stdarg.h"
 #include "setjmp.h"
+#include "string.h"
+#include "time.h"
 
 VM vm;
 
@@ -189,6 +191,7 @@ static void binary_op(char operator) {
 }
 
 static void show_stack() {
+    printf(" ");
     for (Value *i = vm.stack; i < vm.stack_top; i++) {
         if (i == curr_frame()->FP) {
             printf("\033[0;31m");
@@ -305,8 +308,7 @@ static inline Value read_constant2() {
 static inline String *read_constant_string() {
     Value value = read_constant();
     if (!is_ref_of(value, OBJ_STRING)) {
-        IMPLEMENTATION_ERROR(
-            "trying to read a constant string, but the value is not a String");
+        IMPLEMENTATION_ERROR("trying to read a constant string, but the value is not a String");
         return NULL;
     }
     return (String *)(as_ref(value));
@@ -510,7 +512,7 @@ static InterpretResult run() {
                 break;
             }
             case OP_CALL: {
-                // main, 999, sum, 1, 2
+                // main, 999, sum, 1, 2, top
                 int count = read_byte();
                 Value callee = peek_stack(count);
                 call_value(callee, count);
@@ -531,26 +533,54 @@ static InterpretResult run() {
  * @param arg_count 传入的参数的个数
  */
 static void call_value(Value value, int arg_count) {
-    if (!is_ref_of(value, OBJ_FUNCTION)) {
+    if (!is_ref_of(value, OBJ_FUNCTION) && !is_ref_of(value, OBJ_NATIVE)) {
         // runtime error
         char *name = to_print_chars(value);
         runtime_error("%s is not callable", name);
         free(name);
         catch();
     }
-    LoxFunction *function = as_function(value);
-    if (function->arity != arg_count) {
-        // runtime error
-        runtime_error_and_jump("%s expects %d arguments, and got %d", function->name->chars, function->arity, arg_count);
+    if (is_ref_of(value, OBJ_FUNCTION)) {
+        LoxFunction *function = as_function(value);
+        if (function->arity != arg_count) {
+            // runtime error
+            runtime_error_and_jump("%s expects %d arguments, and got %d", function->name->chars, function->arity, arg_count);
+        }
+        if (vm.frame_count == FRAME_MAX) {
+            runtime_error_and_jump("Stack overflow.");
+        }
+        vm.frame_count ++;
+        CallFrame *frame = curr_frame();
+        frame->FP = vm.stack_top - arg_count - 1;
+        frame->PC = function->chunk.code;
+        frame->function = function;
+    } else if (is_ref_of(value, OBJ_NATIVE)) {
+        // sum, 1, 2, top
+        Value result = as_native(value)->impl(arg_count, vm.stack_top - arg_count);
+        vm.stack_top -= arg_count + 1;
+        stack_push(result);
+    } else {
+        IMPLEMENTATION_ERROR("not callable");
     }
-    if (vm.frame_count == FRAME_MAX) {
-        runtime_error_and_jump("Stack overflow.");
-    }
-    vm.frame_count ++;
-    CallFrame *frame = curr_frame();
-    frame->FP = vm.stack_top - arg_count - 1;
-    frame->PC = function->chunk.code;
-    frame->function = function;
+}
+
+static void define_native(const char *name, NativeImplementation impl) {
+    int len = (int) strlen(name);
+//    String *str = string_copy(name, len);
+//    NativeFunction *nativeFunction = new_native(impl);
+//    table_set(&vm.globals, str, ref_value((Object*)nativeFunction));
+
+    stack_push(ref_value((Object *)string_copy(name, len)));
+    stack_push(ref_value((Object *)new_native(impl, as_string(vm.stack[0]))));
+    table_set(&vm.globals, as_string(vm.stack[0]), vm.stack[1]);
+    stack_pop();
+    stack_pop();
+}
+
+static Value native_clock(int count, Value *value) {
+    (void )count;
+    (void )value;
+    return float_value((double)clock() / CLOCKS_PER_SEC);
 }
 
 
@@ -563,6 +593,7 @@ void init_VM() {
     init_table(&vm.string_table);
     init_table(&vm.globals);
     init_table(&vm.const_table);
+    define_native("clock", native_clock);
 }
 
 /**

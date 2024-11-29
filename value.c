@@ -151,6 +151,9 @@ static char *to_print_ref(Value value) {
                 asprintf(&buffer, "<fn: %s>", as_function(value)->name->chars);
             }
             break;
+        case OBJ_NATIVE:
+            asprintf(&buffer, "<native: %s>", as_native(value)->name->chars);
+            break;
         default:
             printf("error: encountering a value with unknown type: %d\n", type);
             break;

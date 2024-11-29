@@ -393,11 +393,11 @@ static void function_statement(FunctionType type) {
 }
 
 static void fun_declaration() {
-    int index = parse_identifier_declaration(false);
+    int name = parse_identifier_declaration(false);
     mark_initialized(); // 将函数名立刻标记为已初始化。
     function_statement(TYPE_FUNCTION);
     if (current_scope->depth == 0) {
-        emit_two_bytes(OP_DEFINE_GLOBAL, index);
+        emit_two_bytes(OP_DEFINE_GLOBAL, name);
     }
 }
 
@@ -1215,9 +1215,7 @@ static inline void grouping(bool can_assign) {
 
 /**
  * 如果value属于预先装载值，那么直接返回其对应的索引。
- * 如果value属于String，如果该值已存在于lexeme_table中，则返回其索引。
- * 如果不存在，则用add_constant添加后，也将其存入lexeme_table中。
- * 若都不是，则将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引.
+ * 否则将指定的 value 作为常数储存到 vm.code.constants 之中，然后返回其索引.
  * 该函数包装了 add_constant
  * @return 常数的索引
  * */
@@ -1226,16 +1224,16 @@ static int make_constant(Value value) {
     if (cache != -1) {
         return cache;
     }
-    if (is_ref_of(value, OBJ_STRING)) {
-        Value str_index;
-        if (table_get(&parser.lexeme_table, as_string(value), &str_index)) {
-            return as_int(str_index);
-        } else {
-            str_index = int_value(add_constant(current_chunk(), value));
-            table_set(&parser.lexeme_table, as_string(value), str_index);
-            return as_int(str_index);
-        }
-    }
+//    if (is_ref_of(value, OBJ_STRING)) {
+//        Value str_index;
+//        if (table_get(&parser.lexeme_table, as_string(value), &str_index)) {
+//            return as_int(str_index);
+//        } else {
+//            str_index = int_value(add_constant(current_chunk(), value));
+//            table_set(&parser.lexeme_table, as_string(value), str_index);
+//            return as_int(str_index);
+//        }
+//    }
     int index = add_constant(current_chunk(), value);
     return index;
 }
@@ -1480,11 +1478,6 @@ LoxFunction *compile(const char *src) {
     }
 
     LoxFunction *function = end_compiler();
-
-//    bool has_error = parser.has_error;
-
-//    parser.panic_mode = false;
-//    parser.has_error = false;
 
     free_table(&parser.lexeme_table);
 

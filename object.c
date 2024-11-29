@@ -19,6 +19,10 @@ inline LoxFunction *as_function(Value value) {
     return (LoxFunction *) as_ref(value);
 }
 
+inline NativeFunction *as_native(Value value) {
+    return (NativeFunction *) as_ref(value);
+}
+
 /**
  * 从指定的 src 处产生一个新的 String。原 char*不会被修改。
  * */
@@ -93,4 +97,11 @@ LoxFunction *new_function() {
     init_chunk(&function->chunk);
     function->arity = 0;
     return function;
+}
+
+NativeFunction *new_native(NativeImplementation impl, String *name) {
+    NativeFunction *native = (NativeFunction *) allocate_object(sizeof(NativeFunction), OBJ_NATIVE);
+    native->impl = impl;
+    native->name = name;
+    return native;
 }

@@ -46,6 +46,10 @@ void free_object(Object *object) {
             re_allocate(object, sizeof(LoxFunction), 0);
             break;
         }
+        case OBJ_NATIVE: {
+            re_allocate(object, sizeof(NativeFunction), 0);
+            break;
+        }
         default:
             return;
     }
