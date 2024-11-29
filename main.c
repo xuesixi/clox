@@ -19,7 +19,7 @@ static void repl() {
             add_history(line);
             free(line);
         } else {
-            printf("\n");
+            NEW_LINE();
             break;
         }
     }

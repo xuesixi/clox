@@ -333,11 +333,11 @@ static InterpretResult run() {
         uint8_t instruction = read_byte();
         switch (instruction) {
             case OP_RETURN: {
+                //
                 Value result = stack_pop(); // 返回值
                 vm.stack_top = curr_frame()->FP;
                 vm.frame_count--;
                 if (vm.frame_count == 0) {
-                    stack_pop(); // pop <main>
                     return INTERPRET_OK;
                 }
                 stack_push(result);
@@ -363,7 +363,6 @@ static InterpretResult run() {
                     break;
                 } else {
                     runtime_error_and_jump("the value of type: %d is cannot be negated", value.type);
-//                    return INTERPRET_RUNTIME_ERROR;
                 }
             }
             case OP_ADD:
@@ -438,7 +437,6 @@ static InterpretResult run() {
                     stack_push(value);
                 } else {
                     runtime_error_and_jump("Accessing an undefined variable: %s", name->chars);
-//                    return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
             }
@@ -446,14 +444,12 @@ static InterpretResult run() {
                 String *name = read_constant_string();
                 if (table_has(&vm.const_table, name)) {
                     runtime_error_and_jump("The const variable %s cannot be re-assigned", name->chars);
-//                    return INTERPRET_RUNTIME_ERROR;
                 }
                 if (table_set(&vm.globals, name, peek_stack(0))) {
                     break;
                 } else {
                     table_delete(&vm.globals, name);
                     runtime_error_and_jump("Setting an undefined variable: %s", name->chars);
-//                    return INTERPRET_RUNTIME_ERROR;
                 }
             }
             case OP_GET_LOCAL: {

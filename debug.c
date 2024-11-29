@@ -34,9 +34,8 @@ static int constant_instruction(const char *name, const Chunk *chunk, int offset
     uint8_t index = chunk->code[offset + 1];
     printf("%-23s %4d : ", name, index);
     Value value = chunk->constants.values[index];
-    // print_value_with_type(value);
     print_value(value);
-    printf("\n");
+    NEW_LINE();
     return offset + 2;
 }
 
@@ -47,7 +46,7 @@ static int constant2_instruction(const char *name, const Chunk *chunk, int offse
     printf("%-23s %4d : ", name, index);
     Value value = chunk->constants.values[index];
     print_value(value);
-    printf("\n");
+    NEW_LINE();
     return offset + 3;
 }
 
