@@ -67,7 +67,7 @@ typedef struct Local {
 
 typedef enum FunctionType {
     TYPE_FUNCTION,
-    TYPE_SCRIPT,
+    TYPE_MAIN,
 } FunctionType;
 
 typedef struct Scope {
@@ -106,6 +106,8 @@ static void clear_scope(int to);
 
 static inline void block_statement();
 
+static inline void return_statement();
+
 static void set_new_scope(Scope *scope, FunctionType type);
 
 static void error_at(Token *token, const char *message);
@@ -127,6 +129,8 @@ static void emit_two_bytes(uint8_t byte1, uint8_t byte2);
 static void emit_uint16(uint16_t value);
 
 static void emit_constant(int index);
+
+static void emit_return_nil();
 
 static LoxFunction *end_compiler();
 
@@ -536,6 +540,8 @@ static void statement() {
         for_statement();
     } else if (match(TOKEN_SWITCH)) {
         switch_statement();
+    } else if (match(TOKEN_RETURN)){
+        return_statement();
     } else {
         expression_statement();
     }
@@ -952,6 +958,20 @@ static void block_statement() {
     consume(TOKEN_RIGHT_BRACE, "A block should terminate with a }");
 }
 
+static inline void return_statement() {
+    if (current_scope->depth == 0) {
+        error_at_previous("Cannot return at the top level");
+        return;
+    }
+    if (match(TOKEN_SEMICOLON)) {
+        emit_return_nil();
+    } else {
+        expression();
+        consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the statement");
+        emit_byte(OP_RETURN);
+    }
+}
+
 static inline void print_statement() {
     expression();
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminated the statement");
@@ -1224,7 +1244,7 @@ static int make_constant(Value value) {
  * 将当前scope中的函数返回。切换回到上一层scope
  */
 static LoxFunction *end_compiler() {
-    emit_byte(OP_RETURN);
+    emit_return_nil();
     LoxFunction *function = current_scope->function;
     if (SHOW_COMPILE_RESULT && !parser.has_error) {
         disassemble_chunk(current_chunk(), function->name == NULL ? "<script>" : function->name->chars);
@@ -1264,6 +1284,10 @@ static void emit_constant(int index) {
     } else {
         error_at_previous("Too many constants for a chunk");
     }
+}
+
+static inline void emit_return_nil() {
+    emit_two_bytes(OP_NIL, OP_RETURN);
 }
 
 /**
@@ -1414,7 +1438,7 @@ static void set_new_scope(Scope *scope, FunctionType type) {
     scope->count = 0;
     scope->function = new_function();
 
-    if (type != TYPE_SCRIPT) {
+    if (type != TYPE_MAIN) {
         scope->function->name = string_copy(parser.previous.start, parser.previous.length);
     }
 
@@ -1447,7 +1471,7 @@ LoxFunction *compile(const char *src) {
     init_map(&label_map, int_hash, int_equal);
 
     Scope scope;
-    set_new_scope(&scope, TYPE_SCRIPT);
+    set_new_scope(&scope, TYPE_MAIN);
 
     advance(); // 初始移动，如此一来，prev为null，curr为第一个token
 

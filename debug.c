@@ -150,6 +150,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return jump_instruction("OP_JUMP_IF_FALSE_POP", chunk, offset, true);
         case OP_JUMP_IF_TRUE_POP:
             return jump_instruction("OP_JUMP_IF_TRUE_POP", chunk, offset, true);
+        case OP_CALL:
+            return byte_instruction("OP_CALL", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

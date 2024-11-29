@@ -57,10 +57,6 @@ String *string_allocate(char *chars, int length) {
  * 将a 和 b 的字符串表达拼接在一起，产生一个 String
  * */
 String *string_concat(Value a, Value b) {
-    if (!(is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
-        runtime_error("at least one operand needs to be string");
-        return NULL;
-    }
     char *a_str = to_print_chars(a);
     char *b_str = to_print_chars(b);
     char *buffer;

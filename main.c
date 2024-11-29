@@ -46,11 +46,11 @@ static void run_file(const char *path) {
     InterpretResult result = interpret(src);
     free(src);
     if (result == INTERPRET_COMPILE_ERROR) {
-        printf("compile error\n");
+        printf("== compile error ==\n");
     } else if (result == INTERPRET_RUNTIME_ERROR) {
-        printf("runtime error\n");
+        printf("== runtime error ==\n");
     } else {
-        printf("good\n");
+        printf("== execution finished ==\n");
     }
 }
 

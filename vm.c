@@ -9,8 +9,11 @@
 #include "memory.h"
 #include "object.h"
 #include "stdarg.h"
+#include "setjmp.h"
 
 VM vm;
+
+jmp_buf error_buf;
 
 static CallFrame *curr_frame();
 static uint8_t read_byte();
@@ -18,12 +21,16 @@ static uint16_t read_uint16();
 static bool is_falsy(Value value);
 static void reset_stack();
 static Value read_constant();
-static inline Value read_constant2();
+static Value read_constant2();
 static InterpretResult run();
 static void show_stack();
 static Value peek_stack(int distance);
 static void binary_op(char operator);
 static void binary_number_op(Value a, Value b, char operator);
+static bool call_value(Value value, int arg_count);
+static void runtime_error(const char *format, ...);
+void catch();
+void runtime_error_and_jump(const char *format, ...);
 
 /* ------------------上面是静态函数申明-----------------------
    ------------------下面是静态函数定义----------------------- */
@@ -33,14 +40,17 @@ static inline CallFrame *curr_frame() {
 }
 
 static void binary_number_op(Value a, Value b, char operator) {
-    if (operator==
-        '+' &&(is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
+    if (operator== '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
         String *str = string_concat(a, b);
         stack_push(ref_value(&str->object));
         return;
     }
     if (!is_number(a) || !is_number(b)) {
-        runtime_error("the operand is not a number");
+        char *a_text = to_print_chars(a);
+        char *b_text = to_print_chars(b);
+        runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
+        free(a_text);
+        free(b_text);
         return;
     }
     if (is_int(a) && is_int(b)) {
@@ -184,7 +194,7 @@ static void show_stack() {
     NEW_LINE();
 }
 
-static bool is_falsy(Value value) {
+static inline bool is_falsy(Value value) {
     if (is_bool(value)) {
         return as_bool(value) == false;
     }
@@ -204,7 +214,8 @@ static inline Value peek_stack(int distance) {
 }
 
 /**
- * 会自动添加换行符。
+ * 输出错误消息（会自动添加换行符）
+ * 打印调用栈消息。清空栈。
  */
 void runtime_error(const char *format, ...) {
     va_list args;
@@ -212,11 +223,33 @@ void runtime_error(const char *format, ...) {
     vfprintf(stderr, format, args);
     va_end(args);
     fputs("\n", stderr);
-    CallFrame *frame = curr_frame();
-    size_t index = frame->PC - frame->function->chunk.code - 1;
-    int line = frame->function->chunk.lines[index];
-    fprintf(stderr, "[line %d] in script\n", line);
+
+    for (int i = vm.frame_count - 1; i >= 0; i --) {
+        CallFrame *frame = vm.frames + i;
+        LoxFunction *function = frame->function;
+        size_t index = frame->PC - frame->function->chunk.code - 1;
+        int line = function->chunk.lines[index];
+        fprintf(stderr, "[line %d] in ", line);
+        if (i == 0) {
+            fprintf(stderr, "main()\n");
+        } else {
+            fprintf(stderr, "%s()\n", function->name->chars);
+        }
+    }
+
     reset_stack();
+}
+
+inline void catch() {
+    longjmp(error_buf, 1);
+}
+
+void runtime_error_and_jump(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    runtime_error(format, args);
+    va_end(args);
+    catch();
 }
 
 /**
@@ -260,7 +293,7 @@ static inline String *read_constant_string() {
 }
 
 /**
- * 遍历虚拟机的 curr_frame 的 chunk 中的每一个指令，执行之
+ * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之
  * @return 执行的结果
  */
 static InterpretResult run() {
@@ -270,11 +303,19 @@ static InterpretResult run() {
             CallFrame *frame = curr_frame();
             disassemble_instruction(& frame->function->chunk, (int)(frame->PC - frame->function->chunk.code));
         }
-        uint8_t instruction = read_byte();
 
+        uint8_t instruction = read_byte();
         switch (instruction) {
             case OP_RETURN: {
-                return INTERPRET_OK;
+                Value result = stack_pop();
+                vm.stack_top = curr_frame()->FP;
+                vm.frame_count--;
+                if (vm.frame_count == 0) {
+                    stack_pop(); // pop <main>
+                    return INTERPRET_OK;
+                }
+                stack_push(result);
+                break;
             }
             case OP_CONSTANT: {
                 Value value = read_constant();
@@ -295,8 +336,7 @@ static InterpretResult run() {
                     stack_push(float_value(-as_float(stack_pop())));
                     break;
                 } else {
-                    runtime_error("the value of type: %d is cannot be negated",
-                                  value.type);
+                    runtime_error("the value of type: %d is cannot be negated", value.type);
                     return INTERPRET_RUNTIME_ERROR;
                 }
             }
@@ -341,10 +381,13 @@ static InterpretResult run() {
                 break;
             case OP_PRINT:
                 if (TRACE_EXECUTION) {
-                    printf(">>> ");
+                    printf("\033[0;32m"); // start green color output
                 }
                 print_value(stack_pop());
                 NEW_LINE();
+                if (TRACE_EXECUTION) {
+                    printf("\033[0m"); // end green color output
+                }
                 break;
             case OP_POP:
                 stack_pop();
@@ -368,8 +411,7 @@ static InterpretResult run() {
                 if (table_get(&vm.globals, name, &value)) {
                     stack_push(value);
                 } else {
-                    runtime_error("Accessing an undefined variable: %s",
-                                  name->chars);
+                    runtime_error("Accessing an undefined variable: %s", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
@@ -377,16 +419,14 @@ static InterpretResult run() {
             case OP_SET_GLOBAL: {
                 String *name = read_constant_string();
                 if (table_has(&vm.const_table, name)) {
-                    runtime_error("The const variable %s cannot be re-assigned",
-                                  name->chars);
+                    runtime_error("The const variable %s cannot be re-assigned", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 if (table_set(&vm.globals, name, peek_stack(0))) {
                     break;
                 } else {
                     table_delete(&vm.globals, name);
-                    runtime_error("Setting an undefined variable: %s",
-                                  name->chars);
+                    runtime_error("Setting an undefined variable: %s", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
             }
@@ -447,12 +487,55 @@ static InterpretResult run() {
                 }
                 break;
             }
+            case OP_CALL: {
+                // main, 999, sum, 1, 2
+                int count = read_byte();
+                Value callee = peek_stack(count);
+                if (! call_value(callee, count) ) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             default: {
                 runtime_error("unrecognized instruction");
+                break;
             }
         }
     }
 }
+
+/**
+ * 创建一个call frame。
+ * @param value 要调用的函数
+ * @param arg_count 传入的参数的个数
+ * @return 如果value是合适的函数，且参数数量正确，返回true。否则是错误，返回false
+ */
+static bool call_value(Value value, int arg_count) {
+    if (!is_ref_of(value, OBJ_FUNCTION)) {
+        // runtime error
+        char *name = to_print_chars(value);
+        runtime_error("%s is not callable", name);
+        free(name);
+        return false;
+    }
+    LoxFunction *function = as_function(value);
+    if (function->arity != arg_count) {
+        // runtime error
+        runtime_error("%s expects %d arguments, and got %d", function->name->chars, function->arity, arg_count);
+        return false;
+    }
+    if (vm.frame_count == FRAME_MAX) {
+        runtime_error("Stack overflow.");
+        return false;
+    }
+    vm.frame_count ++;
+    CallFrame *frame = curr_frame();
+    frame->FP = vm.stack_top - arg_count - 1;
+    frame->PC = function->chunk.code;
+    frame->function = function;
+    return true;
+}
+
 
 /* ------------------上面是静态函数定义-----------------------
    ------------------下面是申明在头文件中的函数定义----------------- */
@@ -473,6 +556,10 @@ void free_VM() {
     free_map(&label_map);
 }
 
+/**
+ * 将value置于stack_top处，然后自增stack_top
+ * @param value
+ */
 inline void stack_push(Value value) {
     *vm.stack_top = value;
     vm.stack_top++;

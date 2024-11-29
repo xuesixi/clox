@@ -40,7 +40,7 @@ typedef enum OpCode{
     OP_JUMP_IF_NOT_EQUAL, // op, offset16: 如果栈顶的两个值不相等，则跳转
     OP_JUMP_IF_FALSE_POP,
     OP_JUMP_IF_TRUE_POP,
-    OP_CALL,
+    OP_CALL, // op, arg_count:
 } OpCode;
 
 typedef struct Chunk{

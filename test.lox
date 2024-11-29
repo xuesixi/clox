@@ -1,7 +1,18 @@
 # huhu declare
-fun hey() {
-    var name = "juju";
-    print "this is hey()";
+fun hey(name) {
+    var greeting = "hello, ";
+    print greeting + name;
+
+    fun add(a, b) {
+        return a + b;
+    }
+
+    return add(false, 123);
 }
 
-print hey;
+var name = "moria";
+# function call
+var answer = hey(name);
+
+# print name
+print answer;

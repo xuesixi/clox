@@ -40,7 +40,6 @@ void init_VM();
 void free_VM();
 InterpretResult interpret(const char *src);
 InterpretResult produce(const char *src, const char *path);
-void runtime_error(const char *format, ...);
 void stack_push(Value value);
 Value stack_pop();
 

@@ -147,9 +147,9 @@ static char *to_print_ref(Value value) {
             break;
         case OBJ_FUNCTION:
             if (as_function(value)->name == NULL) {
-                asprintf(&buffer, "<script>");
+                asprintf(&buffer, "<main>");
             } else {
-                asprintf(&buffer, "<function: %s>", as_function(value)->name->chars);
+                asprintf(&buffer, "<fn: %s>", as_function(value)->name->chars);
             }
             break;
         default:
