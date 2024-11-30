@@ -28,7 +28,7 @@ static void repl() {
             }
 
         } else {
-            // when a consume() is demanded
+            // if consume() views the input as not finished
             char *extra_line = readline("... ");
             char *temp;
             asprintf(&temp, "%s%s", line, extra_line);

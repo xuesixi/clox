@@ -983,7 +983,11 @@ static inline void print_statement() {
 static inline void expression_statement() {
     expression();
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminated the statement");
-    emit_byte(OP_POP);
+    if (REPL) {
+        emit_byte(OP_EXPRESSION_PRINT);
+    } else {
+        emit_byte(OP_POP);
+    }
 }
 
 static inline void expression() {
@@ -1005,36 +1009,36 @@ static void arithmetic_equal(OpCode set_op, OpCode get_op, int index) {
             break;
         }
         case TOKEN_PLUS_EQUAL: {
-            expression();
             emit_two_bytes(get_op, index);
+            expression();
             emit_byte(OP_ADD);
             emit_two_bytes(set_op, index);
             break;
         }
         case TOKEN_MINUS_EQUAL: {
-            expression();
             emit_two_bytes(get_op, index);
+            expression();
             emit_byte(OP_SUBTRACT);
             emit_two_bytes(set_op, index);
             break;
         }
         case TOKEN_STAR_EQUAL: {
-            expression();
             emit_two_bytes(get_op, index);
+            expression();
             emit_byte(OP_MULTIPLY);
             emit_two_bytes(set_op, index);
             break;
         }
         case TOKEN_SLASH_EQUAL: {
-            expression();
             emit_two_bytes(get_op, index);
+            expression();
             emit_byte(OP_DIVIDE);
             emit_two_bytes(set_op, index);
             break;
         }
         case TOKEN_PERCENT_EQUAL: {
-            expression();
             emit_two_bytes(get_op, index);
+            expression();
             emit_byte(OP_MOD);
             emit_two_bytes(set_op, index);
             break;
@@ -1334,11 +1338,18 @@ static inline bool check(TokenType type) {
  */
 static inline void consume(TokenType type, const char *message) {
     if (parser.current.type != type) {
+
         if (check(TOKEN_EOF) && REPL) {
-            longjmp(consume_buf, 1);
+
+            // 如果consume的是分号，那么什么都不做
+            // 否则让用户继续输入
+            if (type != TOKEN_SEMICOLON) {
+                longjmp(consume_buf, 1);
+            }
         } else {
             error_at_current(message);
         }
+
     } else {
         advance();
     }

@@ -1,10 +1,10 @@
 
 var num = 10;
-fun say_num() {
-    print "num is " + num;
-}
 
-for (var i = 0; i < 10; i += 1) {
-    say_num();
+while (true) {
+    print "num is now: " + num;
+    num -= 1;
+    if (num == 5) {
+        break;
+    }
 }
-print "end";

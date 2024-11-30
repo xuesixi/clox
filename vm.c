@@ -435,16 +435,25 @@ static InterpretResult run() {
             case OP_NOT:
                 stack_push(bool_value(is_falsy(stack_pop())));
                 break;
-            case OP_PRINT:
-                if (TRACE_EXECUTION) {
+            case OP_PRINT: {
+                if (REPL || TRACE_EXECUTION) {
                     printf("\033[0;32m"); // start green color output
                 }
                 print_value(stack_pop());
                 NEW_LINE();
-                if (TRACE_EXECUTION) {
-                    printf("\033[0m"); // end green color output
+                if (REPL || TRACE_EXECUTION) {
+                    printf("\033[0m"); // end color output
                 }
                 break;
+            }
+            case OP_EXPRESSION_PRINT: {
+                Value to_print = stack_pop();
+                printf("\033[0;90m"); // start gray color output
+                print_value(to_print);
+                NEW_LINE();
+                printf("\033[0m"); // end color output
+                break;
+            }
             case OP_POP:
                 stack_pop();
                 break;

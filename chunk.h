@@ -27,6 +27,7 @@ typedef enum OpCode{
     OP_GREATER,
     OP_EQUAL,
     OP_PRINT,
+    OP_EXPRESSION_PRINT,
     OP_POP,
     OP_DEFINE_GLOBAL, // OP, index: 定义一个全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
     OP_DEFINE_GLOBAL_CONST, // OP, index: 定义一个const全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
