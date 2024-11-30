@@ -307,7 +307,9 @@ Token scan_token() {
         case '/':
             return make_token(match('=') ? TOKEN_SLASH_EQUAL : TOKEN_SLASH);
         case '*':
-            return make_token(match('=') ? TOKEN_STAR_EQUAL : TOKEN_STAR);
+            if (match('=')) return make_token(TOKEN_STAR_EQUAL);
+            if (match('*')) return make_token(TOKEN_STAR_STAR);
+            return make_token(TOKEN_STAR);
         case '%':
             return make_token(match('=') ? TOKEN_PERCENT_EQUAL : TOKEN_PERCENT);
         case '!':

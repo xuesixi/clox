@@ -18,6 +18,7 @@ typedef enum OpCode{
     OP_MULTIPLY,
     OP_DIVIDE,
     OP_MOD,
+    OP_POWER,
     OP_NIL,
     OP_TRUE,
     OP_FALSE,

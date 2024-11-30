@@ -5,6 +5,9 @@
 #ifndef CLOX_VALUE_H
 #define CLOX_VALUE_H
 
+#define AS_NUMBER(value) \
+    (is_int(value) ? as_int(value) : as_float(value))
+
 #include "common.h"
 
 typedef struct Object Object;

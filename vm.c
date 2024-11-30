@@ -389,6 +389,21 @@ static InterpretResult run() {
                 binary_number_op(a, b, '%');
                 break;
             }
+            case OP_POWER: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                if (is_number(a) && is_number(b)) {
+                    stack_push(float_value(pow(AS_NUMBER(a), AS_NUMBER(b))));
+                } else {
+                    char *a_text = to_print_chars(a);
+                    char *b_text = to_print_chars(b);
+                    runtime_error("the operands, %s and %s, do not support the power operation", a_text, b_text);
+                    free(a_text);
+                    free(b_text);
+                    catch();
+                }
+                break;
+            }
             case OP_LESS: {
                 Value b = stack_pop();
                 Value a = stack_pop();
