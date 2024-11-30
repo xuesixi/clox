@@ -8,6 +8,7 @@
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
+
 #include "stdarg.h"
 #include "setjmp.h"
 #include "string.h"
@@ -607,13 +608,67 @@ static void define_native(const char *name, NativeImplementation impl) {
 }
 
 static Value native_clock(int count, Value *value) {
-    (void )count;
+    if (count != 0) {
+        runtime_error_and_catch("expects no argument");
+        return nil_value();
+    }
     (void )value;
     return float_value((double)clock() / CLOCKS_PER_SEC);
 }
 
-static Value native_printf(int count, Value *value) {
+static Value native_int(int count, Value *value) {
+    if (count != 1) {
+        runtime_error_and_catch("expects one argument");
+        return nil_value();
+    }
+    switch (value->type) {
+        case VAL_INT:
+            return *value;
+        case VAL_FLOAT:
+            return int_value((int) as_float(*value));
+        case VAL_BOOL:
+            return int_value((int) as_bool(*value));
+        default:
+            if (is_ref_of(*value, OBJ_STRING)) {
+                String *str = as_string(*value);
+                char *end;
+                int result = strtol(str->chars, &end, 10);
+                if (end == str->chars) {
+                    runtime_error_and_catch("not a valid int: %s", str->chars);
+                }
+                return int_value(result);
+            }
+            runtime_error_and_catch("not a valid input");
+            return nil_value();
+    }
+}
 
+static Value native_float(int count, Value *value) {
+    if (count != 1) {
+        runtime_error_and_catch("expects one argument");
+        return nil_value();
+    }
+    Value v = *value;
+    switch (v.type) {
+        case VAL_INT:
+            return float_value((double ) as_int(v));
+        case VAL_FLOAT:
+            return v;
+        case VAL_BOOL:
+            return float_value((double ) as_bool(v));
+        default:
+            if (is_ref_of(v, OBJ_STRING)) {
+                String *str = as_string(v);
+                char *end;
+                double result = strtod(str->chars, &end);
+                if (end == str->chars) {
+                    runtime_error_and_catch("not a valid float: %s", str->chars);
+                }
+                return float_value(result);
+            }
+            runtime_error_and_catch("not a valid input");
+            return nil_value();
+    }
 }
 
 
@@ -627,6 +682,8 @@ void init_VM() {
     init_table(&vm.globals);
     init_table(&vm.const_table);
     define_native("clock", native_clock);
+    define_native("int", native_int);
+    define_native("float", native_float);
 }
 
 /**
