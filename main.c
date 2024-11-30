@@ -13,6 +13,8 @@ jmp_buf consume_buf;
 
 static void repl() {
     REPL = true;
+    additional_repl_init();
+    printf("You are in the clox REPL mode. Type help() to see details\n\n");
     while (true) {
         char *line;
         if (setjmp(consume_buf) == 0 ) {

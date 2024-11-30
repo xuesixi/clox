@@ -582,8 +582,7 @@ static void call_value(Value value, int arg_count) {
         LoxFunction *function = as_function(value);
         if (function->arity != arg_count) {
             // runtime error
-            runtime_error_and_catch("%s expects %d arguments, and got %d", function->name->chars, function->arity,
-                                    arg_count);
+            runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
         }
         if (vm.frame_count == FRAME_MAX) {
             runtime_error_and_catch("Stack overflow.");
@@ -594,8 +593,11 @@ static void call_value(Value value, int arg_count) {
         frame->PC = function->chunk.code;
         frame->function = function;
     } else if (is_ref_of(value, OBJ_NATIVE)) {
-        // sum, 1, 2, top
-        Value result = as_native(value)->impl(arg_count, vm.stack_top - arg_count);
+        NativeFunction *native = as_native(value);
+        if (native->arity != arg_count) {
+            runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity, arg_count);
+        }
+        Value result = native->impl(arg_count, vm.stack_top - arg_count);
         vm.stack_top -= arg_count + 1;
         stack_push(result);
     } else {
@@ -603,33 +605,25 @@ static void call_value(Value value, int arg_count) {
     }
 }
 
-static void define_native(const char *name, NativeImplementation impl) {
+static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
 //    String *str = string_copy(name, len);
 //    NativeFunction *nativeFunction = new_native(impl);
 //    table_set(&vm.globals, str, ref_value((Object*)nativeFunction));
 
     stack_push(ref_value((Object *)string_copy(name, len)));
-    stack_push(ref_value((Object *)new_native(impl, as_string(vm.stack[0]))));
+    stack_push(ref_value((Object *)new_native(impl, as_string(vm.stack[0]), arity)));
     table_set(&vm.globals, as_string(vm.stack[0]), vm.stack[1]);
     stack_pop();
     stack_pop();
 }
 
 static Value native_clock(int count, Value *value) {
-    if (count != 0) {
-        runtime_error_and_catch("expects no argument");
-        return nil_value();
-    }
     (void )value;
     return float_value((double)clock() / CLOCKS_PER_SEC);
 }
 
 static Value native_int(int count, Value *value) {
-    if (count != 1) {
-        runtime_error_and_catch("expects one argument");
-        return nil_value();
-    }
     switch (value->type) {
         case VAL_INT:
             return *value;
@@ -653,10 +647,6 @@ static Value native_int(int count, Value *value) {
 }
 
 static Value native_float(int count, Value *value) {
-    if (count != 1) {
-        runtime_error_and_catch("expects one argument");
-        return nil_value();
-    }
     Value v = *value;
     switch (v.type) {
         case VAL_INT:
@@ -680,6 +670,25 @@ static Value native_float(int count, Value *value) {
     }
 }
 
+static Value native_help(int count, Value *value) {
+    (void ) count;
+    (void ) value;
+    printf("You are in the REPL mode because you run clox directly without providing any arguments.\n");
+    printf("You can also do `clox path/to/script` to run a lox script.\n");
+    printf("In this REPL mode, expression results will be printed out automatically in gray color.\n");
+    printf("Use ctrl+C or ctrl+D to quit.\n");
+    return nil_value();
+}
+
+static Value native_rand(int count, Value *value) {
+    Value a = value[0];
+    Value b = value[1];
+    if (!is_int(a) || !is_int(b)) {
+        runtime_error_and_catch("arguments need to be int");
+    }
+    return int_value(as_int(a) + rand() % as_int(b));
+}
+
 
 /* ------------------上面是静态函数定义-----------------------
    ------------------下面是申明在头文件中的函数定义----------------- */
@@ -687,12 +696,18 @@ static Value native_float(int count, Value *value) {
 void init_VM() {
     reset_stack();
     vm.objects = NULL;
+    srand(time(NULL));
     init_table(&vm.string_table);
     init_table(&vm.globals);
     init_table(&vm.const_table);
-    define_native("clock", native_clock);
-    define_native("int", native_int);
-    define_native("float", native_float);
+    define_native("clock", native_clock, 0);
+    define_native("int", native_int, 1);
+    define_native("float", native_float, 1);
+    define_native("rand", native_rand, 2);
+}
+
+void additional_repl_init() {
+    define_native("help", native_help, 0);
 }
 
 /**

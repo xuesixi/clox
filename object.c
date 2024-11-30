@@ -99,9 +99,10 @@ LoxFunction *new_function() {
     return function;
 }
 
-NativeFunction *new_native(NativeImplementation impl, String *name) {
+NativeFunction *new_native(NativeImplementation impl, String *name, int arity) {
     NativeFunction *native = (NativeFunction *) allocate_object(sizeof(NativeFunction), OBJ_NATIVE);
     native->impl = impl;
     native->name = name;
+    native->arity = arity;
     return native;
 }

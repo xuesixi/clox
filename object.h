@@ -36,6 +36,7 @@ typedef struct NativeFunction {
     Object object;
     NativeImplementation impl;
     String *name;
+    int arity;
 } NativeFunction;
 
 bool is_ref_of(Value value, ObjectType type);
@@ -46,7 +47,7 @@ String *string_concat(Value a, Value b);
 
 Object *allocate_object(size_t size, ObjectType type);
 LoxFunction *new_function();
-NativeFunction *new_native(NativeImplementation impl, String *name);
+NativeFunction *new_native(NativeImplementation impl, String *name, int arity);
 LoxFunction *as_function(Value value);
 NativeFunction *as_native(Value value);
 

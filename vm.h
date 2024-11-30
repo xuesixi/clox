@@ -38,5 +38,6 @@ void init_VM();
 void free_VM();
 InterpretResult interpret(const char *src);
 InterpretResult produce(const char *src, const char *path);
+void additional_repl_init();
 
 #endif //CLOX_VM_H
