@@ -21,7 +21,7 @@
 typedef struct Parser {
     Token previous;
     Token current;
-    Table lexeme_table;
+//    Table lexeme_table;
     int break_point;
     int old_break_point;
     int continue_point;
@@ -80,8 +80,7 @@ typedef struct Scope {
 } Scope;
 
 Parser parser;
-Map label_map;
-//Chunk *compiling_chunk;
+//Map label_map;
 Scope *current_scope;
 
 static int argument_list();
@@ -315,17 +314,18 @@ static void parse_precedence(Precedence precedence) {
 }
 
 /**
- * 如果SHOW_COMPILE_RESULT选项被激活，我们会用label_map记录遇到的标签对应的字节码的索引的值。
+ * 如果SHOW_LABEL选项被激活，我们会用label_map记录遇到的标签对应的字节码的索引的值。
  * 在debug.c中，如果一个字节码索引有对应的标签，我们会在展示汇编时把标签也打印出来。
  * 这里map_set中的索引有+1，这是为了防止索引0被当成NULL。在debug中也有同样的+1；
  */
 static void label_statement() {
+    IMPLEMENTATION_ERROR("label is not supported now");
     if (SHOW_LABEL) {
         Token label = parser.previous;
         char *text = ALLOCATE(char, label.length + 1);
         memcpy(text, label.start, label.length);
         text[label.length] = '\0';
-        map_set(&label_map, (void *) (current_chunk()->count + 1), text);
+//        map_set(&label_map, (void *) (current_chunk()->count + 1), text);
     }
 }
 
@@ -1451,7 +1451,7 @@ static void set_new_scope(Scope *scope, FunctionType type) {
 }
 
 static void init_parser(Parser *the_parser) {
-    init_table(&the_parser->lexeme_table);
+//    init_table(&the_parser->lexeme_table);
     the_parser->continue_point = -1;
     the_parser->break_point = -1;
 }
@@ -1466,7 +1466,7 @@ LoxFunction *compile(const char *src) {
     init_scanner(src);
     init_parser(&parser);
 
-    init_map(&label_map, int_hash, int_equal);
+//    init_map(&label_map, int_hash, int_equal);
 
     Scope scope;
     set_new_scope(&scope, TYPE_MAIN);
@@ -1479,7 +1479,7 @@ LoxFunction *compile(const char *src) {
 
     LoxFunction *function = end_compiler();
 
-    free_table(&parser.lexeme_table);
+//    free_table(&parser.lexeme_table);
 
     if (parser.has_error) {
         parser.has_error = false;

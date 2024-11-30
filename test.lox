@@ -1,15 +1,10 @@
 
-var start = clock();
-fun fbnc(num) {
-    if (num < 2) {
-        return num;
-    } else {
-        return fbnc(num - 1) + fbnc(num-2);
-    }
+var num = 10;
+fun say_num() {
+    print "num is " + num;
 }
 
-print fbnc(35);
-
-print clock() - start;
-
-
+for (var i = 0; i < 10; i += 1) {
+    say_num();
+}
+print "end";

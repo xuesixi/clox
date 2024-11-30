@@ -581,6 +581,10 @@ static Value native_clock(int count, Value *value) {
     return float_value((double)clock() / CLOCKS_PER_SEC);
 }
 
+static Value native_printf(int count, Value *value) {
+
+}
+
 
 /* ------------------上面是静态函数定义-----------------------
    ------------------下面是申明在头文件中的函数定义----------------- */
@@ -607,7 +611,7 @@ void free_VM() {
     free_table(&vm.string_table);
     free_table(&vm.globals);
     free_table(&vm.const_table);
-    free_map(&label_map);
+//    free_map(&label_map);
 }
 
 /**

@@ -55,12 +55,12 @@ static int jump_instruction(const char *name, const Chunk *chunk, int offset, bo
     uint8_t i1 = chunk->code[offset + 2];
     int index = u8_to_u16(i0, i1);
     int target = forward ? offset + 3 + index : offset + 3 - index;
-    char *label = map_get(&label_map, (void*)(target + 1));
-    if (label != NULL) {
-        printf("%-23s   -> %04d: %s\n", name, target, label);
-    } else {
+//    char *label = map_get(&label_map, (void*)(target + 1));
+//    if (label != NULL) {
+//        printf("%-23s   -> %04d: %s\n", name, target, label);
+//    } else {
         printf("%-23s   -> %04d\n", name, target);
-    }
+//    }
     return offset + 3;
 }
 
@@ -70,11 +70,11 @@ static int jump_instruction(const char *name, const Chunk *chunk, int offset, bo
  */
 int disassemble_instruction(Chunk *chunk, int offset) {
 
-    char *label = map_get(&label_map, (void*)(offset + 1)); // +1 是为了防止索引0被当成NULL。见label_statement()
-    if (label != NULL) {
-        NEW_LINE();
-        printf("%s: \n", label);
-    }
+//    char *label = map_get(&label_map, (void*)(offset + 1)); // +1 是为了防止索引0被当成NULL。见label_statement()
+//    if (label != NULL) {
+//        NEW_LINE();
+//        printf("%s: \n", label);
+//    }
 
     // code index
     printf("%04d ", offset);
