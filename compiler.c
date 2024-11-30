@@ -1329,7 +1329,11 @@ static inline bool check(TokenType type) {
  */
 static inline void consume(TokenType type, const char *message) {
     if (parser.current.type != type) {
-        error_at_current(message);
+        if (check(TOKEN_EOF) && REPL) {
+            longjmp(consume_buf, 1);
+        } else {
+            error_at_current(message);
+        }
     } else {
         advance();
     }

@@ -33,7 +33,6 @@ typedef enum {
 } InterpretResult;
 
 extern VM vm;
-extern bool REPL;
 
 void init_VM();
 void free_VM();

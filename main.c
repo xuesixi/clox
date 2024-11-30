@@ -2,25 +2,40 @@
 #include "readline/readline.h"
 #include "stdlib.h"
 #include <unistd.h>
+#include "string.h"
 #include "vm.h"
 
 bool REPL;
 bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
 bool SHOW_LABEL = false;
-
+jmp_buf consume_buf;
 
 static void repl() {
     REPL = true;
     while (true) {
-        char *line = readline("> ");
-        if (line != NULL) {
-            interpret(line);
-            add_history(line);
-            free(line);
+        char *line;
+        if (setjmp(consume_buf) == 0 ) {
+            line = readline("> ");
+            execute:
+            if (line != NULL) {
+                interpret(line);
+                add_history(line);
+                free(line);
+            } else {
+                NEW_LINE();
+                break;
+            }
+
         } else {
-            NEW_LINE();
-            break;
+            // when a consume() is demanded
+            char *extra_line = readline("... ");
+            char *temp;
+            asprintf(&temp, "%s%s", line, extra_line);
+            free(line);
+            free(extra_line);
+            line = temp;
+            goto execute;
         }
     }
 }
