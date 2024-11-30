@@ -12,6 +12,7 @@
 #include "setjmp.h"
 #include "string.h"
 #include "time.h"
+#include "math.h"
 
 VM vm;
 
@@ -31,7 +32,7 @@ static void binary_number_op(Value a, Value b, char operator);
 static void call_value(Value value, int arg_count);
 static void runtime_error(const char *format, ...);
 void catch();
-void runtime_error_and_jump(const char *format, ...);
+void runtime_error_and_catch(const char *format, ...);
 static void stack_push(Value value);
 static Value stack_pop();
 
@@ -95,7 +96,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error_and_jump("invalid binary operator");
+                runtime_error_and_catch("invalid binary operator");
                 return;
         }
     } else if (is_float(a) && is_int(b)) {
@@ -121,7 +122,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error_and_jump("invalid binary operator");
+                runtime_error_and_catch("invalid binary operator");
                 return;
         }
     } else if (is_float(a) && is_float(b)){
@@ -147,7 +148,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error_and_jump("invalid binary operator");
+                runtime_error_and_catch("invalid binary operator");
                 return;
         }
     } else if (operator== '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
@@ -242,11 +243,28 @@ inline void catch() {
  * 输出错误消息（会自动添加换行符）
  * 打印调用栈消息。清空栈。然后跳转至错误处理处
  */
-void runtime_error_and_jump(const char *format, ...) {
+void runtime_error_and_catch(const char *format, ...) {
+    fputs("\nRuntime Error: ", stderr);
     va_list args;
     va_start(args, format);
-    runtime_error(format, args);
+    vfprintf(stderr, format, args);
     va_end(args);
+    fputs("\n", stderr);
+
+    for (int i = vm.frame_count - 1; i >= 0; i --) {
+        CallFrame *frame = vm.frames + i;
+        LoxFunction *function = frame->function;
+        size_t index = frame->PC - frame->function->chunk.code - 1;
+        int line = function->chunk.lines[index];
+        fprintf(stderr, "at [line %d] in ", line);
+        if (i == 0) {
+            fprintf(stderr, "main()\n");
+        } else {
+            fprintf(stderr, "%s()\n", function->name->chars);
+        }
+    }
+
+    reset_stack();
     catch();
 }
 
@@ -338,7 +356,7 @@ static InterpretResult run() {
                     stack_push(float_value(-as_float(stack_pop())));
                     break;
                 } else {
-                    runtime_error_and_jump("the value of type: %d is cannot be negated", value.type);
+                    runtime_error_and_catch("the value of type: %d is cannot be negated", value.type);
                 }
             }
             case OP_ADD: {
@@ -358,21 +376,18 @@ static InterpretResult run() {
                 Value a = stack_pop();
                 binary_number_op(a, b, '*');
                 break;
-
             }
             case OP_DIVIDE: {
                 Value b = stack_pop();
                 Value a = stack_pop();
                 binary_number_op(a, b, '/');
                 break;
-
             }
             case OP_MOD: {
                 Value b = stack_pop();
                 Value a = stack_pop();
                 binary_number_op(a, b, '%');
                 break;
-
             }
             case OP_LESS: {
                 Value b = stack_pop();
@@ -436,20 +451,20 @@ static InterpretResult run() {
                 if (table_get(&vm.globals, name, &value)) {
                     stack_push(value);
                 } else {
-                    runtime_error_and_jump("Accessing an undefined variable: %s", name->chars);
+                    runtime_error_and_catch("Accessing an undefined variable: %s", name->chars);
                 }
                 break;
             }
             case OP_SET_GLOBAL: {
                 String *name = read_constant_string();
                 if (table_has(&vm.const_table, name)) {
-                    runtime_error_and_jump("The const variable %s cannot be re-assigned", name->chars);
+                    runtime_error_and_catch("The const variable %s cannot be re-assigned", name->chars);
                 }
                 if (table_set(&vm.globals, name, peek_stack(0))) {
                     break;
                 } else {
                     table_delete(&vm.globals, name);
-                    runtime_error_and_jump("Setting an undefined variable: %s", name->chars);
+                    runtime_error_and_catch("Setting an undefined variable: %s", name->chars);
                 }
             }
             case OP_GET_LOCAL: {
@@ -517,7 +532,7 @@ static InterpretResult run() {
                 break;
             }
             default: {
-                runtime_error_and_jump("unrecognized instruction");
+                runtime_error_and_catch("unrecognized instruction");
                 break;
             }
         }
@@ -542,10 +557,11 @@ static void call_value(Value value, int arg_count) {
         LoxFunction *function = as_function(value);
         if (function->arity != arg_count) {
             // runtime error
-            runtime_error_and_jump("%s expects %d arguments, and got %d", function->name->chars, function->arity, arg_count);
+            runtime_error_and_catch("%s expects %d arguments, and got %d", function->name->chars, function->arity,
+                                    arg_count);
         }
         if (vm.frame_count == FRAME_MAX) {
-            runtime_error_and_jump("Stack overflow.");
+            runtime_error_and_catch("Stack overflow.");
         }
         vm.frame_count ++;
         CallFrame *frame = curr_frame();
