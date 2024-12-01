@@ -1,6 +1,6 @@
 
 # clox
-clox is a virtual machine of the lox programming language. 
+clox is a interpreter of the lox programming language. 
 
 It has a compiler to compile scripts into bytecode, and a stack-based virtual machine to run the bytecode.
 
@@ -8,38 +8,58 @@ It has a compiler to compile scripts into bytecode, and a stack-based virtual ma
 
 It currently requires GNU/readline.
 
-* `$ make clox`: produce the executable "clox"
+* `$ make clox`: produce the executable "clox". You can also do `$ cc *.c -o clox -l readline`
 * `$ make run`: build, run REPL, and then clean.
 * `$ make file`: build, run the file "test.lox", and then clean.
 
 ## usage
 * `$ clox`: run REPL
-* `$ clox file`: run a lox script 
+* `$ clox path/to/script`: run a lox script 
 
-Other options to implement:
-* `$ clox -c script_path output_path`: compile a script and write the bytecode to the specified path
-* `$ clox -b bytecode_path`: run a bytecode file
-* `$ clox -d bytecode_path`: disassemble a bytecode file
+Other options
+* `-s`: show the compiled bytecode before running
+* `-d`: trace the execution process
 
 # the lox programming language
 
+## style
+
+* Most statements are terminated by a `;`
+* As in c/java/javascript, structural statements do not need `;`
+* `//` starts a single line comment
+
 ## type
-Lox supports the following built-in types
-* int 
-* float
-* bool
-* nil
-* String
+Lox has the following built-in types
+* `int` 
+* `float`
+* `bool`
+* `nil`
+* `string`
+* `function`
+
+## arithmetic
+
+float and int support arithmetic operations.
+* `+`: addition
+* `-`: subtraction
+* `*`: multiplication
+* `/`: division. As in c, if both operands are int, it is a integer division.
+* `%`: modulo. Can only be used between two int
+* `**`: power. The result is always a float
 
 ## variable
 * `var` to declare a variable. Lox is dynamic typed. A variable can hold values of different types. If not initialized, it has the default value of `nil`
 * `const` to declare a constant variable which must be initialized and cannot be mutated.
 
+```LOX
+var name = "anda";
+name = 10;
+```
+
 ## scope
 `{}` creates new scope. Variables in a inner scope can shadow variables in out scopes with the same name. No varibales can have the same name in one scope. 
 
-The global scope is different. If a variable cannot be resolved at compiled time, it is assumed to be global. If such a variable does not exist at runtime,
-a runtime error occurs.
+The global scope is different. If a variable cannot be resolved at compiled time, it is assumed to be global. If such a variable does not exist at runtime, a runtime error occurs. 
 
 Global variables are allowed to have the same name. The latest declaration will override old ones.
 
@@ -51,8 +71,44 @@ Lox provides a built-in keyword `print` to output to stdout. A new line will be 
 * `and`: return the first false value. If no false operands, return the last true value.
 * `or`: return the first true value. If no true operands, return the last false value.
 
-## `if/else/while/for`
-* as in c/java/javascript
+## control flow
+Lox support `if/else/while/for` as in c/java/javascript
+
+## function
+Use the keyword `fun` to declare a function. Functions are first-class values in lox.
+If a function does not explicitly return anything, it returns `nil`
+
+```lox
+fun greet(name) {
+    print "good day: " + name;
+}
+greet("huhu");
+```
+
+## native functions
+
+Clox has some built-in functions written in C.
+
+* `clock()`: return the time (in seconds) since the program starts
+* `int(input)`: convert string or float to int
+* `float(input)`: convert int or string to float
+* `rand(low, high)`: return a random int in [low, high]. Both arguments need to be int. 
+
+# REPL
+
+**REPL stands for "Read, Evaluate, Print, Loop".** It is an environment allowing you to write and test codes quickly.
+
+If you run `$ clox` without providing the path to a script, you will be in the REPL mode.
+
+* It has a basic support for multipl-line input. 
+
+* You can omit the `;` in this mode if it is the end of a statement.
+
+* the results of all expression statements like `1 + 2` or `sum(1, 2, 3)` will be printed out automatically in gray color.
+
+* The output of real `print` statements will be in green color.
+
+Use `ctrl+D` or `ctrl+C` to quit REPL.
 
 # Virtual Machine
 
@@ -73,6 +129,7 @@ One bytecode is one byte.
 ## instructions
 
 #### OP_RETURN
+
 #### OP_POP 
 ```
 pop()
