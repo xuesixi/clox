@@ -23,6 +23,10 @@ inline NativeFunction *as_native(Value value) {
     return (NativeFunction *) as_ref(value);
 }
 
+inline Closure *as_closure(Value value) {
+    return (Closure*) as_ref(value);
+}
+
 /**
  * 从指定的 src 处产生一个新的 String。原 char*不会被修改。
  * */
@@ -97,6 +101,12 @@ LoxFunction *new_function() {
     init_chunk(&function->chunk);
     function->arity = 0;
     return function;
+}
+
+Closure *new_closure(LoxFunction *function) {
+    Closure *closure = (Closure *) allocate_object(sizeof(Closure), OBJ_CLOSURE);
+    closure->function = function;
+    return closure;
 }
 
 NativeFunction *new_native(NativeImplementation impl, String *name, int arity) {

@@ -50,6 +50,10 @@ void free_object(Object *object) {
             re_allocate(object, sizeof(NativeFunction), 0);
             break;
         }
+        case OBJ_CLOSURE: {
+            re_allocate(object, sizeof(Closure), 0);
+            break;
+        }
         default:
             return;
     }

@@ -1,10 +1,11 @@
 
-var num = 10;
-
-while (true) {
-    print "num is now: " + num;
-    num -= 1;
-    if (num == 5) {
-        break;
-    }
+var start = clock();
+fun fbnc(num) {
+    if (num < 2) {
+        return num;
+    } 
+    return fbnc(num - 1) + fbnc(num - 2);
 }
+
+print fbnc(30);
+print clock() - start;

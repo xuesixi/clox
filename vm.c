@@ -218,8 +218,8 @@ void runtime_error(const char *format, ...) {
 
     for (int i = vm.frame_count - 1; i >= 0; i --) {
         CallFrame *frame = vm.frames + i;
-        LoxFunction *function = frame->function;
-        size_t index = frame->PC - frame->function->chunk.code - 1;
+        LoxFunction *function = frame->closure->function;
+        size_t index = frame->PC - frame->closure->function->chunk.code - 1;
         int line = function->chunk.lines[index];
         fprintf(stderr, "at [line %d] in ", line);
         if (i == 0) {
@@ -254,8 +254,8 @@ void runtime_error_and_catch(const char *format, ...) {
 
     for (int i = vm.frame_count - 1; i >= 0; i --) {
         CallFrame *frame = vm.frames + i;
-        LoxFunction *function = frame->function;
-        size_t index = frame->PC - frame->function->chunk.code - 1;
+        LoxFunction *function = frame->closure->function;
+        size_t index = frame->PC - frame->closure->function->chunk.code - 1;
         int line = function->chunk.lines[index];
         fprintf(stderr, "at [line %d] in ", line);
         if (i == 0) {
@@ -288,11 +288,11 @@ static inline uint16_t read_uint16() {
  * @return 下一个字节代表的常数
  */
 static inline Value read_constant() {
-    return curr_frame()->function->chunk.constants.values[read_byte()];
+    return curr_frame()->closure->function->chunk.constants.values[read_byte()];
 }
 
 static inline Value read_constant2() {
-    return curr_frame()->function->chunk.constants.values[read_uint16()];
+    return curr_frame()->closure->function->chunk.constants.values[read_uint16()];
 }
 
 /**
@@ -323,7 +323,7 @@ static InterpretResult run() {
         if (TRACE_EXECUTION) {
             show_stack();
             CallFrame *frame = curr_frame();
-            disassemble_instruction(& frame->function->chunk, (int)(frame->PC - frame->function->chunk.code));
+            disassemble_instruction(& frame->closure->function->chunk, (int)(frame->PC - frame->closure->function->chunk.code));
         }
 
         uint8_t instruction = read_byte();
@@ -556,6 +556,12 @@ static InterpretResult run() {
                 call_value(callee, count);
                 break;
             }
+            case OP_CLOSURE: {
+                Value f = read_constant();
+                Closure *closure = new_closure(as_function(f));
+                stack_push(ref_value((Object *) closure));
+                break;
+            }
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;
@@ -571,17 +577,9 @@ static InterpretResult run() {
  * @param arg_count 传入的参数的个数
  */
 static void call_value(Value value, int arg_count) {
-    if (!is_ref_of(value, OBJ_FUNCTION) && !is_ref_of(value, OBJ_NATIVE)) {
-        // runtime error
-        char *name = to_print_chars(value);
-        runtime_error("%s is not callable", name);
-        free(name);
-        catch();
-    }
-    if (is_ref_of(value, OBJ_FUNCTION)) {
-        LoxFunction *function = as_function(value);
+    if (is_ref_of(value, OBJ_CLOSURE)) {
+        LoxFunction *function = as_closure(value)->function;
         if (function->arity != arg_count) {
-            // runtime error
             runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
         }
         if (vm.frame_count == FRAME_MAX) {
@@ -591,7 +589,7 @@ static void call_value(Value value, int arg_count) {
         CallFrame *frame = curr_frame();
         frame->FP = vm.stack_top - arg_count - 1;
         frame->PC = function->chunk.code;
-        frame->function = function;
+        frame->closure = as_closure(value);
     } else if (is_ref_of(value, OBJ_NATIVE)) {
         NativeFunction *native = as_native(value);
         if (native->arity != arg_count) {
@@ -601,7 +599,10 @@ static void call_value(Value value, int arg_count) {
         vm.stack_top -= arg_count + 1;
         stack_push(result);
     } else {
-        IMPLEMENTATION_ERROR("not callable");
+        char *name = to_print_chars(value);
+        runtime_error("%s is not callable", name);
+        free(name);
+        catch();
     }
 }
 
@@ -675,7 +676,8 @@ static Value native_help(int count, Value *value) {
     (void ) value;
     printf("You are in the REPL mode because you run clox directly without providing any arguments.\n");
     printf("You can also do `clox path/to/script` to run a lox script.\n");
-    printf("In this REPL mode, expression results will be printed out automatically in gray color.\n");
+    printf("In this REPL mode, expression results will be printed out automatically in gray color. \n");
+    printf("You may also omit the last semicolon for a statement.\n");
     printf("Use ctrl+C or ctrl+D to quit.\n");
     return nil_value();
 }
@@ -753,12 +755,18 @@ InterpretResult interpret(const char *src) {
         return INTERPRET_COMPILE_ERROR;
     }
 
+    stack_push(ref_value((Object *) function));
+
     vm.frame_count++;
     CallFrame *frame = curr_frame();
-    frame->function = function;
+
+    Closure *closure = new_closure(function);
+    frame->closure = closure;
     frame->FP = vm.stack;
     frame->PC = function->chunk.code;
-    stack_push(ref_value((Object *) function));
+
+    stack_pop();
+    stack_push(ref_value((Object *) closure));
 
     return run();
 }

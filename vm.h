@@ -9,7 +9,8 @@
 #include "table.h"
 
 typedef struct CallFrame {
-    LoxFunction *function;
+//    LoxFunction *function;
+    Closure *closure;
     uint8_t *PC; // program counter
     Value *FP; // frame pointer. The start of the frame
 } CallFrame;

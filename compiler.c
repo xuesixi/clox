@@ -391,7 +391,8 @@ static void function_statement(FunctionType type) {
 
     // 将这个函数作为一个常量储存起来
     int index = make_constant(ref_value((Object*)function));
-    emit_constant(index);
+//    emit_constant(index);
+    emit_two_bytes(OP_CLOSURE, index);
 }
 
 static void fun_declaration() {

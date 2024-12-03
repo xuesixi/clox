@@ -153,6 +153,14 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return jump_instruction("OP_JUMP_IF_TRUE_POP", chunk, offset, true);
         case OP_CALL:
             return byte_instruction("OP_CALL", chunk, offset);
+        case OP_CLOSURE: {
+            offset++;
+            int index = chunk->code[offset ++];
+            printf("%-23s : ", "OP_CLOSURE");
+            print_value(chunk->constants.values[index]);
+            NEW_LINE();
+            return offset;
+        }
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;
