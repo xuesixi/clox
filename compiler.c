@@ -1312,7 +1312,7 @@ static LoxFunction *end_compiler() {
     emit_return_nil();
     LoxFunction *function = current_scope->function;
     if (SHOW_COMPILE_RESULT && !parser.has_error) {
-        disassemble_chunk(current_chunk(), function->name == NULL ? "<script>" : function->name->chars);
+        disassemble_chunk(current_chunk(), function->name == NULL ? "<main>" : function->name->chars);
     }
     current_scope = current_scope->enclosing;
     return function;

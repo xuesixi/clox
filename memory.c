@@ -51,7 +51,13 @@ void free_object(Object *object) {
             break;
         }
         case OBJ_CLOSURE: {
+            Closure *closure = (Closure *) object;
+            FREE_ARRAY(UpValueObject*, closure->upvalues, closure->upvalue_count);
             re_allocate(object, sizeof(Closure), 0);
+            break;
+        }
+        case OBJ_UPVALUE: {
+            re_allocate(object, sizeof(UpValueObject), 0);
             break;
         }
         default:

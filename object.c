@@ -106,8 +106,20 @@ LoxFunction *new_function() {
 
 Closure *new_closure(LoxFunction *function) {
     Closure *closure = (Closure *) allocate_object(sizeof(Closure), OBJ_CLOSURE);
+    UpValueObject **upvalues = (UpValueObject **) ALLOCATE(UpValueObject*, function->upvalue_count);
+    for (int i = 0; i < function->upvalue_count; ++i) {
+        upvalues[i] = NULL;
+    }
+    closure->upvalue_count = function->upvalue_count;
+    closure->upvalues = upvalues;
     closure->function = function;
     return closure;
+}
+
+UpValueObject *new_upvalue(Value *position) {
+    UpValueObject *upValueObject = (UpValueObject *) allocate_object(sizeof(UpValueObject), OBJ_UPVALUE);
+    upValueObject->position = position;
+    return upValueObject;
 }
 
 NativeFunction *new_native(NativeImplementation impl, String *name, int arity) {

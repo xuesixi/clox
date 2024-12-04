@@ -308,6 +308,11 @@ static inline String *read_constant_string() {
     return (String *)(as_ref(value));
 }
 
+static UpValueObject *capture_upvalue(Value *value) {
+    UpValueObject *new_capture = new_upvalue(value);
+    return new_capture;
+}
+
 /**
  * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之
  * @return 执行的结果
@@ -559,6 +564,27 @@ static InterpretResult run() {
                 Value f = read_constant();
                 Closure *closure = new_closure(as_function(f));
                 stack_push(ref_value((Object *) closure));
+
+                for (int i = 0; i < closure->upvalue_count; ++i) {
+                    bool is_local = read_byte();
+                    int index = read_byte();
+                    if (is_local) {
+                        closure->upvalues[i] = capture_upvalue(curr_frame()->FP + index);
+                    } else {
+                        closure->upvalues[i] = curr_frame()->closure->upvalues[index];
+                    }
+                }
+                
+                break;
+            }
+            case OP_GET_UPVALUE: {
+                int index = read_byte();
+                stack_push(* curr_frame()->closure->upvalues[index]->position);
+                break;
+            }
+            case OP_SET_UPVALUE: {
+                int index = read_byte();
+                * curr_frame()->closure->upvalues[index]->position = peek_stack(0);
                 break;
             }
             default: {

@@ -2,17 +2,13 @@
  var num = 10;
  
  fun outer() {
-     var age = 10;
- 
-     fun middle() {
-         var name = "anda";
- 
-         fun inner() {
-             print name + age + num;
-         }
-         return inner;
+     var age = 99;
+     fun say() {
+        print age;
      }
- 
-     return middle;
+
+     say();
  }
+
+ outer();
 

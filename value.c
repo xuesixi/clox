@@ -144,18 +144,21 @@ static char *to_print_ref(Value value) {
         case OBJ_STRING:
             asprintf(&buffer, "%s", as_string(value)->chars);
             break;
-        case OBJ_FUNCTION:
-            if (as_function(value)->name == NULL) {
+        case OBJ_CLOSURE:
+            if (as_closure(value)->function->name == NULL) {
                 asprintf(&buffer, "<main>");
             } else {
-                asprintf(&buffer, "<fn: %s>", as_function(value)->name->chars);
+                asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
             }
             break;
         case OBJ_NATIVE:
             asprintf(&buffer, "<native: %s>", as_native(value)->name->chars);
             break;
-        case OBJ_CLOSURE:
-            asprintf(&buffer, "<closure>");
+        case OBJ_FUNCTION:
+            asprintf(&buffer, "<function>");
+            break;
+        case OBJ_UPVALUE:
+            asprintf(&buffer, "<upvalue>");
             break;
         default:
             printf("error: encountering a value with unknown type: %d\n", type);
