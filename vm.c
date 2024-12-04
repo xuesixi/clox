@@ -550,7 +550,6 @@ static InterpretResult run() {
                 break;
             }
             case OP_CALL: {
-                // main, 999, sum, 1, 2, top
                 int count = read_byte();
                 Value callee = peek_stack(count);
                 call_value(callee, count);

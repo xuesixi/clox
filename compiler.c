@@ -66,6 +66,11 @@ typedef struct Local {
     bool is_const;
 } Local;
 
+typedef struct UpValue {
+    int index; // 这个upvalue在下一外层的upvalues或者locals中的索引
+    bool is_local; // 这个upvalue对于下一外层的scope来说，是local还是另一个upvalue
+} UpValue;
+
 typedef enum FunctionType {
     TYPE_FUNCTION,
     TYPE_MAIN,
@@ -73,10 +78,11 @@ typedef enum FunctionType {
 
 typedef struct Scope {
     Local locals[UINT8_MAX + 1];
+    UpValue upvalues[UINT8_MAX + 1];
     LoxFunction *function;
     struct Scope *enclosing;
     FunctionType functionType;
-    int count;
+    int local_count;
     int depth;
 } Scope;
 
@@ -207,6 +213,10 @@ static bool check(TokenType type);
 static void synchronize();
 
 static int make_constant(Value value);
+
+static int resolve_upvalue(Scope *scope, Token *identifier);
+
+static int add_upvalue(Scope *scope, int index, bool is_local);
 
 //-------------------------------------------------------------------------
 
@@ -354,7 +364,7 @@ static void declaration() {
  */
 static inline void mark_initialized() {
     if (current_scope->depth > 0) {
-        current_scope->locals[current_scope->count - 1].depth = current_scope->depth;
+        current_scope->locals[current_scope->local_count - 1].depth = current_scope->depth;
     }
 }
 
@@ -391,8 +401,14 @@ static void function_statement(FunctionType type) {
 
     // 将这个函数作为一个常量储存起来
     int index = make_constant(ref_value((Object*)function));
-//    emit_constant(index);
+
+    // OP_closure 后面紧跟着的是一个function，而非closure对象。这个function对象会在运行时被包装成closure
     emit_two_bytes(OP_CLOSURE, index);
+
+    for (int i = 0; i < function->upvalue_count; ++i) {
+        emit_byte(scope.upvalues[i].is_local);
+        emit_byte(scope.upvalues[i].index);
+    }
 }
 
 static void fun_declaration() {
@@ -434,7 +450,7 @@ static void const_declaration() {
     if (current_scope->depth == 0) {
         emit_two_bytes(OP_DEFINE_GLOBAL_CONST, index);
     } else {
-        current_scope->locals[current_scope->count - 1].depth = current_scope->depth;
+        current_scope->locals[current_scope->local_count - 1].depth = current_scope->depth;
     }
     // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
 }
@@ -450,7 +466,7 @@ static void declare_local(bool is_const) {
  * 因为本地变量是唯一可以长时间存在的元素，一个本地变量在locals中的索引必然就是它在stack中的索引。
  *
  */
-    if (current_scope->count >= STACK_MAX) {
+    if (current_scope->local_count >= STACK_MAX) {
         error_at_previous("too many local variables");
         return;
     }
@@ -458,7 +474,7 @@ static void declare_local(bool is_const) {
     Token *token = &parser.previous;
 
     // 检查同一层scope中是否存在同名的变量
-    for (int i = current_scope->count - 1; i >= 0; i--) {
+    for (int i = current_scope->local_count - 1; i >= 0; i--) {
         Local *curr = current_scope->locals + i;
         if (curr->depth < current_scope->depth) {
             break;
@@ -469,11 +485,11 @@ static void declare_local(bool is_const) {
     }
 
     // 添加新的local变量
-    Local *local = current_scope->locals + current_scope->count;
+    Local *local = current_scope->locals + current_scope->local_count;
     local->name = parser.previous;
     local->is_const = is_const;
     local->depth = -1; // 在完成初始化之后，再设置为正确值。这是为了防止初始化中用到自己，比如`var num = num + 10;`
-    current_scope->count++;
+    current_scope->local_count++;
 }
 
 /**
@@ -485,7 +501,7 @@ static void declare_local(bool is_const) {
  * @return 该变量在local变量表的位置（同时也是vm的栈中的索引）
  */
 static int resolve_local(Scope *scope, Token *token, bool *is_const) {
-    for (int i = scope->count - 1; i >= 0; i--) {
+    for (int i = scope->local_count - 1; i >= 0; i--) {
         Local *curr = scope->locals + i;
         if (lexeme_equal(token, &curr->name)) {
             if (curr->depth == -1) {
@@ -500,6 +516,41 @@ static int resolve_local(Scope *scope, Token *token, bool *is_const) {
         }
     }
     return -1;
+}
+
+/**
+ * 已知给定的identifier不存在于scope中，将其视为upvalue，向外层寻找
+ * @return 如果找到了，将之添加到scope的upvalues中，然后返回其索引。如果没找到，返回-1
+ */
+static int resolve_upvalue(Scope *scope, Token *identifier) {
+    if (scope->enclosing == NULL) {
+        return -1;
+    }
+    int index = resolve_local(scope->enclosing, identifier, NULL);
+    if (index != -1) {
+        return add_upvalue(scope, index, true);
+    }
+    index = resolve_upvalue(scope->enclosing, identifier);
+    if (index != -1) {
+        return add_upvalue(scope, index, false);
+    }
+    return -1;
+}
+
+static int add_upvalue(Scope *scope, int index, bool is_local) {
+    int count = scope->function->upvalue_count;
+    for (int i = 0; i < count; ++i) {
+        if (scope->upvalues[i].index == index && scope->upvalues[i].is_local == is_local) {
+            return i;
+        }
+    }
+    if (count == UINT8_MAX + 1) {
+        error_at_previous("Too many closure variables in the function");
+        return 0;
+    }
+    scope->upvalues[count].index = index;
+    scope->upvalues[count].is_local = is_local;
+    return scope->function->upvalue_count ++;
 }
 
 /**
@@ -869,14 +920,14 @@ static inline void begin_scope() {
  * 清除所有比to层级更深的local变量。对于每一个被清除的local变量，产生一个POP指令
  * */
 static void clear_scope(int to) {
-    while (current_scope->count > 0) {
+    while (current_scope->local_count > 0) {
         // 当前顶层的那个local
-        Local *curr = current_scope->locals + current_scope->count - 1;
+        Local *curr = current_scope->locals + current_scope->local_count - 1;
 
         // 如果这个local的层级更深，那么我们需要将其移除
         if (curr->depth > to) {
             emit_byte(OP_POP);
-            current_scope->count--;
+            current_scope->local_count--;
         } else {
             break;
         }
@@ -887,7 +938,7 @@ static void clear_scope(int to) {
  * 对于每一个比to层级更深的变量，产生一个POP指令。但该函数不会修改count
  * */
 static void emit_pops_to_clear(int to) {
-    Local *curr = current_scope->locals + current_scope->count - 1;
+    Local *curr = current_scope->locals + current_scope->local_count - 1;
     while (curr >= current_scope->locals) {
         // 如果这个local的层级更深，那么我们需要将其移除
         if (curr->depth > to) {
@@ -1066,11 +1117,17 @@ static inline bool match_assign() {
  * @param can_assign
  */
 static void named_variable(Token *name, bool can_assign) {
-    int set_op = OP_SET_LOCAL;
-    int get_op = OP_GET_LOCAL;
+    int set_op;
+    int get_op;
+    int index;
     bool is_const = false;
-    int index = resolve_local(current_scope, name, &is_const);
-    if (index == -1) {
+    if ((index = resolve_local(current_scope, name, &is_const)) != -1) {
+        set_op = OP_SET_LOCAL;
+        get_op = OP_GET_LOCAL;
+    } else if ((index = resolve_upvalue(current_scope, name)) != -1) {
+        set_op = OP_SET_UPVALUE;
+        get_op = OP_GET_UPVALUE;
+    } else {
         index = identifier_constant(name);
         set_op = OP_SET_GLOBAL;
         get_op = OP_GET_GLOBAL;
@@ -1454,7 +1511,7 @@ static void set_new_scope(Scope *scope, FunctionType type) {
     scope->functionType = type;
     scope->function = NULL;
     scope->depth = 0;
-    scope->count = 0;
+    scope->local_count = 0;
     scope->function = new_function();
 
     if (type != TYPE_MAIN) {
@@ -1465,7 +1522,7 @@ static void set_new_scope(Scope *scope, FunctionType type) {
     current_scope = scope;
 
     // 一个初始的占位符，代表当前scope的函数
-    Local *local = &current_scope->locals[current_scope->count++];
+    Local *local = &current_scope->locals[current_scope->local_count++];
     local->depth = 0;
     local->name.start = "";
     local->name.length = 0;

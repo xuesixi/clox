@@ -35,6 +35,8 @@ typedef enum OpCode{
     OP_SET_GLOBAL, // OP, index: 为一个全局变量赋值为栈顶的值。变量名为const[index]。不消耗栈顶的值。
     OP_GET_LOCAL, // OP, index: 将stack[index]的值置入栈顶
     OP_SET_LOCAL, // op, index: 将栈顶的值赋值给stack[index]。不消耗栈顶的值。
+    OP_GET_UPVALUE,
+    OP_SET_UPVALUE,
     OP_JUMP_IF_FALSE, // op, offset16: 如果栈顶的值是false，那么ip += offset16。不消耗栈顶的值
     OP_JUMP_IF_TRUE, // op, offset16: 如果栈顶的值是true, 那么ip += offset16。不消耗栈顶的值
     OP_JUMP_BACK, // op, offset16: ip -= offset16. 不消耗栈顶的值

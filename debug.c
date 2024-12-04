@@ -153,12 +153,24 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return jump_instruction("OP_JUMP_IF_TRUE_POP", chunk, offset, true);
         case OP_CALL:
             return byte_instruction("OP_CALL", chunk, offset);
+        case OP_GET_UPVALUE:
+            return constant_instruction("OP_GET_UPVALUE", chunk, offset);
+        case OP_SET_UPVALUE:
+            return constant_instruction("OP_SET_UPVALUE", chunk, offset);
         case OP_CLOSURE: {
             offset++;
             int index = chunk->code[offset ++];
-            printf("%-23s : ", "OP_CLOSURE");
-            print_value(chunk->constants.values[index]);
+            printf("%-23s %4d : ", "OP_CLOSURE", index);
+            Value value = chunk->constants.values[index];
+            print_value(value);
             NEW_LINE();
+            LoxFunction *function = as_function(value);
+            for (int i = 0; i < function->upvalue_count; ++i) {
+                bool is_local = chunk->code[offset ++];
+                index = chunk->code[offset ++];
+                printf("%04d    | ", offset - 2);
+                printf("%-23s %s: %d\n","", is_local ? "local" : "upvalue", index);
+            }
             return offset;
         }
         default:

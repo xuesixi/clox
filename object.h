@@ -29,6 +29,7 @@ typedef struct LoxFunction {
     int arity;
     Chunk chunk;
     String *name;
+    int upvalue_count;
 } LoxFunction;
 
 typedef struct Closure {

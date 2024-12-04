@@ -1,11 +1,18 @@
 
-var start = clock();
-fun fbnc(num) {
-    if (num < 2) {
-        return num;
-    } 
-    return fbnc(num - 1) + fbnc(num - 2);
-}
+ var num = 10;
+ 
+ fun outer() {
+     var age = 10;
+ 
+     fun middle() {
+         var name = "anda";
+ 
+         fun inner() {
+             print name + age + num;
+         }
+         return inner;
+     }
+ 
+     return middle;
+ }
 
-print fbnc(30);
-print clock() - start;

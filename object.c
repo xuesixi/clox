@@ -98,8 +98,9 @@ static uint32_t chars_hash(const char *key, int length) {
 LoxFunction *new_function() {
     LoxFunction *function = (LoxFunction *) allocate_object(sizeof(LoxFunction), OBJ_FUNCTION);
     function->name = NULL;
-    init_chunk(&function->chunk);
     function->arity = 0;
+    function->upvalue_count = 0;
+    init_chunk(&function->chunk);
     return function;
 }
 
