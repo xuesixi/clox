@@ -561,6 +561,11 @@ static InterpretResult run() {
                 break;
             }
             case OP_CLOSURE: {
+                /* 值得注意的是，对于嵌套的closure，虽然在编译时，是内部的
+                 * 函数先编译，但是在运行时，是先执行外层函数的OP_closure。
+                 * 然后等到外层函数被调用、内层函数被定义后，内层函数的OP_closure
+                 * 才会被执行
+                 */
                 Value f = read_constant();
                 Closure *closure = new_closure(as_function(f));
                 stack_push(ref_value((Object *) closure));

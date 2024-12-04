@@ -1516,9 +1516,11 @@ static void set_new_scope(Scope *scope, FunctionType type) {
 
     if (type != TYPE_MAIN) {
         scope->function->name = string_copy(parser.previous.start, parser.previous.length);
+        scope->enclosing = current_scope;
+    } else {
+        scope->enclosing = NULL;
     }
 
-    scope->enclosing = current_scope;
     current_scope = scope;
 
     // 一个初始的占位符，代表当前scope的函数

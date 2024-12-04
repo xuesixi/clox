@@ -2,12 +2,7 @@
  var num = 10;
  
  fun outer() {
-     var age = 99;
-     fun say() {
-        print age;
-     }
-
-     say();
+    print "hello";
  }
 
  outer();
