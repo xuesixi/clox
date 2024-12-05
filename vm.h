@@ -20,6 +20,7 @@ typedef struct VM{
     int frame_count;
     Value stack[STACK_MAX];
     Value *stack_top;
+    UpValueObject *open_upvalues;
     Object *objects; // 所有object的值
     Table string_table; // 同名的String只会创建一次。
     Table globals; // 储存所有全局变量

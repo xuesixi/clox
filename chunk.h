@@ -46,6 +46,7 @@ typedef enum OpCode{
     OP_JUMP_IF_TRUE_POP,
     OP_CALL, // op, arg_count:
     OP_CLOSURE,
+    OP_CLOSE_UPVALUE,
 } OpCode;
 
 typedef struct Chunk{

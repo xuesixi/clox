@@ -36,12 +36,14 @@ typedef struct LoxFunction {
 typedef struct UpValueObject {
     Object object;
     Value *position;
+    Value closed;
+    struct UpValueObject *next;
 } UpValueObject;
 
 typedef struct Closure {
     Object object;
     LoxFunction *function;
-    UpValueObject **upvalues;
+    UpValueObject **upvalues; // 意思是array of pointers to UpValueObject，之所以有额外一层pointer，是因为我们多个closure可以共享同一个UpVlaueObject本体。
     int upvalue_count;
 } Closure;
 

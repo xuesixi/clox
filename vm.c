@@ -198,6 +198,7 @@ static inline bool is_falsy(Value value) {
 static inline void reset_stack() {
     vm.stack_top = vm.stack;
     vm.frame_count = 0;
+    vm.open_upvalues = NULL;
 }
 
 static inline Value peek_stack(int distance) {
@@ -308,9 +309,49 @@ static inline String *read_constant_string() {
     return (String *)(as_ref(value));
 }
 
+/**
+ * 返回一个捕获了当前处于value位置上的那个值的UpValueObject对象。
+ * 如果那个只是第一次被捕获，新建UpValueObject，将其添加入链表中，然后返回之，否则沿用旧有的。
+ */
 static UpValueObject *capture_upvalue(Value *value) {
+    // vm.open_upvalues 是有序的。第一个元素的position值是最大的（处于stack中更高的位置）
+    UpValueObject *curr = vm.open_upvalues;
+    UpValueObject *pre = NULL;
+    while (curr != NULL && curr->position > value) {
+        pre = curr;
+        curr = curr->next;
+    }
+    // 三种情况：curr为NULL；curr->position == value; curr->position < value
+
+
+    if (curr != NULL && curr->position == value) {
+        return curr;
+    }
+
     UpValueObject *new_capture = new_upvalue(value);
+    new_capture->next = curr;
+    if (pre == NULL) {
+        vm.open_upvalues = new_capture;
+    } else {
+        pre->next = curr;
+    }
+
     return new_capture;
+}
+
+
+/**
+ * 将vm.open_upvalues中所有位置处于position以及其上的upvalue的值进行“close”，
+ * 也就是说，将对应的栈上的值保存到UpValueObject其自身中。
+ */
+static void close_upvalue(Value *position) {
+    UpValueObject *curr = vm.open_upvalues;
+    while (curr != NULL && curr->position >= position) {
+        curr->closed = *curr->position; // 把栈上的值保存入closed中
+        curr->position = &curr->closed; // 重新设置position。如此一来upvalue的get，set指令可以正常运行
+        curr = curr->next;
+    }
+    vm.open_upvalues = curr;
 }
 
 /**
@@ -336,9 +377,10 @@ static InterpretResult run() {
             case OP_RETURN: {
                 Value result = stack_pop(); // 返回值
                 vm.stack_top = curr_frame()->FP;
+                close_upvalue(vm.stack_top);
                 vm.frame_count--;
                 if (vm.frame_count == 0) {
-                    return INTERPRET_OK;
+                    return INTERPRET_OK; // 程序运行结束
                 }
                 stack_push(result);
                 break;
@@ -592,6 +634,11 @@ static InterpretResult run() {
                 * curr_frame()->closure->upvalues[index]->position = peek_stack(0);
                 break;
             }
+            case OP_CLOSE_UPVALUE: {
+                close_upvalue(vm.stack_top - 1);
+                stack_pop();
+                break;
+            }
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;
@@ -650,11 +697,13 @@ static void define_native(const char *name, NativeImplementation impl, int arity
 }
 
 static Value native_clock(int count, Value *value) {
+    (void )count;
     (void )value;
     return float_value((double)clock() / CLOCKS_PER_SEC);
 }
 
 static Value native_int(int count, Value *value) {
+    (void )count;
     switch (value->type) {
         case VAL_INT:
             return *value;
@@ -678,6 +727,7 @@ static Value native_int(int count, Value *value) {
 }
 
 static Value native_float(int count, Value *value) {
+    (void )count;
     Value v = *value;
     switch (v.type) {
         case VAL_INT:
@@ -713,6 +763,7 @@ static Value native_help(int count, Value *value) {
 }
 
 static Value native_rand(int count, Value *value) {
+    (void )count;
     Value a = value[0];
     Value b = value[1];
     if (!is_int(a) || !is_int(b)) {
@@ -728,6 +779,7 @@ static Value native_rand(int count, Value *value) {
 void init_VM() {
     reset_stack();
     vm.objects = NULL;
+    vm.open_upvalues = NULL;
     srand(time(NULL));
     init_table(&vm.string_table);
     init_table(&vm.globals);

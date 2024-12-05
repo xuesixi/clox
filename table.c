@@ -331,5 +331,6 @@ int int_hash(void *p) {
 }
 
 bool int_equal(void *a, void *b) {
-    return (int) a == (int) b;
+    return a == b;
+//    return (int) a == (int) b;
 }

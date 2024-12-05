@@ -1,9 +1,38 @@
+//var globalOne;
+//var globalTwo;
 
- var num = 10;
- 
- fun outer() {
-    print "hello";
- }
+fun vector(x, y) {
 
- outer();
+    // 0: get x
+    // 1: get y
+    // 2: addition
 
+    fun getX() {
+        return x;
+    }
+
+    fun getY() {
+        return y;
+    }
+
+    fun addition(a, b) {
+        return vector(x + a, y + b);
+    }
+
+    fun all(index) {
+        switch (index) {
+            case 0: return getX;
+            case 1: return getY;
+            case 2: return addition;
+        }
+    }
+
+    return all;
+}
+
+var v = vector(3, 4);
+var v2 = v(2)(5, 6);
+print v(0)();
+print v(1)();
+print v2(0)();
+print v2(1)();

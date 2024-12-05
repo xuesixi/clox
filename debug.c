@@ -173,6 +173,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             }
             return offset;
         }
+        case OP_CLOSE_UPVALUE:
+            return simple_instruction("OP_CLOSE_UPVALUE", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

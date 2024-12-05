@@ -119,6 +119,8 @@ Closure *new_closure(LoxFunction *function) {
 UpValueObject *new_upvalue(Value *position) {
     UpValueObject *upValueObject = (UpValueObject *) allocate_object(sizeof(UpValueObject), OBJ_UPVALUE);
     upValueObject->position = position;
+    upValueObject->next = NULL;
+    upValueObject->closed = nil_value();
     return upValueObject;
 }
 

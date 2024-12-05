@@ -64,6 +64,7 @@ typedef struct Local {
     Token name;
     int depth;
     bool is_const;
+    bool is_captured;
 } Local;
 
 typedef struct UpValue {
@@ -488,6 +489,7 @@ static void declare_local(bool is_const) {
     Local *local = current_scope->locals + current_scope->local_count;
     local->name = parser.previous;
     local->is_const = is_const;
+    local->is_captured = false;
     local->depth = -1; // 在完成初始化之后，再设置为正确值。这是为了防止初始化中用到自己，比如`var num = num + 10;`
     current_scope->local_count++;
 }
@@ -528,6 +530,7 @@ static int resolve_upvalue(Scope *scope, Token *identifier) {
     }
     int index = resolve_local(scope->enclosing, identifier, NULL);
     if (index != -1) {
+        scope->enclosing->locals[index].is_captured = true;
         return add_upvalue(scope, index, true);
     }
     index = resolve_upvalue(scope->enclosing, identifier);
@@ -926,7 +929,11 @@ static void clear_scope(int to) {
 
         // 如果这个local的层级更深，那么我们需要将其移除
         if (curr->depth > to) {
-            emit_byte(OP_POP);
+            if (curr->is_captured) {
+                emit_byte(OP_CLOSE_UPVALUE);
+            } else {
+                emit_byte(OP_POP);
+            }
             current_scope->local_count--;
         } else {
             break;
@@ -1112,9 +1119,7 @@ static inline bool match_assign() {
 }
 
 /**
- * 解析global/local变量的get/set
- * @param name
- * @param can_assign
+ * 解析变量的get/set
  */
 static void named_variable(Token *name, bool can_assign) {
     int set_op;
@@ -1528,6 +1533,7 @@ static void set_new_scope(Scope *scope, FunctionType type) {
     local->depth = 0;
     local->name.start = "";
     local->name.length = 0;
+    local->is_captured = false;
 }
 
 static void init_parser(Parser *the_parser) {

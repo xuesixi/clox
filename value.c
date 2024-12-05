@@ -155,7 +155,7 @@ static char *to_print_ref(Value value) {
             asprintf(&buffer, "<native: %s>", as_native(value)->name->chars);
             break;
         case OBJ_FUNCTION:
-            asprintf(&buffer, "<function>");
+            asprintf(&buffer, "<fn: %s>", as_function(value)->name->chars);
             break;
         case OBJ_UPVALUE:
             asprintf(&buffer, "<upvalue>");
