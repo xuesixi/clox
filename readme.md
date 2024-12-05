@@ -27,6 +27,7 @@ Other options
 * Most statements are terminated by a `;`
 * As in c/java/javascript, structural statements do not need `;`
 * `//` starts a single line comment
+* `/* comment */` is also supported
 
 ## type
 Lox has the following built-in types

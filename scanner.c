@@ -207,7 +207,24 @@ static void skip_whitespace() {
                         advance();
                     }
                     continue;
-                } else {
+                } else if (peek_next() == '*') {
+                    advance();
+                    advance();
+                    while ( (peek() != '*' || peek_next() != '/') && !is_end()) {
+                        if (peek() == '\n') {
+                            scanner.line ++;
+                        }
+                        advance();
+                    }
+                    if (is_end()) {
+                        printf("unterminated comment\n");
+                    } else {
+                        advance();
+                        advance();
+                        continue;
+                    }
+                }
+                else {
                     return;
                 }
             default:
