@@ -30,7 +30,7 @@ typedef struct Value{
     ValueType type;
 } Value;
 
-typedef struct {
+typedef struct ValueArray{
     int capacity;
     int count;
     Value *values;

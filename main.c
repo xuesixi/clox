@@ -4,7 +4,11 @@
 #include <unistd.h>
 #include "string.h"
 #include "vm.h"
+#include "io.h"
 
+bool COMPILE_ONLY = false;
+bool RUN_BYTECODE = false;
+char OUTPUT_PATH[100];
 bool REPL;
 bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
@@ -74,24 +78,32 @@ static void run_file(const char *path) {
     }
 }
 
-/*
 static void produce_bytecode(const char *code_path, const char *result_path) {
     char *src = read_file(code_path);
     InterpretResult result = produce(src, result_path);
     free(src);
     if (result == INTERPRET_COMPILE_ERROR) {
-        printf("compile error\n");
+        printf("== compile error ==\n");
     } else if (result == INTERPRET_RUNTIME_ERROR) {
-        printf("runtime error\n");
+        printf("== runtime error ==\n");
     } else {
-        printf("good\n");
+        printf("== produce finished ==\n");
     }
 }
-*/
 
-// static void run_bytecode(const char *bytecode_path) {
-//     FILE *file = fopen(bytecode_path, "rb");
-// }
+static void main_run_bytecode(const char *code_path) {
+
+    InterpretResult result = read_run_bytecode(code_path);
+    if (result == INTERPRET_COMPILE_ERROR) {
+        printf("== compile error ==\n");
+    } else if (result == INTERPRET_RUNTIME_ERROR) {
+        printf("== runtime error ==\n");
+    } else if (result == INTERPRET_READ_ERROR){
+        printf("== io error ==\n");
+    } else {
+        printf("== execution finished ==\n");
+    }
+}
 
 /**
  * clox
@@ -100,7 +112,7 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
 int main(int argc, char *const argv[]) {
 
     init_VM();
-    char *options = "dls";
+    char *options = "dlsc:bh";
     char op;
     while ((op = getopt(argc, argv, options)) != -1) {
         switch (op) {
@@ -113,16 +125,39 @@ int main(int argc, char *const argv[]) {
             case 'l':
                 SHOW_LABEL = true;
                 break;
+            case 'c':
+                COMPILE_ONLY = true;
+                strcpy(OUTPUT_PATH, optarg);
+                break;
+            case 'b':
+                RUN_BYTECODE = true;
+                break;
+            case 'h':
             default:
-                printf("Invalid option %c\n", op);
+                printf("Options: \n");
                 printf("-s: show the compile result\n");
                 printf("-d: trace the execution\n");
+                printf("-c path/to/output: compile and write and result to the specified path\n");
+                printf("-b: treat the given file as bytecode\n");
+                exit(1);
         }
     }
     if (optind < argc) {
-        run_file(argv[optind]);
+        if (COMPILE_ONLY) {
+            produce_bytecode(argv[optind], OUTPUT_PATH);
+        } else if (RUN_BYTECODE) {
+            main_run_bytecode(argv[optind]);
+        } else {
+            run_file(argv[optind]);
+        }
     } else {
-        repl();
+        if (COMPILE_ONLY) {
+            printf("The output path is not specified\n");
+            printf("The typical format of compiling is `clox -c output/path script/path`\n");
+            exit(1);
+        } else {
+            repl();
+        }
     }
 
     free_VM();

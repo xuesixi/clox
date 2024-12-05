@@ -1,4 +1,26 @@
 
-(fun () {
-    return 10;
- })();
+// var num = 1;
+// 
+// fun out() {
+//     var age = 5;
+// 
+//     return fun (a, b) {
+//         return a + b + num + 5;
+//     };
+// }
+// 
+// const add = out();
+// print add(1, 2);
+
+fun fbnc(num) {
+    if (num < 2) {
+        return num;
+    }
+    return fbnc(num - 1) + fbnc (num -2);
+}
+
+var start = clock();
+print fbnc(35);
+print clock() - start;
+
+

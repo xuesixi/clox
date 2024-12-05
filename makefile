@@ -1,8 +1,10 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Wformat -g
-SRC = $(wildcard *.c)
+SRC = chunk.c compiler.c debug.c io.c main.c memory.c object.c scanner.c table.c value.c vm.c
 OBJ = $(SRC:.c=.o)
 TARGET = clox
+
+all: $(TARGET)
 
 $(TARGET): $(OBJ)
 	@$(CC) $(OBJ) -o $(TARGET) -l readline
@@ -12,7 +14,6 @@ run: $(TARGET)
 	@./$(TARGET) -ds
 	@rm $(OBJ)
 	@rm $(TARGET)
-
 
 f: file
 

@@ -58,7 +58,7 @@ typedef struct Chunk{
 } Chunk;
 
 void init_chunk(Chunk *c);
-void write_chunk(Chunk *c, uint8_t data, int line);
+void write_to_chunk(Chunk *c, uint8_t data, int line);
 void free_chunk(Chunk *c);
 int constant_mapping(Value value);
 int add_constant(Chunk *c, Value constant);

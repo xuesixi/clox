@@ -5,6 +5,7 @@
 #include "vm.h"
 
 #include "compiler.h"
+#include "io.h"
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
@@ -771,6 +772,7 @@ static Value native_help(int count, Value *value) {
     (void ) value;
     printf("You are in the REPL mode because you run clox directly without providing any arguments.\n");
     printf("You can also do `clox path/to/script` to run a lox script.\n");
+    printf("Or do `clox -h` to see more options\n");
     printf("In this REPL mode, expression results will be printed out automatically in gray color. \n");
     printf("You may also omit the last semicolon for a statement.\n");
     printf("Use ctrl+C or ctrl+D to quit.\n");
@@ -875,24 +877,41 @@ InterpretResult interpret(const char *src) {
  * @return
  */
 InterpretResult produce(const char *src, const char *path) {
+    LoxFunction *function = compile(src);
+    if (function == NULL) {
+        return INTERPRET_COMPILE_ERROR;
+    }
+
     FILE *file = fopen(path, "wb");
     if (file == NULL) {
         printf("Error when opening the file: %s\n", path);
         return INTERPRET_PRODUCE_ERROR;
     }
-    Chunk chunk;
-    init_chunk(&chunk);
-    if (!compile(src)) {
-        free_chunk(&chunk);
-        return INTERPRET_COMPILE_ERROR;
-    }
-    unsigned long result = fwrite(&chunk, sizeof(Chunk), 1, file);
+    write_function(file, function);
     fclose(file);
-    free_chunk(&chunk);
-    if (result == 1) {
-        return INTERPRET_OK;
-    } else {
-        printf("Error when writing to the file: %s\n", path);
-        return INTERPRET_PRODUCE_ERROR;
+    return INTERPRET_OK;
+}
+
+InterpretResult read_run_bytecode(const char *path) {
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        printf("Error when opening the file: %s\n", path);
+        return INTERPRET_READ_ERROR;
     }
+    LoxFunction *function = read_function(file);
+    fclose(file);
+
+    stack_push(ref_value((Object *) function));
+    vm.frame_count++;
+    CallFrame *frame = curr_frame();
+
+    Closure *closure = new_closure(function);
+    frame->closure = closure;
+    frame->FP = vm.stack;
+    frame->PC = function->chunk.code;
+
+    stack_pop();
+    stack_push(ref_value((Object *) closure));
+
+    return run();
 }

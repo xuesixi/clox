@@ -1380,7 +1380,7 @@ static inline Chunk *current_chunk() {
  * 向当前 scope 的 function 的 chunk 中写入字节
  */
 static inline void emit_byte(uint8_t byte) {
-    write_chunk(current_chunk(), byte, parser.previous.line);
+    write_to_chunk(current_chunk(), byte, parser.previous.line);
 }
 
 /**

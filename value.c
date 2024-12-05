@@ -211,7 +211,7 @@ static char *to_print_ref(Value value) {
             } else if (strcmp(fun->name->chars, "$lambda") == 0){
                 asprintf(&buffer, "<lambda>");
             } else {
-                asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
+                asprintf(&buffer, "<fn: %s>", fun->name->chars);
             }
             break;
         }

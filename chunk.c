@@ -61,7 +61,7 @@ int compute_new_capacity(Chunk *c) {
  * @param data 数据，也就是一个字节
  * @param line 所在行
  */
-void write_chunk(Chunk *c, uint8_t data, int line) {
+void write_to_chunk(Chunk *c, uint8_t data, int line) {
     if (c->capacity == c->count) {
         int new_capacity = compute_new_capacity(c);
         c->code = GROW_ARRAY(uint8_t, c->code, c->capacity, new_capacity);

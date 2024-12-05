@@ -32,6 +32,7 @@ typedef enum {
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR,
     INTERPRET_PRODUCE_ERROR,
+    INTERPRET_READ_ERROR,
 } InterpretResult;
 
 extern VM vm;
@@ -40,6 +41,7 @@ void init_VM();
 void free_VM();
 InterpretResult interpret(const char *src);
 InterpretResult produce(const char *src, const char *path);
+InterpretResult read_run_bytecode(const char *path);
 void additional_repl_init();
 
 #endif //CLOX_VM_H
