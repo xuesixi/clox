@@ -190,19 +190,31 @@ static char *to_print_ref(Value value) {
         case OBJ_STRING:
             asprintf(&buffer, "%s", as_string(value)->chars);
             break;
-        case OBJ_CLOSURE:
-            if (as_closure(value)->function->name == NULL) {
+        case OBJ_CLOSURE: {
+            LoxFunction *fun = as_closure(value)->function;
+            if (fun->name == NULL) {
                 asprintf(&buffer, "<main>");
+            } else if (strcmp(fun->name->chars, "$lambda") == 0){
+                asprintf(&buffer, "<lambda>");
             } else {
                 asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
             }
             break;
+        }
         case OBJ_NATIVE:
             asprintf(&buffer, "<native: %s>", as_native(value)->name->chars);
             break;
-        case OBJ_FUNCTION:
-            asprintf(&buffer, "<fn: %s>", as_function(value)->name->chars);
+        case OBJ_FUNCTION: {
+            LoxFunction *fun = as_function(value);
+            if (fun->name == NULL) {
+                asprintf(&buffer, "<main>");
+            } else if (strcmp(fun->name->chars, "$lambda") == 0){
+                asprintf(&buffer, "<lambda>");
+            } else {
+                asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
+            }
             break;
+        }
         case OBJ_UPVALUE:
             asprintf(&buffer, "<upvalue>");
             break;

@@ -6,6 +6,7 @@ clox
 *.iml
 *.out
 *.dSYM
+*.swp
 compile_commands.json
 .clang-format
 .idea/

@@ -75,6 +75,7 @@ typedef struct UpValue {
 typedef enum FunctionType {
     TYPE_FUNCTION,
     TYPE_MAIN,
+    TYPE_LAMBDA,
 } FunctionType;
 
 typedef struct Scope {
@@ -171,6 +172,8 @@ static void and(bool can_assign);
 
 static void or(bool can_assign);
 
+static void lambda(bool can_assign);
+
 static void declaration();
 
 static void statement();
@@ -252,7 +255,7 @@ ParseRule rules[] = {
         [TOKEN_ELSE]          = {NULL, NULL, PREC_NONE},
         [TOKEN_FALSE]         = {literal, NULL, PREC_NONE},
         [TOKEN_FOR]           = {NULL, NULL, PREC_NONE},
-        [TOKEN_FUN]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_FUN]           = {lambda, NULL, PREC_NONE},
         [TOKEN_IF]            = {NULL, NULL, PREC_NONE},
         [TOKEN_NIL]           = {literal, NULL, PREC_NONE},
         [TOKEN_OR]            = {NULL, or, PREC_OR},
@@ -410,6 +413,11 @@ static void function_statement(FunctionType type) {
         emit_byte(scope.upvalues[i].is_local);
         emit_byte(scope.upvalues[i].index);
     }
+}
+
+static void lambda(bool can_assign) {
+    (void ) can_assign;
+    function_statement(TYPE_LAMBDA);
 }
 
 static void fun_declaration() {
@@ -1519,8 +1527,11 @@ static void set_new_scope(Scope *scope, FunctionType type) {
     scope->local_count = 0;
     scope->function = new_function();
 
-    if (type != TYPE_MAIN) {
+    if (type == TYPE_FUNCTION) {
         scope->function->name = string_copy(parser.previous.start, parser.previous.length);
+        scope->enclosing = current_scope;
+    } else if (type == TYPE_LAMBDA) {
+        scope->function->name = string_copy("$lambda", 7);
         scope->enclosing = current_scope;
     } else {
         scope->enclosing = NULL;
