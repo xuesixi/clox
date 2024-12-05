@@ -8,6 +8,7 @@
 bool REPL;
 bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
+int TRACE_SKIP = -1;
 bool SHOW_LABEL = false;
 jmp_buf consume_buf;
 

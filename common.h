@@ -13,6 +13,7 @@
 
 extern bool SHOW_COMPILE_RESULT;
 extern bool TRACE_EXECUTION;
+extern int TRACE_SKIP;
 extern bool SHOW_LABEL;
 extern bool REPL;
 

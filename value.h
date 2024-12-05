@@ -66,4 +66,18 @@ Value ref_value(Object *value);
 bool value_equal(Value a, Value b);
 bool object_equal(Object *a, Object *b);
 
+extern char *RED;
+extern char *BOLD_RED;
+extern char *GREEN;
+extern char *BOLD_GREEN;
+extern char *CYAN;
+extern char *GRAY;
+extern char *MAGENTA;
+extern char *BLUE;
+extern char *YELLOW;
+
+void start_color(char *color);
+void end_color();
+void print_value_with_color(Value value);
+
 #endif //CLOX_VALUE_H

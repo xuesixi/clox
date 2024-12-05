@@ -4,6 +4,7 @@
 
 #include "debug.h"
 
+
 /**
  *
  * @param chunk
@@ -15,7 +16,6 @@ void disassemble_chunk(Chunk *chunk, const char *name) {
     for (int offset = 0; offset < chunk->count; ) {
         offset = disassemble_instruction(chunk, offset);
     }
-//    NEW_LINE();
     NEW_LINE();
 }
 
@@ -34,7 +34,7 @@ static int constant_instruction(const char *name, const Chunk *chunk, int offset
     uint8_t index = chunk->code[offset + 1];
     printf("%-23s %4d : ", name, index);
     Value value = chunk->constants.values[index];
-    print_value(value);
+    print_value_with_color(value);
     NEW_LINE();
     return offset + 2;
 }
@@ -45,7 +45,7 @@ static int constant2_instruction(const char *name, const Chunk *chunk, int offse
     int index = u8_to_u16(i0, i1);
     printf("%-23s %4d : ", name, index);
     Value value = chunk->constants.values[index];
-    print_value(value);
+    print_value_with_color(value);
     NEW_LINE();
     return offset + 3;
 }
@@ -162,15 +162,16 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             int index = chunk->code[offset ++];
             printf("%-23s %4d : ", "OP_CLOSURE", index);
             Value value = chunk->constants.values[index];
-            print_value(value);
+            print_value_with_color(value);
             NEW_LINE();
             LoxFunction *function = as_function(value);
-            for (int i = 0; i < function->upvalue_count; ++i) {
-                bool is_local = chunk->code[offset ++];
-                index = chunk->code[offset ++];
-                printf("%04d    | ", offset - 2);
-                printf("%-23s %s: %d\n","", is_local ? "local" : "upvalue", index);
-            }
+            offset += function->upvalue_count * 2;
+//            for (int i = 0; i < function->upvalue_count; ++i) {
+//                bool is_local = chunk->code[offset ++];
+//                index = chunk->code[offset ++];
+//                printf("%04d    | ", offset - 2);
+//                printf("%-23s %s: %d\n","", is_local ? "local" : "upvalue", index);
+//            }
             return offset;
         }
         case OP_CLOSE_UPVALUE:

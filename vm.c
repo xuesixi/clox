@@ -37,6 +37,9 @@ void runtime_error_and_catch(const char *format, ...);
 static void stack_push(Value value);
 static Value stack_pop();
 
+
+
+
 /* ------------------上面是静态函数申明-----------------------
    ------------------下面是静态函数定义----------------------- */
 
@@ -171,14 +174,14 @@ static void show_stack() {
     printf(" ");
     for (Value *i = vm.stack; i < vm.stack_top; i++) {
         if (i == curr_frame()->FP) {
-            printf("\033[0;31m");
-            printf("|");
-            printf("\033[0m");
+            start_color(BOLD_RED);
+            printf("@");
+            end_color();
         } else {
             printf(" ");
         }
         printf("[ ");
-        print_value(*i);
+        print_value_with_color(*i);
         printf(" ]");
     }
     NEW_LINE();
@@ -364,12 +367,21 @@ static InterpretResult run() {
         //  运行时错误会跳转至这里
         return INTERPRET_RUNTIME_ERROR;
     }
-
+//    char console[20];
     while (true) {
-        if (TRACE_EXECUTION) {
+        if (TRACE_EXECUTION && TRACE_SKIP == -1) {
             show_stack();
-            CallFrame *frame = curr_frame();
-            disassemble_instruction(& frame->closure->function->chunk, (int)(frame->PC - frame->closure->function->chunk.code));
+//            fgets(console, 20, stdin);
+//            if (strcmp(console, "o\n") == 0) {
+//                TRACE_SKIP = true;
+//            }
+            if (getchar() == 'o') {
+                TRACE_SKIP = vm.frame_count - 1; // skip until the frame_count is equal to TRACE_SKIP
+                while (getchar() != '\n');
+            } else {
+                CallFrame *frame = curr_frame();
+                disassemble_instruction(& frame->closure->function->chunk, (int)(frame->PC - frame->closure->function->chunk.code));
+            }
         }
 
         uint8_t instruction = read_byte();
@@ -379,6 +391,9 @@ static InterpretResult run() {
                 vm.stack_top = curr_frame()->FP;
                 close_upvalue(vm.stack_top);
                 vm.frame_count--;
+                if (vm.frame_count == TRACE_SKIP) {
+                    TRACE_SKIP = -1; // no skip. Step by step
+                }
                 if (vm.frame_count == 0) {
                     return INTERPRET_OK; // 程序运行结束
                 }
@@ -484,21 +499,21 @@ static InterpretResult run() {
                 break;
             case OP_PRINT: {
                 if (REPL || TRACE_EXECUTION) {
-                    printf("\033[0;32m"); // start green color output
+                    start_color(BOLD_GREEN);
                 }
                 print_value(stack_pop());
                 NEW_LINE();
                 if (REPL || TRACE_EXECUTION) {
-                    printf("\033[0m"); // end color output
+                    end_color();
                 }
                 break;
             }
             case OP_EXPRESSION_PRINT: {
                 Value to_print = stack_pop();
-                printf("\033[0;90m"); // start gray color output
+                start_color(GRAY);
                 print_value(to_print);
                 NEW_LINE();
-                printf("\033[0m"); // end color output
+                end_color();
                 break;
             }
             case OP_POP:

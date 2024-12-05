@@ -9,6 +9,52 @@
 #include "memory.h"
 #include "object.h"
 
+char *RED = "\033[31m";
+char *BOLD_RED = "\033[31;1m";
+char *GREEN = "\033[32m";
+char *BOLD_GREEN = "\033[1;32m";
+char *CYAN = "\033[36m";
+char *GRAY = "\033[0;90m";
+char *MAGENTA = "\033[35m";
+char *BLUE = "\033[38;5;32m";
+char *YELLOW = "\033[1;33m";
+
+inline void start_color(char *color) {
+    printf("%s", color);
+}
+
+inline void end_color() {
+    printf("\033[0m");
+}
+
+void print_value_with_color(Value value) {
+    char *str = to_print_chars(value);
+    switch (value.type) {
+        case VAL_INT:
+        case VAL_FLOAT:
+        case VAL_NIL:
+        case VAL_BOOL:
+            start_color(YELLOW);
+            break;
+        case VAL_REF: {
+            switch (as_ref(value)->type) {
+                case OBJ_STRING:
+                    start_color(MAGENTA);
+                    break;
+                case OBJ_CLOSURE:
+                case OBJ_NATIVE:
+                case OBJ_FUNCTION:
+                    start_color(BLUE);
+                    break;
+            }
+            break;
+        }
+    }
+    printf("%s", str);
+    end_color();
+    free(str);
+}
+
 static char *to_print_ref(Value value);
 
 void init_ValueArray(ValueArray *array) {
