@@ -154,6 +154,17 @@ void table_add_all(Table *from, Table *to) {
     }
 }
 
+void table_mark(Table *table) {
+    if (table == NULL) {
+        return;
+    }
+    for (int i = 0; i < table->capacity; ++i) {
+        Entry *entry = table->backing + i;
+        mark_object((Object *) entry->key);
+        mark_value(entry->value);
+    }
+}
+
 String *table_find_string(Table *table, const char *name, int length, uint32_t hash) {
     if (table->count == 0) {
         return NULL;

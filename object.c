@@ -82,7 +82,11 @@ Object *allocate_object(size_t size, ObjectType type) {
     Object *obj = re_allocate(NULL, 0, size);
     obj->type = type;
     obj->next = vm.objects;
+    obj->is_marked = false;
     vm.objects = obj;
+#ifdef DEBUG_LOG_GC
+    printf("%p is allocated with size %zu for %d\n", obj, size, type);
+#endif
     return obj;
 }
 

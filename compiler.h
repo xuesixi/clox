@@ -10,6 +10,8 @@
 
 LoxFunction *compile(const char* source);
 
+void mark_compiler_roots();
+
 __attribute__((unused)) void show_tokens(const char *source);
 
 #endif //CLOX_COMPILER_H

@@ -797,6 +797,9 @@ void init_VM() {
     reset_stack();
     vm.objects = NULL;
     vm.open_upvalues = NULL;
+    vm.gray_count = 0;
+    vm.gray_capacity = 0;
+    vm.gray_stack = NULL;
     srand(time(NULL));
     init_table(&vm.string_table);
     init_table(&vm.globals);
@@ -824,6 +827,7 @@ void free_VM() {
     free_table(&vm.string_table);
     free_table(&vm.globals);
     free_table(&vm.const_table);
+    free(vm.gray_stack);
 //    free_map(&label_map);
 }
 

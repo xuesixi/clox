@@ -92,6 +92,7 @@ Parser parser;
 //Map label_map;
 Scope *current_scope;
 
+
 static int argument_list();
 
 static void call(bool can_assign);
@@ -235,7 +236,7 @@ ParseRule rules[] = {
         [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
         [TOKEN_SEMICOLON]     = {NULL, NULL, PREC_NONE},
         [TOKEN_SLASH]         = {NULL, binary, PREC_FACTOR},
-        [TOKEN_STAR]          = {NULL, binary, PREC_FACTOR},
+        [TOKEN_STAR]          = {lambda, binary, PREC_FACTOR},
         [TOKEN_STAR_STAR]     = {NULL, binary, PREC_POWER},
         [TOKEN_PERCENT]       = {NULL, binary, PREC_FACTOR},
         [TOKEN_BANG]          = {unary, NULL, PREC_NONE},
@@ -272,6 +273,14 @@ ParseRule rules[] = {
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
 };
+
+void mark_compiler_roots() {
+    Scope *curr = current_scope;
+    while (curr != NULL) {
+        mark_object((Object *) curr->function);
+        curr = curr->enclosing;
+    }
+}
 
 static inline bool lexeme_equal(Token *a, Token *b) {
     return a->length == b->length && memcmp(a->start, b->start, a->length) == 0;

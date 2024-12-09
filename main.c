@@ -1,10 +1,8 @@
-#include "chunk.h"
 #include "readline/readline.h"
 #include "stdlib.h"
 #include <unistd.h>
 #include "string.h"
 #include "vm.h"
-#include "io.h"
 
 bool COMPILE_ONLY = false;
 bool RUN_BYTECODE = false;

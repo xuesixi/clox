@@ -16,6 +16,7 @@ typedef enum {
 typedef struct Object{
     ObjectType type;
     Object *next;
+    bool is_marked;
 } Object; 
 
 typedef struct String{
@@ -43,7 +44,7 @@ typedef struct UpValueObject {
 typedef struct Closure {
     Object object;
     LoxFunction *function;
-    UpValueObject **upvalues; // 意思是array of pointers to UpValueObject，之所以有额外一层pointer，是因为我们多个closure可以共享同一个UpVlaueObject本体。
+    UpValueObject **upvalues; // array of pointers to UpValueObject，之所以有额外一层pointer，是因为多个closure可以共享同一个UpVlaueObject本体。
     int upvalue_count;
 } Closure;
 

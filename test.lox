@@ -1,6 +1,7 @@
 
-var a = false;
 /*
+var a = false;
+
 var num = 1;
 
 fun out() {
@@ -13,3 +14,22 @@ fun out() {
 
 const add = out();
 print add(1, 2);
+*/
+
+/*
+fun fbnc(num) {
+    if (num <2) {
+        return num;
+    } else {
+        return fbnc(num - 1) + fbnc (num - 2);
+    }
+}
+
+
+print fbnc(35);
+*/
+
+*(a, b) {
+    print a + b;
+}(3, 4);
+

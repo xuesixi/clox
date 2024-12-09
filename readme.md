@@ -17,8 +17,14 @@ It currently requires GNU/readline.
 * `$ clox path/to/script`: run a lox script 
 
 Other options
-* `-s`: show the compiled bytecode before running
+* `-s`: show the compiled bytecode 
 * `-d`: trace the execution process
+* `-c path/to/output`: compile the script to bytecode and write to the specified output path.
+    * e.g. `$ clox -c hello.byte hello.lox`
+
+* `-b`: treat the provided file as bytecode
+    * e.g. `$ clox -b hello.byte`
+
 
 # the lox programming language
 
@@ -26,7 +32,7 @@ Other options
 
 * Most statements are terminated by a `;`
 * As in c/java/javascript, structural statements do not need `;`
-* `//` starts a single line comment
+* `//`  a single line comment
 * `/* comment */` is also supported
 
 ## type

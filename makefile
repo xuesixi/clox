@@ -9,6 +9,9 @@ all: $(TARGET)
 $(TARGET): $(OBJ)
 	@$(CC) $(OBJ) -o $(TARGET) -l readline
 
+o: $(SRC)
+	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline
+
 .PHONY: run
 run: $(TARGET)
 	@./$(TARGET) -ds
@@ -20,14 +23,6 @@ f: file
 .PHONY: file
 file: $(TARGET)
 	@./$(TARGET) -ds test.lox
-	@rm $(OBJ)
-	@rm $(TARGET)
-
-s: silence
-
-.PHONY: silence
-silence: $(TARGET)
-	@./$(TARGET) test.lox
 	@rm $(OBJ)
 	@rm $(TARGET)
 

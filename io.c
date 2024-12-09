@@ -5,17 +5,17 @@
 #include "io.h"
 #include "stdlib.h"
 
-void write_string(FILE *file, String *string);
-void write_value(FILE *file, Value *value);
-void write_valueArray(FILE *file, ValueArray *valueArray);
-void write_chunk(FILE *file, Chunk *chunk);
+static void write_string(FILE *file, String *string);
+static void write_value(FILE *file, Value *value);
+static void write_valueArray(FILE *file, ValueArray *valueArray);
+static void write_chunk(FILE *file, Chunk *chunk);
 
-String *read_string(FILE *file);
-Value read_value(FILE *file);
-ValueArray read_valueArray(FILE *file);
-Chunk read_chunk(FILE *file);
+static String *read_string(FILE *file);
+static Value read_value(FILE *file);
+static ValueArray read_valueArray(FILE *file);
+static Chunk read_chunk(FILE *file);
 
-void write_value(FILE *file, Value *value) {
+static void write_value(FILE *file, Value *value) {
 
     fwrite(& value->type, sizeof(int ), 1, file);
     fwrite(& value->as, sizeof(value->as), 1, file);
@@ -36,7 +36,7 @@ void write_value(FILE *file, Value *value) {
     }
 }
 
-Value read_value(FILE *file) {
+static Value read_value(FILE *file) {
     Value value;
     fread(& value.type, sizeof(int ), 1, file);
     fread(&value.as, sizeof (value.as), 1, file);
@@ -58,14 +58,14 @@ Value read_value(FILE *file) {
     return value;
 }
 
-void write_chunk(FILE *file, Chunk *chunk) {
+static void write_chunk(FILE *file, Chunk *chunk) {
     fwrite(&chunk->count, sizeof(int ), 1, file);
     fwrite(chunk->code, sizeof(uint8_t), chunk->count, file);
     fwrite(chunk->lines, sizeof(int ), chunk->count, file);
     write_valueArray(file, &chunk->constants);
 }
 
-Chunk read_chunk(FILE *file) {
+static Chunk read_chunk(FILE *file) {
     Chunk chunk;
     fread(&chunk.count, sizeof(int ), 1, file);
     chunk.code = malloc(sizeof(uint8_t) * chunk.count);
@@ -77,14 +77,14 @@ Chunk read_chunk(FILE *file) {
     return chunk;
 }
 
-void write_valueArray(FILE *file, ValueArray *valueArray) {
+static void write_valueArray(FILE *file, ValueArray *valueArray) {
     fwrite(& valueArray->count, sizeof(int ), 1, file);
     for (int i = 0; i < valueArray->count; ++i) {
         write_value(file, valueArray->values + i);
     }
 }
 
-void write_string(FILE *file, String *string) {
+static void write_string(FILE *file, String *string) {
     if (string == NULL) {
         int len = -1;
         fwrite(&len, sizeof(int ), 1, file);
@@ -94,7 +94,7 @@ void write_string(FILE *file, String *string) {
     }
 }
 
-String *read_string(FILE *file) {
+static String *read_string(FILE *file) {
     int length;
     char *text;
     fread(&length, sizeof(int ), 1, file);
@@ -122,7 +122,7 @@ LoxFunction *read_function(FILE *file) {
     return function;
 }
 
-ValueArray read_valueArray(FILE *file) {
+static ValueArray read_valueArray(FILE *file) {
     ValueArray array;
     array.count = 0;
     fread(&array.count, sizeof(int ), 1, file);
