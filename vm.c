@@ -685,7 +685,7 @@ static void call_value(Value value, int arg_count) {
         frame->closure = as_closure(value);
     } else if (is_ref_of(value, OBJ_NATIVE)) {
         NativeFunction *native = as_native(value);
-        if (native->arity != arg_count) {
+        if (native->arity != arg_count && native->arity != -1) {
             runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity, arg_count);
         }
         Value result = native->impl(arg_count, vm.stack_top - arg_count);
@@ -710,6 +710,77 @@ static void define_native(const char *name, NativeImplementation impl, int arity
     table_set(&vm.globals, as_string(vm.stack[0]), vm.stack[1]);
     stack_pop();
     stack_pop();
+}
+
+static inline int max(int a, int b) {
+    return a > b ? a : b;
+}
+
+static Value native_format(int count, Value *values) {
+    const char *format = as_string(*values)->chars;
+    int capacity = 25;
+    char *buf = malloc(capacity);
+    int pre = 0;
+    int curr = 0;
+    int buf_len = 0;
+    int curr_v = 0;
+
+    while (true) {
+        while (format[curr] != '\0' && format[curr] != '#') {
+            curr ++;
+        }
+
+        int new_len = curr - pre;
+        // buf overflow checking
+        if (buf_len + new_len > capacity) {
+            capacity = max(2 * capacity, buf_len + new_len);
+            buf = realloc(buf, capacity);
+        }
+
+        memcpy(buf + buf_len, format + pre, new_len);
+        buf_len += new_len;
+        pre = curr;
+
+        if (format[curr] == '\0') {
+            if (curr_v != count - 1) {
+                free(buf);
+                runtime_error_and_catch("format: more arguments than placeholders");
+            }
+            break;
+        }
+
+        if (format[curr] == '#') {
+            if (curr_v == count - 1) {
+                free(buf);
+                runtime_error_and_catch("format: more placeholders than arguments");
+            }
+
+            Value v = values[curr_v + 1];
+            char *v_chars = to_print_chars(v);
+
+            // buf overflow checking
+            int v_chars_len;
+            if (is_ref_of(v, OBJ_STRING)) {
+                v_chars_len = as_string(v)->length;
+            } else {
+                v_chars_len = strlen(v_chars);
+            }
+            if (v_chars_len + buf_len > capacity) {
+                capacity = max(2 * capacity, v_chars_len + buf_len);
+                buf = realloc(buf, capacity);
+            }
+            memcpy(buf + buf_len, v_chars, v_chars_len);
+            buf_len += v_chars_len;
+            curr ++;
+            pre = curr;
+            curr_v ++;
+            free(v_chars);
+        }
+    }
+
+    String *string = string_copy(buf, buf_len);
+    free(buf);
+    return ref_value((Object *) string);
 }
 
 static Value native_clock(int count, Value *value) {
@@ -805,6 +876,7 @@ void init_VM() {
     define_native("int", native_int, 1);
     define_native("float", native_float, 1);
     define_native("rand", native_rand, 2);
+    define_native("f", native_format, -1);
 }
 
 void additional_repl_init() {

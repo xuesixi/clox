@@ -1,15 +1,11 @@
 
-var a = false;
-/*
-var num = 1;
-
-fun out() {
-    var age = 5;
-
-    return fun (a, b) {
-        return a + b + num + 5;
+fun ku(age, num) {
+    return fun() {
+        return f("the age is #, the num is #", age, num);
     };
 }
 
-const add = out();
-print add(1, 2);
+var num = ku(12, 33);
+print num();
+
+
