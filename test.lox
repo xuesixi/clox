@@ -1,11 +1,3 @@
+var num = read();
 
-fun ku(age, num) {
-    return fun() {
-        return f("the age is #, the num is #", age, num);
-    };
-}
-
-var num = ku(12, 33);
-print num();
-
-
+print f("your num^2 is #, great!", float(num)**2);

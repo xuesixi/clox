@@ -712,6 +712,20 @@ static void define_native(const char *name, NativeImplementation impl, int arity
     stack_pop();
 }
 
+/**
+ * read a line. Return it as a String. the \n will not be included
+ * */
+static Value native_read(int count, Value *values) {
+    if (count > 0) {
+        print_value(*values);
+    }
+    size_t len;
+    char *line = fgetln(stdin, &len);
+    String *str = string_copy(line, len-1);
+    free(line);
+    return ref_value((Object *)str);
+}
+
 static inline int max(int a, int b) {
     return a > b ? a : b;
 }
@@ -877,6 +891,7 @@ void init_VM() {
     define_native("float", native_float, 1);
     define_native("rand", native_rand, 2);
     define_native("f", native_format, -1);
+    define_native("read", native_read, -1);
 }
 
 void additional_repl_init() {
