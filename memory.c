@@ -11,7 +11,7 @@
 static void mark_roots();
 
 void mark_object(Object *object) {
-    if (object == NULL) {
+    if (object == NULL || object->is_marked) {
         return;
     }
 
@@ -63,15 +63,91 @@ static void mark_roots() {
 
 }
 
+static void blacken_object(Object *object) {
+#ifdef DEBUG_LOG_GC
+    printf("blacken %p", object);
+    print_value(ref_value(object));
+    NEW_LINE();
+#endif
+    switch (object->type) {
+        case OBJ_STRING:
+        case OBJ_NATIVE:
+            break;
+        case OBJ_UPVALUE: {
+            UpValueObject *up = (UpValueObject *) object;
+            mark_value(up->closed);
+            break;
+        }
+        case OBJ_FUNCTION: {
+            LoxFunction *function = (LoxFunction *)object;
+            mark_object((Object *) function->name);
+            for (int i = 0; i < function->chunk.constants.count; ++i) {
+                mark_value(function->chunk.constants.values[i]);
+            }
+            break;
+        }
+        case OBJ_CLOSURE: {
+            Closure *closure = (Closure *) object;
+            mark_object((Object *) closure->function);
+            for (int i = 0; i < closure->upvalue_count; ++i) {
+                mark_object((Object *) closure->upvalues[i]);
+            }
+            break;
+        }
+    }
+}
+
+static void trace() {
+    while (vm.gray_count > 0) {
+        Object *object = vm.gray_stack[vm.gray_count - 1];
+        blacken_object(object);
+        vm.gray_count --;
+    }
+}
+
+static void sweep() {
+    // 遍历列表，free所有没有被标记的对象
+    if (vm.objects == NULL) {
+        return;
+    }
+
+    Object *pre = vm.objects;
+    Object *curr = vm.objects->next;
+
+    while (curr != NULL) {
+        if (!curr->is_marked) {
+            Object *unreachable = curr;
+            curr = curr->next;
+            pre->next = curr;
+            free_object(unreachable);
+        } else {
+            curr->is_marked = false;
+            pre = curr;
+            curr = curr->next;
+        }
+    }
+
+    if (!vm.objects->is_marked) {
+        Object *unreachable = vm.objects;
+        vm.objects = vm.objects ->next;
+        free_object(unreachable);
+    } else {
+        vm.objects->is_marked = false;
+    }
+}
+
 static void gc() {
     #ifdef DEBUG_LOG_GC
     printf("---- gc begin\n");
     #endif
 
     mark_roots();
+    trace();
+    table_sweep(&vm.string_table);
+    sweep();
 
     #ifdef DEBUG_LOG_GC
-    printf("---- gc end\n");
+    printf("gc end ----\n");
     #endif
 }
 

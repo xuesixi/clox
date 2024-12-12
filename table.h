@@ -43,6 +43,7 @@ Value table_delete(Table *table, String *key);
 void table_add_all(Table *from, Table *to);
 String *table_find_string(Table *table, const char *name, int length, uint32_t hash);
 void table_mark(Table *table);
+void table_sweep(Table *table);
 
 void init_map(Map *map, HashFunction hash, EqualityFunction equal);
 void free_map(Map *map);

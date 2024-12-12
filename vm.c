@@ -804,14 +804,14 @@ void init_VM() {
     init_table(&vm.string_table);
     init_table(&vm.globals);
     init_table(&vm.const_table);
-    define_native("clock", native_clock, 0);
-    define_native("int", native_int, 1);
-    define_native("float", native_float, 1);
-    define_native("rand", native_rand, 2);
+//    define_native("clock", native_clock, 0);
+//    define_native("int", native_int, 1);
+//    define_native("float", native_float, 1);
+//    define_native("rand", native_rand, 2);
 }
 
 void additional_repl_init() {
-    define_native("help", native_help, 0);
+//    define_native("help", native_help, 0);
 }
 
 /**

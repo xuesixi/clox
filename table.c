@@ -165,6 +165,19 @@ void table_mark(Table *table) {
     }
 }
 
+void table_sweep(Table *table) {
+    for (int i = 0; i < table->capacity; ++i) {
+        Entry *entry = table->backing + i;
+        if (entry != NULL) {
+            Object *object = (Object*) entry->key;
+            if (!object->is_marked) {
+                entry->key = NULL;
+                entry->value = bool_value(true);
+            }
+        }
+    }
+}
+
 String *table_find_string(Table *table, const char *name, int length, uint32_t hash) {
     if (table->count == 0) {
         return NULL;
