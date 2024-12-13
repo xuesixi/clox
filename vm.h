@@ -47,4 +47,7 @@ InterpretResult produce(const char *src, const char *path);
 InterpretResult read_run_bytecode(const char *path);
 void additional_repl_init();
 
+void stack_push(Value value);
+Value stack_pop();
+
 #endif //CLOX_VM_H

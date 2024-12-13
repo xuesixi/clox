@@ -170,7 +170,7 @@ void table_sweep(Table *table) {
         Entry *entry = table->backing + i;
         if (entry != NULL) {
             Object *object = (Object*) entry->key;
-            if (!object->is_marked) {
+            if (entry->key != NULL && !object->is_marked) {
                 entry->key = NULL;
                 entry->value = bool_value(true);
             }

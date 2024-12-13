@@ -18,6 +18,8 @@
 #include "stdlib.h"
 #include "debug.h"
 
+bool compiling = true;
+
 typedef struct Parser {
     Token previous;
     Token current;
@@ -1530,6 +1532,7 @@ void show_tokens(const char *src) {
  */
 static void set_new_scope(Scope *scope, FunctionType type) {
 
+
     scope->functionType = type;
     scope->function = NULL;
     scope->depth = 0;
@@ -1540,6 +1543,7 @@ static void set_new_scope(Scope *scope, FunctionType type) {
         scope->function->name = string_copy(parser.previous.start, parser.previous.length);
         scope->enclosing = current_scope;
     } else if (type == TYPE_LAMBDA) {
+//        scope->function->name = (String *) 1;
         scope->function->name = string_copy("$lambda", 7);
         scope->enclosing = current_scope;
     } else {
@@ -1586,6 +1590,7 @@ LoxFunction *compile(const char *src) {
     LoxFunction *function = end_compiler();
 
 //    free_table(&parser.lexeme_table);
+    compiling = false;
 
     if (parser.has_error) {
         parser.has_error = false;

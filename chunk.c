@@ -4,6 +4,7 @@
 
 #include "chunk.h"
 
+#include "vm.h"
 #include "memory.h"
 
 static void init_constant(Chunk *chunk) {
@@ -76,7 +77,7 @@ void write_to_chunk(Chunk *c, uint8_t data, int line) {
 void free_chunk(Chunk *c) {
     FREE_ARRAY(uint8_t, c->code, c->count);
     FREE_ARRAY(int, c->lines, c->count);
-    init_chunk(c);
+//    init_chunk(c);
 }
 
 /**
@@ -109,6 +110,8 @@ int constant_mapping(Value value) {
  * @return 该常量在 chunk 中的 constants 中的索引。
  */
 inline int add_constant(Chunk *c, Value constant) {
+    stack_push(constant);
     append_ValueArray(&c->constants, constant);
+    stack_pop();
     return c->constants.count - 1;
 }

@@ -1,35 +1,11 @@
 
-/*
-var a = false;
+var do = fun() {
+    var name = "anda";
+    var age = 10;
+    print "name is " + name + " and age is " + age;
+};
 
-var num = 1;
-
-fun out() {
-    var age = 5;
-
-    return fun (a, b) {
-        return a + b + num + 5;
-    };
-}
-
-const add = out();
-print add(1, 2);
-*/
-
-/*
-fun fbnc(num) {
-    if (num <2) {
-        return num;
-    } else {
-        return fbnc(num - 1) + fbnc (num - 2);
-    }
-}
-
-
-print fbnc(35);
-*/
-
-*(a, b) {
-    print a + b;
-}(3, 4);
-
+do();
+do = "new do";
+print do;
+print do + "again";

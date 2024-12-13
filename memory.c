@@ -17,7 +17,7 @@ void mark_object(Object *object) {
 
 #ifdef DEBUG_LOG_GC
     printf("%p mark ", (void*)object);
-    print_value(ref_value(object));
+    print_value_with_color(ref_value(object));
     printf("\n");
 #endif
 
@@ -65,8 +65,8 @@ static void mark_roots() {
 
 static void blacken_object(Object *object) {
 #ifdef DEBUG_LOG_GC
-    printf("blacken %p", object);
-    print_value(ref_value(object));
+    printf("blacken %p ", object);
+    print_value_with_color(ref_value(object));
     NEW_LINE();
 #endif
     switch (object->type) {
@@ -99,9 +99,8 @@ static void blacken_object(Object *object) {
 
 static void trace() {
     while (vm.gray_count > 0) {
-        Object *object = vm.gray_stack[vm.gray_count - 1];
+        Object *object = vm.gray_stack[ -- vm.gray_count];
         blacken_object(object);
-        vm.gray_count --;
     }
 }
 
@@ -119,6 +118,12 @@ static void sweep() {
             Object *unreachable = curr;
             curr = curr->next;
             pre->next = curr;
+
+//#ifdef DEBUG_LOG_GC
+//            printf("sweep %p: ", unreachable);
+//            print_value(ref_value(unreachable));
+//            NEW_LINE();
+//#endif
             free_object(unreachable);
         } else {
             curr->is_marked = false;
@@ -130,6 +135,13 @@ static void sweep() {
     if (!vm.objects->is_marked) {
         Object *unreachable = vm.objects;
         vm.objects = vm.objects ->next;
+//
+//#ifdef DEBUG_LOG_GC
+//        printf("sweep %p: ", unreachable);
+//        print_value(ref_value(unreachable));
+//        NEW_LINE();
+//#endif
+
         free_object(unreachable);
     } else {
         vm.objects->is_marked = false;
@@ -138,7 +150,7 @@ static void sweep() {
 
 static void gc() {
     #ifdef DEBUG_LOG_GC
-    printf("---- gc begin\n");
+    printf("gc begin >>> \n");
     #endif
 
     mark_roots();
@@ -147,7 +159,8 @@ static void gc() {
     sweep();
 
     #ifdef DEBUG_LOG_GC
-    printf("gc end ----\n");
+    printf("<<< gc end\n");
+    NEW_LINE();
     #endif
 }
 
@@ -160,7 +173,7 @@ void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
     (void )old_size;
 
     #ifdef DEBUG_STRESS_GC
-    if (new_byte_size > 0) {
+    if (new_byte_size > 0 && ! compiling) {
         gc();
     }
     #endif
@@ -186,7 +199,12 @@ void free_all_objects() {
 
 void free_object(Object *object) {
 #ifdef DEBUG_LOG_GC
-    printf("%p is free with type %d\n", object, object->type);
+    start_color(BLUE);
+    printf("%p is free with type %d", object, object->type);
+    printf("value: ");
+    print_value_with_color(ref_value(object));
+    NEW_LINE();
+    end_color();
 #endif
     switch (object->type) {
         case OBJ_STRING: {

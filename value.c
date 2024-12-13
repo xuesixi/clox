@@ -67,8 +67,7 @@ void append_ValueArray(ValueArray *array, Value value) {
     if (array->capacity < array->count + 1) {
         int oldCapacity = array->capacity;
         array->capacity = array->capacity < 8 ? 8 : 2 * array->capacity;
-        array->values =
-                GROW_ARRAY(Value, array->values, oldCapacity, array->capacity);
+        array->values = GROW_ARRAY(Value, array->values, oldCapacity, array->capacity);
     }
 
     array->values[array->count] = value;
@@ -207,7 +206,7 @@ static char *to_print_ref(Value value) {
         case OBJ_FUNCTION: {
             LoxFunction *fun = as_function(value);
             if (fun->name == NULL) {
-                asprintf(&buffer, "<main>");
+                asprintf(&buffer, "<fn: main>");
             } else if (strcmp(fun->name->chars, "$lambda") == 0){
                 asprintf(&buffer, "<lambda>");
             } else {

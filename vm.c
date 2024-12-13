@@ -35,8 +35,6 @@ static void call_value(Value value, int arg_count);
 static void runtime_error(const char *format, ...);
 void catch();
 void runtime_error_and_catch(const char *format, ...);
-static void stack_push(Value value);
-static Value stack_pop();
 
 
 
@@ -157,7 +155,11 @@ static void binary_number_op(Value a, Value b, char operator) {
                 return;
         }
     } else if (operator== '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
+        stack_push(a);
+        stack_push(b);
         String *str = string_concat(a, b);
+        stack_pop();
+        stack_pop();
         stack_push(ref_value(&str->object));
         return;
     } else {
@@ -835,12 +837,12 @@ void free_VM() {
  * 将value置于stack_top处，然后自增stack_top
  * @param value 想要添加的value
  */
-static inline void stack_push(Value value) {
+inline void stack_push(Value value) {
     *vm.stack_top = value;
     vm.stack_top++;
 }
 
-static inline Value stack_pop() {
+inline Value stack_pop() {
     vm.stack_top--;
     return *(vm.stack_top);
 }
@@ -869,6 +871,7 @@ InterpretResult interpret(const char *src) {
     frame->PC = function->chunk.code;
 
     stack_pop();
+
     stack_push(ref_value((Object *) closure));
 
     return run();

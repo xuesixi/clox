@@ -53,11 +53,13 @@ String *string_allocate(char *chars, int length) {
     }
 
     String *str = (String *)allocate_object(sizeof(String), OBJ_STRING);
+    stack_push(ref_value((Object *) str));
     str->object.type = OBJ_STRING;
     str->chars = chars;
     str->length = length;
     str->hash = hash;
     table_set(&vm.string_table, str, nil_value());
+    stack_pop();
     return str;
 }
 
@@ -85,7 +87,7 @@ Object *allocate_object(size_t size, ObjectType type) {
     obj->is_marked = false;
     vm.objects = obj;
 #ifdef DEBUG_LOG_GC
-    printf("%p is allocated with size %zu for %d\n", obj, size, type);
+    printf("%p is allocated with size %zu for type %d\n", obj, size, type);
 #endif
     return obj;
 }
