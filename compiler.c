@@ -74,12 +74,6 @@ typedef struct UpValue {
     bool is_local; // 这个upvalue对于下一外层的scope来说，是local还是另一个upvalue
 } UpValue;
 
-typedef enum FunctionType {
-    TYPE_FUNCTION,
-    TYPE_MAIN,
-    TYPE_LAMBDA,
-} FunctionType;
-
 typedef struct Scope {
     Local locals[UINT8_MAX + 1];
     UpValue upvalues[UINT8_MAX + 1];
@@ -1537,14 +1531,12 @@ static void set_new_scope(Scope *scope, FunctionType type) {
     scope->function = NULL;
     scope->depth = 0;
     scope->local_count = 0;
-    scope->function = new_function();
+    scope->function = new_function(type);
 
     if (type == TYPE_FUNCTION) {
         scope->function->name = string_copy(parser.previous.start, parser.previous.length);
         scope->enclosing = current_scope;
     } else if (type == TYPE_LAMBDA) {
-//        scope->function->name = (String *) 1;
-        scope->function->name = string_copy("$lambda", 7);
         scope->enclosing = current_scope;
     } else {
         scope->enclosing = NULL;

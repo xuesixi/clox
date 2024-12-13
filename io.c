@@ -114,7 +114,7 @@ void write_function(FILE *file, LoxFunction *function) {
 }
 
 LoxFunction *read_function(FILE *file) {
-    LoxFunction *function = new_function();
+    LoxFunction *function = new_function(TYPE_FUNCTION);
     fread(&function->arity, sizeof(int ), 1, file);
     function->chunk = read_chunk(file);
     function->name = read_string(file);

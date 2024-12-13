@@ -17,7 +17,13 @@ typedef struct Object{
     ObjectType type;
     Object *next;
     bool is_marked;
-} Object; 
+} Object;
+
+typedef enum FunctionType {
+    TYPE_FUNCTION,
+    TYPE_MAIN,
+    TYPE_LAMBDA,
+} FunctionType;
 
 typedef struct String{
     Object object;
@@ -32,6 +38,7 @@ typedef struct LoxFunction {
     Chunk chunk;
     String *name;
     int upvalue_count;
+    FunctionType type;
 } LoxFunction;
 
 typedef struct UpValueObject {
@@ -65,7 +72,7 @@ String *string_concat(Value a, Value b);
 
 Object *allocate_object(size_t size, ObjectType type);
 
-LoxFunction *new_function();
+LoxFunction *new_function(FunctionType type);
 LoxFunction *as_function(Value value);
 
 NativeFunction *new_native(NativeImplementation impl, String *name, int arity);

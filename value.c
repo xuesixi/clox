@@ -191,9 +191,9 @@ static char *to_print_ref(Value value) {
             break;
         case OBJ_CLOSURE: {
             LoxFunction *fun = as_closure(value)->function;
-            if (fun->name == NULL) {
+            if (fun->type == TYPE_MAIN) {
                 asprintf(&buffer, "<main>");
-            } else if (strcmp(fun->name->chars, "$lambda") == 0){
+            } else if (fun->type == TYPE_LAMBDA){
                 asprintf(&buffer, "<lambda>");
             } else {
                 asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
@@ -205,12 +205,12 @@ static char *to_print_ref(Value value) {
             break;
         case OBJ_FUNCTION: {
             LoxFunction *fun = as_function(value);
-            if (fun->name == NULL) {
-                asprintf(&buffer, "<fn: main>");
-            } else if (strcmp(fun->name->chars, "$lambda") == 0){
-                asprintf(&buffer, "<lambda>");
+            if (fun->type == TYPE_MAIN) {
+                asprintf(&buffer, "<fn-proto: main>");
+            } else if (fun->type == TYPE_LAMBDA){
+                asprintf(&buffer, "<fn-proto: lambda>");
             } else {
-                asprintf(&buffer, "<fn: %s>", fun->name->chars);
+                asprintf(&buffer, "<fn-proto: %s>", fun->name->chars);
             }
             break;
         }

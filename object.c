@@ -101,10 +101,11 @@ static uint32_t chars_hash(const char *key, int length) {
     return hash;
 }
 
-LoxFunction *new_function() {
+LoxFunction *new_function(FunctionType type) {
     LoxFunction *function = (LoxFunction *) allocate_object(sizeof(LoxFunction), OBJ_FUNCTION);
     function->name = NULL;
     function->arity = 0;
+    function->type = type;
     function->upvalue_count = 0;
     init_chunk(&function->chunk);
     return function;
