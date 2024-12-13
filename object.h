@@ -61,7 +61,7 @@ typedef struct NativeFunction {
     Object object;
     NativeImplementation impl;
     String *name;
-    int arity;
+    int arity; // -1 means variable amount of arguments
 } NativeFunction;
 
 bool is_ref_of(Value value, ObjectType type);
