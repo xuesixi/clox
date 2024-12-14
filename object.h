@@ -41,17 +41,17 @@ typedef struct LoxFunction {
     FunctionType type;
 } LoxFunction;
 
-typedef struct UpValueObject {
+typedef struct UpValue {
     Object object;
     Value *position;
     Value closed;
-    struct UpValueObject *next;
-} UpValueObject;
+    struct UpValue *next;
+} UpValue;
 
 typedef struct Closure {
     Object object;
     LoxFunction *function;
-    UpValueObject **upvalues; // array of pointers to UpValueObject，之所以有额外一层pointer，是因为多个closure可以共享同一个UpVlaueObject本体。
+    UpValue **upvalues; // array of pointers to UpValueObject，之所以有额外一层pointer，是因为多个closure可以共享同一个UpValueObject本体。
     int upvalue_count;
 } Closure;
 
@@ -81,6 +81,6 @@ NativeFunction *as_native(Value value);
 Closure *as_closure(Value value);
 Closure *new_closure(LoxFunction *function);
 
-UpValueObject *new_upvalue(Value *position);
+UpValue *new_upvalue(Value *position);
 
 #endif

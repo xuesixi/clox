@@ -67,7 +67,9 @@ fun out() {
     var num = 10;
 
     fun set(new) {
-        num = new;
+        return fun() {
+            num = new;
+        };
     }
 
     fun get() {
@@ -76,10 +78,8 @@ fun out() {
         };
     }
 
-    set(20);
+    set(20)();
     print(get()());
 }
 
 out();
-
-

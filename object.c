@@ -53,13 +53,17 @@ String *string_allocate(char *chars, int length) {
     }
 
     String *str = (String *)allocate_object(sizeof(String), OBJ_STRING);
-    stack_push(ref_value((Object *) str));
+
+    stack_push(ref_value((Object *) str)); // prevent being gc
+
     str->object.type = OBJ_STRING;
     str->chars = chars;
     str->length = length;
     str->hash = hash;
-    table_set(&vm.string_table, str, nil_value());
+    table_set(&vm.string_table, str, nil_value()); // this may cause gc
+
     stack_pop();
+
     return str;
 }
 
@@ -118,7 +122,7 @@ Closure *new_closure(LoxFunction *function) {
 
     closure->function = function;
 
-    UpValueObject **upvalues = (UpValueObject **) ALLOCATE(UpValueObject*, function->upvalue_count);
+    UpValue **upvalues = (UpValue **) ALLOCATE(UpValue*, function->upvalue_count);
     for (int i = 0; i < function->upvalue_count; ++i) {
         upvalues[i] = NULL;
     }
@@ -131,8 +135,8 @@ Closure *new_closure(LoxFunction *function) {
     return closure;
 }
 
-UpValueObject *new_upvalue(Value *position) {
-    UpValueObject *upValueObject = (UpValueObject *) allocate_object(sizeof(UpValueObject), OBJ_UPVALUE);
+UpValue *new_upvalue(Value *position) {
+    UpValue *upValueObject = (UpValue *) allocate_object(sizeof(UpValue), OBJ_UPVALUE);
     upValueObject->position = position;
     upValueObject->next = NULL;
     upValueObject->closed = nil_value();

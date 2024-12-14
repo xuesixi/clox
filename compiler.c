@@ -69,15 +69,14 @@ typedef struct Local {
     bool is_captured;
 } Local;
 
-typedef struct UpValue {
+typedef struct ScopeUpValue {
     int index; // 这个upvalue在下一外层的upvalues或者locals中的索引
     bool is_local; // 这个upvalue对于下一外层的scope来说，是local还是另一个upvalue
-    bool is_const;
-} UpValue;
+} ScopeUpValue;
 
 typedef struct Scope {
     Local locals[UINT8_MAX + 1];
-    UpValue upvalues[UINT8_MAX + 1];
+    ScopeUpValue upvalues[UINT8_MAX + 1];
     LoxFunction *function;
     struct Scope *enclosing;
     FunctionType functionType;
@@ -218,7 +217,7 @@ static int make_constant(Value value);
 
 static int resolve_upvalue(Scope *scope, Token *identifier, bool *is_const);
 
-static int add_upvalue(Scope *scope, int index, bool is_local, bool is_const);
+static int add_upvalue(Scope *scope, int index, bool is_local);
 
 //-------------------------------------------------------------------------
 
@@ -536,7 +535,7 @@ static int resolve_local(Scope *scope, Token *token, bool *is_const) {
 
 /**
  * 已知给定的identifier不存在于scope中，将其视为upvalue，向外层寻找
- * @return 如果找到了，将之添加到scope的upvalues中，然后返回其索引。如果没找到，返回-1
+ * @return 如果找到了，将之添加到scope的upvalues中，然后返回其索引, 并修改is_const，使其代表该upvalue是否const。如果没找到，返回-1
  */
 static int resolve_upvalue(Scope *scope, Token *identifier, bool *is_const) {
     if (scope->enclosing == NULL) {
@@ -546,16 +545,16 @@ static int resolve_upvalue(Scope *scope, Token *identifier, bool *is_const) {
     int index = resolve_local(scope->enclosing, identifier, is_const);
     if (index != -1) {
         scope->enclosing->locals[index].is_captured = true;
-        return add_upvalue(scope, index, true, *is_const);
+        return add_upvalue(scope, index, true);
     }
     index = resolve_upvalue(scope->enclosing, identifier, is_const);
     if (index != -1) {
-        return add_upvalue(scope, index, false, *is_const);
+        return add_upvalue(scope, index, false);
     }
     return -1;
 }
 
-static int add_upvalue(Scope *scope, int index, bool is_local, bool is_const) {
+static int add_upvalue(Scope *scope, int index, bool is_local) {
     int count = scope->function->upvalue_count;
     for (int i = 0; i < count; ++i) {
         if (scope->upvalues[i].index == index && scope->upvalues[i].is_local == is_local) {
@@ -568,7 +567,7 @@ static int add_upvalue(Scope *scope, int index, bool is_local, bool is_const) {
     }
     scope->upvalues[count].index = index;
     scope->upvalues[count].is_local = is_local;
-    scope->upvalues[count].is_const = is_const;
+//    scope->upvalues[count].is_const = is_const;
     return scope->function->upvalue_count ++;
 }
 

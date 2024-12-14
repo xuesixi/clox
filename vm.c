@@ -319,10 +319,10 @@ static inline String *read_constant_string() {
  * 返回一个捕获了当前处于value位置上的那个值的UpValueObject对象。
  * 如果那个只是第一次被捕获，新建UpValueObject，将其添加入链表中，然后返回之，否则沿用旧有的。
  */
-static UpValueObject *capture_upvalue(Value *value) {
+static UpValue *capture_upvalue(Value *value) {
     // vm.open_upvalues 是有序的。第一个元素的position值是最大的（处于stack中更高的位置）
-    UpValueObject *curr = vm.open_upvalues;
-    UpValueObject *pre = NULL;
+    UpValue *curr = vm.open_upvalues;
+    UpValue *pre = NULL;
     while (curr != NULL && curr->position > value) {
         pre = curr;
         curr = curr->next;
@@ -334,7 +334,7 @@ static UpValueObject *capture_upvalue(Value *value) {
         return curr;
     }
 
-    UpValueObject *new_capture = new_upvalue(value);
+    UpValue *new_capture = new_upvalue(value);
     new_capture->next = curr;
     if (pre == NULL) {
         vm.open_upvalues = new_capture;
@@ -351,7 +351,7 @@ static UpValueObject *capture_upvalue(Value *value) {
  * 也就是说，将对应的栈上的值保存到UpValueObject其自身中。
  */
 static void close_upvalue(Value *position) {
-    UpValueObject *curr = vm.open_upvalues;
+    UpValue *curr = vm.open_upvalues;
     while (curr != NULL && curr->position >= position) {
         curr->closed = *curr->position; // 把栈上的值保存入closed中
         curr->position = &curr->closed; // 重新设置position。如此一来upvalue的get，set指令可以正常运行

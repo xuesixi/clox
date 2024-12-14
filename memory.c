@@ -74,7 +74,7 @@ static void blacken_object(Object *object) {
         case OBJ_NATIVE:
             break;
         case OBJ_UPVALUE: {
-            UpValueObject *up = (UpValueObject *) object;
+            UpValue *up = (UpValue *) object;
             mark_value(up->closed);
             break;
         }
@@ -118,12 +118,6 @@ static void sweep() {
             Object *unreachable = curr;
             curr = curr->next;
             pre->next = curr;
-
-//#ifdef DEBUG_LOG_GC
-//            printf("sweep %p: ", unreachable);
-//            print_value(ref_value(unreachable));
-//            NEW_LINE();
-//#endif
             free_object(unreachable);
         } else {
             curr->is_marked = false;
@@ -135,12 +129,6 @@ static void sweep() {
     if (!vm.objects->is_marked) {
         Object *unreachable = vm.objects;
         vm.objects = vm.objects ->next;
-//
-//#ifdef DEBUG_LOG_GC
-//        printf("sweep %p: ", unreachable);
-//        print_value(ref_value(unreachable));
-//        NEW_LINE();
-//#endif
 
         free_object(unreachable);
     } else {
@@ -232,12 +220,12 @@ void free_object(Object *object) {
         }
         case OBJ_CLOSURE: {
             Closure *closure = (Closure *) object;
-            FREE_ARRAY(UpValueObject*, closure->upvalues, closure->upvalue_count);
+            FREE_ARRAY(UpValue*, closure->upvalues, closure->upvalue_count);
             re_allocate(object, sizeof(Closure), 0);
             break;
         }
         case OBJ_UPVALUE: {
-            re_allocate(object, sizeof(UpValueObject), 0);
+            re_allocate(object, sizeof(UpValue), 0);
             break;
         }
         default:
