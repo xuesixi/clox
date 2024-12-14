@@ -7,6 +7,7 @@
 
 #include "chunk.h"
 #include "table.h"
+#include "object.h"
 
 typedef struct CallFrame {
 //    LoxFunction *function;

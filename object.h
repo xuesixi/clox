@@ -4,6 +4,7 @@
 
 #include "value.h"
 #include "chunk.h"
+#include "table.h"
 
 typedef enum {
   OBJ_STRING,
@@ -65,6 +66,7 @@ typedef struct Class {
 typedef struct Instance {
     Object object;
     Class *class;
+    Table fields;
 } Instance;
 
 typedef Value (*NativeImplementation)(int count, Value *values);

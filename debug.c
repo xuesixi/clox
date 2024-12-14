@@ -3,6 +3,7 @@
 //
 
 #include "debug.h"
+#include "object.h"
 
 
 /**
