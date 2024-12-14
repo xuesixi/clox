@@ -652,6 +652,11 @@ static InterpretResult run() {
                 stack_pop();
                 break;
             }
+            case OP_CLASS: {
+                String *name = read_constant_string();
+                stack_push(ref_value((Object *) new_class(name)));
+                break;
+            }
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;
@@ -897,7 +902,7 @@ void init_VM() {
 }
 
 void additional_repl_init() {
-//    define_native("help", native_help, 0);
+    define_native("help", native_help, 0);
 }
 
 /**

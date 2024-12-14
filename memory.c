@@ -94,6 +94,11 @@ static void blacken_object(Object *object) {
             }
             break;
         }
+        case OBJ_CLASS: {
+            Class *class = (Class *) object;
+            mark_object((Object *) class->name);
+            break;
+        }
     }
 }
 
@@ -226,6 +231,10 @@ void free_object(Object *object) {
         }
         case OBJ_UPVALUE: {
             re_allocate(object, sizeof(UpValue), 0);
+            break;
+        }
+        case OBJ_CLASS: {
+            re_allocate(object, sizeof(Class), 0);
             break;
         }
         default:

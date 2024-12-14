@@ -166,16 +166,12 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             NEW_LINE();
             LoxFunction *function = as_function(value);
             offset += function->upvalue_count * 2;
-//            for (int i = 0; i < function->upvalue_count; ++i) {
-//                bool is_local = chunk->code[offset ++];
-//                index = chunk->code[offset ++];
-//                printf("%04d    | ", offset - 2);
-//                printf("%-23s %s: %d\n","", is_local ? "local" : "upvalue", index);
-//            }
             return offset;
         }
         case OP_CLOSE_UPVALUE:
             return simple_instruction("OP_CLOSE_UPVALUE", offset);
+        case OP_CLASS:
+            return constant_instruction("OP_CLASS", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

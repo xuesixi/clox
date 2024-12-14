@@ -173,6 +173,8 @@ static void lambda(bool can_assign);
 
 static void declaration();
 
+static void class_declaration();
+
 static void statement();
 
 static void if_statement();
@@ -350,6 +352,27 @@ static void label_statement() {
     }
 }
 
+static void class_declaration() {
+
+    consume(TOKEN_IDENTIFIER, "An identifier is expected here");
+
+    int name_index = identifier_constant(& parser.previous);
+
+    if (current_scope->depth > 0) {
+        declare_local(false);
+        mark_initialized();
+    }
+
+    emit_two_bytes(OP_CLASS, name_index);
+
+    if (current_scope->depth == 0) {
+        emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
+    }
+
+    consume(TOKEN_LEFT_BRACE, "{ is needed after class");
+    consume(TOKEN_RIGHT_BRACE, "} is needed to terminate class");
+}
+
 static void declaration() {
     if (match(TOKEN_VAR)) {
         var_declaration();
@@ -359,6 +382,8 @@ static void declaration() {
         label_statement();
     } else if (match(TOKEN_FUN)){
         fun_declaration();
+    } else if (match(TOKEN_CLASS)){
+        class_declaration();
     } else {
         statement();
     }
@@ -369,7 +394,7 @@ static void declaration() {
 }
 
 /**
- * 让刚刚解析的那个本地变量标记为已初始化。
+ * 让刚刚解析的那个本地变量标记为已初始化。如果不是本地变量，什么都不做。
  */
 static inline void mark_initialized() {
     if (current_scope->depth > 0) {

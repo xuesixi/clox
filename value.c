@@ -46,6 +46,8 @@ void print_value_with_color(Value value) {
                 case OBJ_FUNCTION:
                     start_color(BLUE);
                     break;
+                case OBJ_UPVALUE:
+                    break;
             }
             break;
         }
@@ -217,6 +219,11 @@ static char *to_print_ref(Value value) {
         case OBJ_UPVALUE:
             asprintf(&buffer, "<upvalue>");
             break;
+        case OBJ_CLASS: {
+            Class *class = as_class(value) ;
+            asprintf(&buffer, "<class: %s>", class->name->chars);
+            break;
+        }
         default:
             printf("error: encountering a value with unknown type: %d\n", type);
             break;

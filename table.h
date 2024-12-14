@@ -2,6 +2,9 @@
 #define CLOX_TABLE_H
 
 #include "object.h"
+//#include "value.h"
+
+typedef struct String String;
 
 typedef struct Entry {
     String *key;

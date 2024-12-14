@@ -11,6 +11,8 @@ typedef enum {
   OBJ_NATIVE,
   OBJ_CLOSURE,
   OBJ_UPVALUE,
+  OBJ_CLASS,
+  OBJ_INSTANCE,
 } ObjectType;
 
 typedef struct Object{
@@ -55,6 +57,16 @@ typedef struct Closure {
     int upvalue_count;
 } Closure;
 
+typedef struct Class {
+    Object object;
+    String *name;
+} Class;
+
+typedef struct Instance {
+    Object object;
+    Class *class;
+} Instance;
+
 typedef Value (*NativeImplementation)(int count, Value *values);
 
 typedef struct NativeFunction {
@@ -82,5 +94,8 @@ Closure *as_closure(Value value);
 Closure *new_closure(LoxFunction *function);
 
 UpValue *new_upvalue(Value *position);
+
+Class *new_class(String *name);
+Class *as_class(Value value);
 
 #endif

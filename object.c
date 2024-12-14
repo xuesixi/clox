@@ -150,3 +150,13 @@ NativeFunction *new_native(NativeImplementation impl, String *name, int arity) {
     native->arity = arity;
     return native;
 }
+
+Class *new_class(String *name) {
+    Class *class = (Class *) allocate_object(sizeof(Class), OBJ_CLASS);
+    class->name = name;
+    return class;
+}
+
+inline Class *as_class(Value value) {
+    return (Class *) as_ref(value);
+}
