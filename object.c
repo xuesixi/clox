@@ -113,13 +113,21 @@ LoxFunction *new_function(FunctionType type) {
 
 Closure *new_closure(LoxFunction *function) {
     Closure *closure = (Closure *) allocate_object(sizeof(Closure), OBJ_CLOSURE);
+
+    stack_push(ref_value((Object *) closure));
+
+    closure->function = function;
+
     UpValueObject **upvalues = (UpValueObject **) ALLOCATE(UpValueObject*, function->upvalue_count);
     for (int i = 0; i < function->upvalue_count; ++i) {
         upvalues[i] = NULL;
     }
+
     closure->upvalue_count = function->upvalue_count;
     closure->upvalues = upvalues;
-    closure->function = function;
+
+    stack_pop();
+
     return closure;
 }
 

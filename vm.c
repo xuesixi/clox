@@ -370,14 +370,9 @@ static InterpretResult run() {
         //  运行时错误会跳转至这里
         return INTERPRET_RUNTIME_ERROR;
     }
-//    char console[20];
     while (true) {
         if (TRACE_EXECUTION && TRACE_SKIP == -1) {
             show_stack();
-//            fgets(console, 20, stdin);
-//            if (strcmp(console, "o\n") == 0) {
-//                TRACE_SKIP = true;
-//            }
             if (getchar() == 'o') {
                 TRACE_SKIP = vm.frame_count - 1; // skip until the frame_count is equal to TRACE_SKIP
                 while (getchar() != '\n');
@@ -887,6 +882,8 @@ void init_VM() {
     vm.gray_count = 0;
     vm.gray_capacity = 0;
     vm.gray_stack = NULL;
+    vm.allocated_size = 0;
+    vm.next_gc = INITIAL_GC_SIZE;
     srand(time(NULL));
     init_table(&vm.string_table);
     init_table(&vm.globals);

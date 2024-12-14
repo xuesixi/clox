@@ -110,7 +110,7 @@ int constant_mapping(Value value) {
  * @return 该常量在 chunk 中的 constants 中的索引。
  */
 inline int add_constant(Chunk *c, Value constant) {
-    stack_push(constant);
+    stack_push(constant); // prevent gc
     append_ValueArray(&c->constants, constant);
     stack_pop();
     return c->constants.count - 1;

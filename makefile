@@ -6,7 +6,7 @@ TARGET = clox
 
 all: $(TARGET)
 
-$(TARGET): $(OBJ)
+$(TARGET): $(OBJ) 
 	@$(CC) $(OBJ) -o $(TARGET) -l readline
 
 o: $(SRC)
@@ -26,7 +26,7 @@ file: $(TARGET)
 	@rm $(OBJ)
 	@rm $(TARGET)
 
-%.o: %.c
+%.o: %.c common.h %.h
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 debug: $(OBJ)

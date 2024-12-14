@@ -52,12 +52,12 @@ static void mark_roots() {
         mark_object((Object *) vm.frames[i].closure);
     }
 
-    // mark open upvalues ? 暂时无法理解。理论上closure们应该可以引用这些值
-    UpValueObject *curr = vm.open_upvalues;
-    while (curr != NULL) {
-        mark_object((Object *) curr);
-        curr = curr->next;
-    }
+//    // mark open upvalues ? 暂时无法理解。理论上closure们应该可以引用这些值
+//    UpValueObject *curr = vm.open_upvalues;
+//    while (curr != NULL) {
+//        mark_object((Object *) curr);
+//        curr = curr->next;
+//    }
 
     mark_compiler_roots(); // 在编译过程中也会分配堆内存，因此也可能触发gc
 
@@ -149,19 +149,19 @@ static void sweep() {
 }
 
 static void gc() {
-    #ifdef DEBUG_LOG_GC
-    printf("gc begin >>> \n");
-    #endif
+#ifdef DEBUG_LOG_GC
+    printf("gc begin >>> size before gc: %zu\n", vm.allocated_size);
+#endif
 
     mark_roots();
     trace();
-    table_sweep(&vm.string_table);
+    table_delete_unreachable(&vm.string_table);
     sweep();
 
-    #ifdef DEBUG_LOG_GC
-    printf("<<< gc end\n");
+#ifdef DEBUG_LOG_GC
+    printf("<<< gc end. size after gc: %zu\n", vm.allocated_size);
     NEW_LINE();
-    #endif
+#endif
 }
 
 /**
@@ -170,7 +170,8 @@ static void gc() {
  * @param byte_size 新的空间大小，以字节为单位
  * */
 void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
-    (void )old_size;
+
+    vm.allocated_size += new_byte_size - old_size;
 
     #ifdef DEBUG_STRESS_GC
     if (new_byte_size > 0 && ! compiling) {
@@ -181,7 +182,13 @@ void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
     if (new_byte_size == 0) {
         free(ptr);
         return NULL;
-    } 
+    }
+
+    if (!compiling && vm.allocated_size > vm.next_gc) {
+        gc();
+        vm.next_gc = vm.allocated_size * GC_GROW_FACTOR;
+    }
+
     void *new_ptr = realloc(ptr, new_byte_size);
     assert(new_ptr != NULL);
     return new_ptr;
@@ -198,9 +205,9 @@ void free_all_objects() {
 }
 
 void free_object(Object *object) {
-#ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_GC_FREE
     start_color(BLUE);
-    printf("%p is free with type %d", object, object->type);
+    printf("free %p, type: %d, ", object, object->type);
     printf("value: ");
     print_value_with_color(ref_value(object));
     NEW_LINE();

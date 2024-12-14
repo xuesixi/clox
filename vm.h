@@ -28,6 +28,8 @@ typedef struct VM{
     int gray_count;
     int gray_capacity;
     Object **gray_stack;
+    size_t allocated_size;
+    size_t next_gc;
 } VM ;
 
 typedef enum {

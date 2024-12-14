@@ -1531,10 +1531,12 @@ static void set_new_scope(Scope *scope, FunctionType type) {
     scope->function = NULL;
     scope->depth = 0;
     scope->local_count = 0;
+
+    String *name = type == TYPE_FUNCTION ? string_copy(parser.previous.start, parser.previous.length) : NULL;
     scope->function = new_function(type);
+    scope->function->name = name;
 
     if (type == TYPE_FUNCTION) {
-        scope->function->name = string_copy(parser.previous.start, parser.previous.length);
         scope->enclosing = current_scope;
     } else if (type == TYPE_LAMBDA) {
         scope->enclosing = current_scope;
@@ -1564,6 +1566,8 @@ static void init_parser(Parser *the_parser) {
  * 返回该scope的function
  * */
 LoxFunction *compile(const char *src) {
+
+    compiling = true;
 
     init_scanner(src);
     init_parser(&parser);

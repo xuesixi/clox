@@ -165,7 +165,10 @@ void table_mark(Table *table) {
     }
 }
 
-void table_sweep(Table *table) {
+/**
+ * 该函数仅仅从table中删除对应的元素，并不清除内存。free_object会在sweep函数中执行。
+ */
+void table_delete_unreachable(Table *table) {
     for (int i = 0; i < table->capacity; ++i) {
         Entry *entry = table->backing + i;
         if (entry != NULL) {

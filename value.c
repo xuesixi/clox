@@ -206,11 +206,11 @@ static char *to_print_ref(Value value) {
         case OBJ_FUNCTION: {
             LoxFunction *fun = as_function(value);
             if (fun->type == TYPE_MAIN) {
-                asprintf(&buffer, "<fn-proto: main>");
+                asprintf(&buffer, "<proto: main>");
             } else if (fun->type == TYPE_LAMBDA){
-                asprintf(&buffer, "<fn-proto: lambda>");
+                asprintf(&buffer, "<proto: lambda>");
             } else {
-                asprintf(&buffer, "<fn-proto: %s>", fun->name->chars);
+                asprintf(&buffer, "<proto: %s>", fun->name->chars);
             }
             break;
         }

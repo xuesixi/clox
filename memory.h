@@ -8,6 +8,9 @@
 #include "object.h"
 #include "stdlib.h"
 
+#define INITIAL_GC_SIZE 1024
+#define GC_GROW_FACTOR 2
+
 #define GROW_ARRAY(type, pointer, oldCount, newCount) \
     ((type *) re_allocate(pointer, sizeof(type) *(oldCount), sizeof(type) * (newCount)))
 

@@ -8,8 +8,9 @@
 #include "stdio.h"
 #include "setjmp.h"
 
-#define DEBUG_STRESS_GC
-#define DEBUG_LOG_GC
+//#define DEBUG_STRESS_GC
+//#define DEBUG_LOG_GC
+#define DEBUG_LOG_GC_FREE
 
 #define FRAME_MAX 64
 #define STACK_MAX (FRAME_MAX * UINT8_MAX)
