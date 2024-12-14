@@ -91,6 +91,8 @@ Scope *current_scope;
 
 static int argument_list();
 
+static inline bool match_assign();
+
 static void call(bool can_assign);
 
 static inline bool lexeme_equal(Token *a, Token *b);
@@ -143,6 +145,8 @@ static void parse_precedence(Precedence precedence);
 
 static void expression();
 
+static void arithmetic_equal(OpCode set_op, OpCode get_op, int index);
+
 static void float_num(bool can_assign);
 
 static void int_num(bool can_assign);
@@ -168,6 +172,8 @@ static void label_statement();
 static void and(bool can_assign);
 
 static void or(bool can_assign);
+
+static void dot(bool can_assign);
 
 static void lambda(bool can_assign);
 
@@ -229,7 +235,7 @@ ParseRule rules[] = {
         [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
         [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
-        [TOKEN_DOT]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
         [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
         [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
         [TOKEN_SEMICOLON]     = {NULL, NULL, PREC_NONE},
@@ -1091,6 +1097,16 @@ static inline void expression_statement() {
 
 static inline void expression() {
     parse_precedence(PREC_ASSIGNMENT);
+}
+
+static void dot(bool can_assign) {
+    consume(TOKEN_IDENTIFIER, "An identifier is expected here");
+    int index = identifier_constant(& parser.previous);
+    if (can_assign && match_assign()) {
+        arithmetic_equal(OP_SET_PROPERTY, OP_GET_PROPERTY, index);
+    } else {
+        emit_two_bytes(OP_GET_PROPERTY, index);
+    }
 }
 
 /**

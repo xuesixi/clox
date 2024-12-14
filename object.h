@@ -100,4 +100,6 @@ UpValue *new_upvalue(Value *position);
 Class *new_class(String *name);
 Class *as_class(Value value);
 
+Instance *new_instance(Class *class);
+Instance *as_instance(Value value);
 #endif

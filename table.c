@@ -96,11 +96,8 @@ bool table_get(Table *table, String *key, Value *value) {
 }
 
 /**
- *
- * @param table
- * @param key
- * @param value
- * @return true if modifying existing pair; false if adding new entry
+ * 设置table的一个键值对。如果key原本就已存在，返回true。如果原本不存在，返回false。
+ * 该函数可能导致gc
  */
 bool table_set(Table *table, String *key, Value value) {
 
@@ -154,6 +151,9 @@ void table_add_all(Table *from, Table *to) {
     }
 }
 
+/**
+ * 标记这个table中的所有entry
+ */
 void table_mark(Table *table) {
     if (table == NULL) {
         return;

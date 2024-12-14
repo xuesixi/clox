@@ -28,7 +28,7 @@ void mark_object(Object *object) {
         vm.gray_stack = realloc(vm.gray_stack, vm.gray_capacity * sizeof(Object *));
     }
 
-    vm.gray_stack[vm.gray_count ++ ] = object;
+    vm.gray_stack[vm.gray_count++] = object;
 }
 
 void mark_value(Value value) {
@@ -40,12 +40,12 @@ void mark_value(Value value) {
 static void mark_roots() {
 
     // mark stack
-    for (Value *curr = vm.stack; curr < vm.stack_top; curr ++) {
+    for (Value *curr = vm.stack; curr < vm.stack_top; curr++) {
         mark_value(*curr);
     }
 
     // mark global
-    table_mark(& vm.globals);
+    table_mark(&vm.globals);
 
     // mark existing frames。否则调用中的函数可能会被回收
     for (int i = 0; i < vm.frame_count; ++i) {
@@ -79,7 +79,7 @@ static void blacken_object(Object *object) {
             break;
         }
         case OBJ_FUNCTION: {
-            LoxFunction *function = (LoxFunction *)object;
+            LoxFunction *function = (LoxFunction *) object;
             mark_object((Object *) function->name);
             for (int i = 0; i < function->chunk.constants.count; ++i) {
                 mark_value(function->chunk.constants.values[i]);
@@ -99,12 +99,18 @@ static void blacken_object(Object *object) {
             mark_object((Object *) class->name);
             break;
         }
+        case OBJ_INSTANCE: {
+            Instance *instance = (Instance *) object;
+            mark_object((Object *) instance->class);
+            table_mark(& instance->fields);
+            break;
+        }
     }
 }
 
 static void trace() {
     while (vm.gray_count > 0) {
-        Object *object = vm.gray_stack[ -- vm.gray_count];
+        Object *object = vm.gray_stack[--vm.gray_count];
         blacken_object(object);
     }
 }
@@ -133,7 +139,7 @@ static void sweep() {
 
     if (!vm.objects->is_marked) {
         Object *unreachable = vm.objects;
-        vm.objects = vm.objects ->next;
+        vm.objects = vm.objects->next;
 
         free_object(unreachable);
     } else {
@@ -142,7 +148,7 @@ static void sweep() {
 }
 
 static void gc() {
-#ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_GC_FREE
     printf("gc begin >>> size before gc: %zu\n", vm.allocated_size);
 #endif
 
@@ -151,7 +157,7 @@ static void gc() {
     table_delete_unreachable(&vm.string_table);
     sweep();
 
-#ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_GC_FREE
     printf("<<< gc end. size after gc: %zu\n", vm.allocated_size);
     NEW_LINE();
 #endif
@@ -166,11 +172,11 @@ void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
 
     vm.allocated_size += new_byte_size - old_size;
 
-    #ifdef DEBUG_STRESS_GC
+#ifdef DEBUG_STRESS_GC
     if (new_byte_size > 0 && ! compiling) {
         gc();
     }
-    #endif
+#endif
 
     if (new_byte_size == 0) {
         free(ptr);
@@ -208,14 +214,14 @@ void free_object(Object *object) {
 #endif
     switch (object->type) {
         case OBJ_STRING: {
-            String *str = (String*)object;
+            String *str = (String *) object;
             FREE_ARRAY(char, 0, str->length + 1);
             re_allocate(object, sizeof(String), 0);
             break;
         }
         case OBJ_FUNCTION: {
             LoxFunction *function = (LoxFunction *) object;
-            free_chunk(& function->chunk);
+            free_chunk(&function->chunk);
             re_allocate(object, sizeof(LoxFunction), 0);
             break;
         }
@@ -235,6 +241,12 @@ void free_object(Object *object) {
         }
         case OBJ_CLASS: {
             re_allocate(object, sizeof(Class), 0);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            Instance *instance = (Instance *) object;
+            free_table(&instance->fields);
+            re_allocate(object, sizeof(Instance), 0);
             break;
         }
         default:

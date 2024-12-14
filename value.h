@@ -72,6 +72,7 @@ extern char *BOLD_RED;
 extern char *GREEN;
 extern char *BOLD_GREEN;
 extern char *CYAN;
+extern char *BOLD_CYAN;
 extern char *GRAY;
 extern char *MAGENTA;
 extern char *BLUE;

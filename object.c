@@ -160,3 +160,14 @@ Class *new_class(String *name) {
 inline Class *as_class(Value value) {
     return (Class *) as_ref(value);
 }
+
+Instance *new_instance(Class *class) {
+    Instance *instance = (Instance *) allocate_object(sizeof(Instance), OBJ_INSTANCE);
+    instance->class = class;
+    init_table(&instance->fields);
+    return instance;
+}
+
+Instance *as_instance(Value value) {
+    return (Instance *) as_ref(value);
+}

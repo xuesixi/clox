@@ -657,6 +657,37 @@ static InterpretResult run() {
                 stack_push(ref_value((Object *) new_class(name)));
                 break;
             }
+            case OP_GET_PROPERTY: {
+                Value value = stack_pop();
+                if (is_ref_of(value,OBJ_INSTANCE) == false) {
+                    char *str = to_print_chars(value);
+                    runtime_error("%s is not an object and does not have property", str);
+                    free(str);
+                    catch();
+                }
+                String *field = read_constant_string();
+                Instance *instance = as_instance(value);
+                Value result = nil_value(); // undefined property is nil
+                table_get(&instance->fields, field, &result);
+                stack_push(result);
+                break;
+            }
+            case OP_SET_PROPERTY: {
+                Value target = peek_stack(1); // prevent being gc
+                Value value = peek_stack(0);
+                if (is_ref_of(target, OBJ_INSTANCE) == false) {
+                    char *str = to_print_chars(value);
+                    runtime_error("%s is not an object and does not have property", str);
+                    free(str);
+                    catch();
+                }
+                String *field = read_constant_string();
+                Instance *instance = as_instance(target);
+                table_set(&instance->fields, field, value); // potential gc
+                vm.stack_top -= 2;
+                stack_push(value);
+                break;
+            }
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;
@@ -693,6 +724,13 @@ static void call_value(Value value, int arg_count) {
         Value result = native->impl(arg_count, vm.stack_top - arg_count);
         vm.stack_top -= arg_count + 1;
         stack_push(result);
+    } else if (is_ref_of(value, OBJ_CLASS)) {
+        Class *class = as_class(value);
+        Instance *instance = new_instance(class);
+
+        vm.stack_top -= arg_count + 1;
+        stack_push(ref_value((Object *) instance));
+
     } else {
         char *name = to_print_chars(value);
         runtime_error("%s is not callable", name);

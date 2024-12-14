@@ -14,6 +14,7 @@ char *BOLD_RED = "\033[31;1m";
 char *GREEN = "\033[32m";
 char *BOLD_GREEN = "\033[1;32m";
 char *CYAN = "\033[36m";
+char *BOLD_CYAN = "\033[1;36m";
 char *GRAY = "\033[0;90m";
 char *MAGENTA = "\033[35m";
 char *BLUE = "\033[38;5;32m";
@@ -47,6 +48,10 @@ void print_value_with_color(Value value) {
                     start_color(BLUE);
                     break;
                 case OBJ_UPVALUE:
+                    break;
+                case OBJ_CLASS:
+                case OBJ_INSTANCE:
+                    start_color(BOLD_CYAN);
                     break;
             }
             break;
@@ -222,6 +227,11 @@ static char *to_print_ref(Value value) {
         case OBJ_CLASS: {
             Class *class = as_class(value) ;
             asprintf(&buffer, "<class: %s>", class->name->chars);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            Instance *instance = as_instance(value);
+            asprintf(&buffer, "<obj: %s>", instance->class->name->chars);
             break;
         }
         default:
