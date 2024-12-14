@@ -1,62 +1,85 @@
 
-fun vector(x, y) {
+// fun vector(x, y) {
+// 
+//     fun getX() {
+//         return x;
+//     }
+// 
+//     fun getY() {
+//         return y;
+//     }
+// 
+//     fun add(a, b) {
+//         return vector(x + a, y + b);
+//     }
+// 
+//     fun dot(v) {
+//         return x * v("getX")() + y * v("getY")();
+//     }
+//     
+//     fun methods(name) {
+//         switch (name) {
+//             case "getX":
+//                 return getX;
+//             case "getY":
+//                 return getY;
+//             case "add":
+//                 return add;
+//             case "dot":
+//                 return dot;
+//             default:
+//                 return nil;
+//         }
+//     }
+// 
+//     return methods;
+// }
+// 
+// var v = vector(3, 5);
+// print f("x is #, y is #", v("getX")(), v("getY")());
+// 
+// var u = v("add")(2, 2);
+// print f("x is #, y is #", u("getX")(), u("getY")());
+// 
+// var w = v("dot")(u);
+// print f("the dot product is #", w);
+// 
+// var num = read("enter num: ");
+// num = int(num);
+// 
+// u = nil;
+// v = nil;
+// vector = nil;
+// 
+// print f("the num squared is #", num ** 2);
+// 
+// fun hey() {
+//     for (var i = 0; i < 300; i += 1) {
+//         print f("num : #", i);
+//     }
+// }
+// 
+// hey();
 
-    fun getX() {
-        return x;
+
+fun out() {
+
+    var num = 10;
+
+    fun set(new) {
+        num = new;
     }
 
-    fun getY() {
-        return y;
+    fun get() {
+        return fun() {
+            return num;
+        };
     }
 
-    fun add(a, b) {
-        return vector(x + a, y + b);
-    }
-
-    fun dot(v) {
-        return x * v("getX")() + y * v("getY")();
-    }
-    
-    fun methods(name) {
-        switch (name) {
-            case "getX":
-                return getX;
-            case "getY":
-                return getY;
-            case "add":
-                return add;
-            case "dot":
-                return dot;
-            default:
-                return nil;
-        }
-    }
-
-    return methods;
+    set(20);
+    print(get()());
 }
 
-var v = vector(3, 5);
-print f("x is #, y is #", v("getX")(), v("getY")());
+out();
 
-var u = v("add")(2, 2);
-print f("x is #, y is #", u("getX")(), u("getY")());
 
-var w = v("dot")(u);
-print f("the dot product is #", w);
-
-var num = read("enter num: ");
-num = int(num);
-
-u = nil;
-v = nil;
-vector = nil;
-
-print f("the num squared is #", num ** 2);
-
-fun hey() {
-    for (var i = 0; i < 300; i += 1) {
-        print f("num : #", i);
-    }
-}
-
-hey();

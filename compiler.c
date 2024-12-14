@@ -72,6 +72,7 @@ typedef struct Local {
 typedef struct UpValue {
     int index; // 这个upvalue在下一外层的upvalues或者locals中的索引
     bool is_local; // 这个upvalue对于下一外层的scope来说，是local还是另一个upvalue
+    bool is_const;
 } UpValue;
 
 typedef struct Scope {
@@ -215,9 +216,9 @@ static void synchronize();
 
 static int make_constant(Value value);
 
-static int resolve_upvalue(Scope *scope, Token *identifier);
+static int resolve_upvalue(Scope *scope, Token *identifier, bool *is_const);
 
-static int add_upvalue(Scope *scope, int index, bool is_local);
+static int add_upvalue(Scope *scope, int index, bool is_local, bool is_const);
 
 //-------------------------------------------------------------------------
 
@@ -537,23 +538,24 @@ static int resolve_local(Scope *scope, Token *token, bool *is_const) {
  * 已知给定的identifier不存在于scope中，将其视为upvalue，向外层寻找
  * @return 如果找到了，将之添加到scope的upvalues中，然后返回其索引。如果没找到，返回-1
  */
-static int resolve_upvalue(Scope *scope, Token *identifier) {
+static int resolve_upvalue(Scope *scope, Token *identifier, bool *is_const) {
     if (scope->enclosing == NULL) {
         return -1;
     }
-    int index = resolve_local(scope->enclosing, identifier, NULL);
+//    bool is_const;
+    int index = resolve_local(scope->enclosing, identifier, is_const);
     if (index != -1) {
         scope->enclosing->locals[index].is_captured = true;
-        return add_upvalue(scope, index, true);
+        return add_upvalue(scope, index, true, *is_const);
     }
-    index = resolve_upvalue(scope->enclosing, identifier);
+    index = resolve_upvalue(scope->enclosing, identifier, is_const);
     if (index != -1) {
-        return add_upvalue(scope, index, false);
+        return add_upvalue(scope, index, false, *is_const);
     }
     return -1;
 }
 
-static int add_upvalue(Scope *scope, int index, bool is_local) {
+static int add_upvalue(Scope *scope, int index, bool is_local, bool is_const) {
     int count = scope->function->upvalue_count;
     for (int i = 0; i < count; ++i) {
         if (scope->upvalues[i].index == index && scope->upvalues[i].is_local == is_local) {
@@ -566,6 +568,7 @@ static int add_upvalue(Scope *scope, int index, bool is_local) {
     }
     scope->upvalues[count].index = index;
     scope->upvalues[count].is_local = is_local;
+    scope->upvalues[count].is_const = is_const;
     return scope->function->upvalue_count ++;
 }
 
@@ -1142,7 +1145,7 @@ static void named_variable(Token *name, bool can_assign) {
     if ((index = resolve_local(current_scope, name, &is_const)) != -1) {
         set_op = OP_SET_LOCAL;
         get_op = OP_GET_LOCAL;
-    } else if ((index = resolve_upvalue(current_scope, name)) != -1) {
+    } else if ((index = resolve_upvalue(current_scope, name, &is_const)) != -1) {
         set_op = OP_SET_UPVALUE;
         get_op = OP_GET_UPVALUE;
     } else {
