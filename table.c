@@ -233,8 +233,6 @@ static inline bool map_empty_entry(MapEntry *entry) {
 }
 
 static inline bool map_del_mark(MapEntry *entry) {
-    // null key && non-null value -> del
-    // not del -> non-null key || null value
     return entry->key == NULL && entry->value != NULL;
 }
 
@@ -359,5 +357,4 @@ int int_hash(void *p) {
 
 bool int_equal(void *a, void *b) {
     return a == b;
-//    return (int) a == (int) b;
 }

@@ -21,24 +21,38 @@ VM vm;
 jmp_buf error_buf;
 
 static CallFrame *curr_frame;
+
 static uint8_t read_byte();
+
 static uint16_t read_uint16();
+
 static bool is_falsy(Value value);
+
 static void reset_stack();
+
 static Value read_constant();
+
 static Value read_constant2();
+
 static InterpretResult run();
+
 static void show_stack();
+
 static Value stack_peek(int distance);
+
 static void binary_number_op(Value a, Value b, char operator);
+
 static void call_value(Value value, int arg_count);
+
 static void runtime_error(const char *format, ...);
+
 static void catch();
+
 static void runtime_error_and_catch(const char *format, ...);
+
 static void invoke_from_class(Class *class, String *name, int arg_count);
+
 static void call_closure(Closure *closure, int arg_count);
-
-
 
 
 /* ------------------上面是静态函数申明-----------------------
@@ -126,7 +140,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 runtime_error_and_catch("invalid binary operator");
                 return;
         }
-    } else if (is_float(a) && is_float(b)){
+    } else if (is_float(a) && is_float(b)) {
         double a_v = as_float(a);
         double b_v = as_float(b);
         switch (operator) {
@@ -152,7 +166,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 runtime_error_and_catch("invalid binary operator");
                 return;
         }
-    } else if (operator== '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
+    } else if (operator == '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
         stack_push(a);
         stack_push(b);
         String *str = string_concat(a, b);
@@ -161,8 +175,8 @@ static void binary_number_op(Value a, Value b, char operator) {
         stack_push(ref_value(&str->object));
         return;
     } else {
-        char *a_text = to_print_chars(a, NULL);
-        char *b_text = to_print_chars(b, NULL);
+        char *a_text = value_to_chars(a, NULL);
+        char *b_text = value_to_chars(b, NULL);
         runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
         free(a_text);
         free(b_text);
@@ -222,7 +236,7 @@ void runtime_error(const char *format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    for (int i = vm.frame_count - 1; i >= 0; i --) {
+    for (int i = vm.frame_count - 1; i >= 0; i--) {
         CallFrame *frame = vm.frames + i;
         LoxFunction *function = frame->closure->function;
         size_t index = frame->PC - frame->closure->function->chunk.code - 1;
@@ -258,7 +272,7 @@ static void runtime_error_and_catch(const char *format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    for (int i = vm.frame_count - 1; i >= 0; i --) {
+    for (int i = vm.frame_count - 1; i >= 0; i--) {
         CallFrame *frame = vm.frames + i;
         LoxFunction *function = frame->closure->function;
         size_t index = frame->PC - frame->closure->function->chunk.code - 1;
@@ -279,7 +293,7 @@ static void runtime_error_and_catch(const char *format, ...) {
  * @return 下一个字节
  */
 static inline uint8_t read_byte() {
-    return *curr_frame->PC ++;
+    return *curr_frame->PC++;
 }
 
 static inline uint16_t read_uint16() {
@@ -310,7 +324,7 @@ static inline String *read_constant_string() {
         IMPLEMENTATION_ERROR("trying to read a constant string, but the value is not a String");
         return NULL;
     }
-    return (String *)(as_ref(value));
+    return (String *) (as_ref(value));
 }
 
 /**
@@ -326,7 +340,6 @@ static UpValue *capture_upvalue(Value *value) {
         curr = curr->next;
     }
     // 三种情况：curr为NULL；curr->position == value; curr->position < value
-
 
     if (curr != NULL && curr->position == value) {
         return curr;
@@ -359,6 +372,9 @@ static void close_upvalue(Value *position) {
 }
 
 
+/**
+ * 在指定的class的methods中寻找某个closure，然后将其包装成一个Method
+ */
 static Method *bind_method(Class *class, String *name, Value receiver) {
     Value value;
     if (table_get(&class->methods, name, &value) == false) {
@@ -387,7 +403,8 @@ static InterpretResult run() {
                 while (getchar() != '\n');
             } else {
                 CallFrame *frame = curr_frame;
-                disassemble_instruction(& frame->closure->function->chunk, (int)(frame->PC - frame->closure->function->chunk.code));
+                disassemble_instruction(&frame->closure->function->chunk,
+                                        (int) (frame->PC - frame->closure->function->chunk.code));
             }
         }
 
@@ -399,7 +416,6 @@ static InterpretResult run() {
                 close_upvalue(vm.stack_top);
                 vm.frame_count--;
                 curr_frame = vm.frames + vm.frame_count - 1;
-//                set_curr_frame();
                 if (vm.frame_count == TRACE_SKIP) {
                     TRACE_SKIP = -1; // no skip. Step by step
                 }
@@ -467,8 +483,8 @@ static InterpretResult run() {
                 if (is_number(a) && is_number(b)) {
                     stack_push(float_value(pow(AS_NUMBER(a), AS_NUMBER(b))));
                 } else {
-                    char *a_text = to_print_chars(a, NULL);
-                    char *b_text = to_print_chars(b, NULL);
+                    char *a_text = value_to_chars(a, NULL);
+                    char *b_text = value_to_chars(b, NULL);
                     runtime_error("the operands, %s and %s, do not support the power operation", a_text, b_text);
                     free(a_text);
                     free(b_text);
@@ -644,17 +660,17 @@ static InterpretResult run() {
                         closure->upvalues[i] = curr_frame->closure->upvalues[index];
                     }
                 }
-                
+
                 break;
             }
             case OP_GET_UPVALUE: {
                 int index = read_byte();
-                stack_push(* curr_frame->closure->upvalues[index]->position);
+                stack_push(*curr_frame->closure->upvalues[index]->position);
                 break;
             }
             case OP_SET_UPVALUE: {
                 int index = read_byte();
-                * curr_frame->closure->upvalues[index]->position = stack_peek(0);
+                *curr_frame->closure->upvalues[index]->position = stack_peek(0);
                 break;
             }
             case OP_CLOSE_UPVALUE: {
@@ -669,8 +685,8 @@ static InterpretResult run() {
             }
             case OP_GET_PROPERTY: {
                 Value value = stack_pop(); // instance
-                if (is_ref_of(value,OBJ_INSTANCE) == false) {
-                    char *str = to_print_chars(value, NULL);
+                if (is_ref_of(value, OBJ_INSTANCE) == false) {
+                    char *str = value_to_chars(value, NULL);
                     runtime_error("%s is not an object and does not have property", str);
                     free(str);
                     catch();
@@ -691,7 +707,7 @@ static InterpretResult run() {
                 Value value = stack_peek(0);
                 String *field = read_constant_string();
                 if (is_ref_of(target, OBJ_INSTANCE) == false) {
-                    char *str = to_print_chars(target, NULL);
+                    char *str = value_to_chars(target, NULL);
                     runtime_error("%s is not an object and does not have the property: %s", str, field->chars);
                     free(str);
                     catch();
@@ -716,14 +732,14 @@ static InterpretResult run() {
                 int arg_count = read_byte();
                 Value receiver = stack_peek(arg_count);
                 if (!is_ref_of(receiver, OBJ_INSTANCE)) {
-                    char *str = to_print_chars(receiver, NULL);
+                    char *str = value_to_chars(receiver, NULL);
                     runtime_error("%s is not object and does not have property %s", str, name->chars);
                     free(str);
                     catch();
                 }
                 Instance *instance = as_instance(receiver);
                 Value closure_value;
-                if (! table_get(&instance->fields, name, &closure_value)) {
+                if (!table_get(&instance->fields, name, &closure_value)) {
                     Class *class = instance->class;
                     invoke_from_class(class, name, arg_count);
                 } else {
@@ -748,26 +764,26 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
     // stack: obj, arg1, arg2, top
     // code: op, name_index, arg_count
     Value closure_value;
-    if (!table_get(&class->methods, name, &closure_value)){
+    if (!table_get(&class->methods, name, &closure_value)) {
         Value receiver = stack_peek(arg_count);
-        char *str = to_print_chars(receiver, NULL);
+        char *str = value_to_chars(receiver, NULL);
         runtime_error("%s does not have the property or method %s", str, name->chars);
         free(str);
         catch();
     }
     call_closure(as_closure(closure_value), arg_count);
-//    call_value(closure_value, arg_count);
 }
 
 static void call_closure(Closure *closure, int arg_count) {
     LoxFunction *function = closure->function;
     if (function->arity != arg_count) {
-        runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
+        runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity,
+                                arg_count);
     }
     if (vm.frame_count == FRAME_MAX) {
         runtime_error_and_catch("Stack overflow.");
     }
-    vm.frame_count ++;
+    vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
     CallFrame *frame = curr_frame;
     frame->FP = vm.stack_top - arg_count - 1;
@@ -777,13 +793,13 @@ static void call_closure(Closure *closure, int arg_count) {
 
 /**
  * 创建一个call frame。
- * 如果value不是函数，或者参数数量不匹配，则出现runtime错误
- * @param value 要调用的函数
+ * 如果value不可调用，或者参数数量不匹配，则出现runtime错误
+ * @param value 要调用的closure、method、native、class
  * @param arg_count 传入的参数的个数
  */
 static void call_value(Value value, int arg_count) {
     if (!is_ref(value)) {
-        char *name = to_print_chars(value, NULL);
+        char *name = value_to_chars(value, NULL);
         runtime_error("%s is not callable", name);
         free(name);
         catch();
@@ -796,7 +812,8 @@ static void call_value(Value value, int arg_count) {
         case OBJ_NATIVE: {
             NativeFunction *native = as_native(value);
             if (native->arity != arg_count && native->arity != -1) {
-                runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity, arg_count);
+                runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity,
+                                        arg_count);
             }
             Value result = native->impl(arg_count, vm.stack_top - arg_count);
             vm.stack_top -= arg_count + 1;
@@ -811,7 +828,8 @@ static void call_value(Value value, int arg_count) {
                 Method *initializer = new_method(as_closure(init_closure), ref_value((Object *) instance));
                 call_value(ref_value((Object *) initializer), arg_count);
             } else if (arg_count != 0) {
-                runtime_error_and_catch("%s does not define init() but got %d arguments", class->name->chars, arg_count);
+                runtime_error_and_catch("%s does not define init() but got %d arguments", class->name->chars,
+                                        arg_count);
             } else {
                 stack_pop();
                 stack_push(ref_value((Object *) instance));
@@ -822,11 +840,10 @@ static void call_value(Value value, int arg_count) {
             Method *method = as_method(value);
             vm.stack_top[-arg_count - 1] = method->receiver;
             call_closure(method->closure, arg_count);
-//            call_value(ref_value((Object *) method->closure), arg_count);
             break;
         }
         default: {
-            char *name = to_print_chars(value, NULL);
+            char *name = value_to_chars(value, NULL);
             runtime_error("%s is not callable", name);
             free(name);
             catch();
@@ -840,8 +857,8 @@ static void define_native(const char *name, NativeImplementation impl, int arity
 //    NativeFunction *nativeFunction = new_native(impl);
 //    table_set(&vm.globals, str, ref_value((Object*)nativeFunction));
 
-    stack_push(ref_value((Object *)string_copy(name, len)));
-    stack_push(ref_value((Object *)new_native(impl, as_string(vm.stack[0]), arity)));
+    stack_push(ref_value((Object *) string_copy(name, len)));
+    stack_push(ref_value((Object *) new_native(impl, as_string(vm.stack[0]), arity)));
     table_set(&vm.globals, as_string(vm.stack[0]), vm.stack[1]);
     stack_pop();
     stack_pop();
@@ -856,9 +873,9 @@ static Value native_read(int count, Value *values) {
     }
     size_t len;
     char *line = fgetln(stdin, &len);
-    String *str = string_copy(line, len-1);
+    String *str = string_copy(line, len - 1);
     free(line);
-    return ref_value((Object *)str);
+    return ref_value((Object *) str);
 }
 
 static inline int max(int a, int b) {
@@ -877,7 +894,7 @@ static Value native_format(int count, Value *values) {
 
     while (true) {
         while (format[curr] != '\0' && format[curr] != '#') {
-            curr ++;
+            curr++;
         }
 
         int new_len = curr - pre;
@@ -907,7 +924,7 @@ static Value native_format(int count, Value *values) {
 
             Value v = values[curr_v + 1];
             int v_chars_len;
-            char *v_chars = to_print_chars(v, &v_chars_len);
+            char *v_chars = value_to_chars(v, &v_chars_len);
 
             if (v_chars_len + buf_len > capacity) {
                 capacity = max(2 * capacity, v_chars_len + buf_len);
@@ -915,9 +932,9 @@ static Value native_format(int count, Value *values) {
             }
             memcpy(buf + buf_len, v_chars, v_chars_len);
             buf_len += v_chars_len;
-            curr ++;
+            curr++;
             pre = curr;
-            curr_v ++;
+            curr_v++;
             free(v_chars);
         }
     }
@@ -928,13 +945,13 @@ static Value native_format(int count, Value *values) {
 }
 
 static Value native_clock(int count, Value *value) {
-    (void )count;
-    (void )value;
-    return float_value((double)clock() / CLOCKS_PER_SEC);
+    (void) count;
+    (void) value;
+    return float_value((double) clock() / CLOCKS_PER_SEC);
 }
 
 static Value native_int(int count, Value *value) {
-    (void )count;
+    (void) count;
     switch (value->type) {
         case VAL_INT:
             return *value;
@@ -958,15 +975,15 @@ static Value native_int(int count, Value *value) {
 }
 
 static Value native_float(int count, Value *value) {
-    (void )count;
+    (void) count;
     Value v = *value;
     switch (v.type) {
         case VAL_INT:
-            return float_value((double ) as_int(v));
+            return float_value((double) as_int(v));
         case VAL_FLOAT:
             return v;
         case VAL_BOOL:
-            return float_value((double ) as_bool(v));
+            return float_value((double) as_bool(v));
         default:
             if (is_ref_of(v, OBJ_STRING)) {
                 String *str = as_string(v);
@@ -983,8 +1000,8 @@ static Value native_float(int count, Value *value) {
 }
 
 static Value native_help(int count, Value *value) {
-    (void ) count;
-    (void ) value;
+    (void) count;
+    (void) value;
     printf("You are in the REPL mode because you run clox directly without providing any arguments.\n");
     printf("You can also do `clox path/to/script` to run a lox script.\n");
     printf("Or do `clox -h` to see more options\n");
@@ -995,7 +1012,7 @@ static Value native_help(int count, Value *value) {
 }
 
 static Value native_rand(int count, Value *value) {
-    (void )count;
+    (void) count;
     Value a = value[0];
     Value b = value[1];
     if (!is_int(a) || !is_int(b)) {
@@ -1021,7 +1038,7 @@ void init_VM() {
     init_table(&vm.string_table);
     init_table(&vm.globals);
     init_table(&vm.const_table);
-    vm.init_string = NULL;
+    vm.init_string = NULL; // prevent invalid address in gc
     vm.init_string = string_copy("init", 4);
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
@@ -1041,7 +1058,6 @@ void additional_repl_init() {
  * @par string_table
  * @par globals
  * @par const_table
- * @par label_map
  */
 void free_VM() {
     free_all_objects();

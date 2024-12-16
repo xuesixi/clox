@@ -103,10 +103,6 @@ static void main_run_bytecode(const char *code_path) {
     }
 }
 
-/**
- * clox
- * clox file
- * */
 int main(int argc, char *const argv[]) {
 
     init_VM();

@@ -1218,7 +1218,7 @@ static inline bool match_assign() {
 }
 
 /**
- * 解析变量的get/set
+ * 将token视为一个变量，解析其get/set
  */
 static void named_variable(Token *name, bool can_assign) {
     int set_op;
@@ -1395,16 +1395,6 @@ static int make_constant(Value value) {
     if (cache != -1) {
         return cache;
     }
-//    if (is_ref_of(value, OBJ_STRING)) {
-//        Value str_index;
-//        if (table_get(&parser.lexeme_table, as_string(value), &str_index)) {
-//            return as_int(str_index);
-//        } else {
-//            str_index = int_value(add_constant(current_chunk(), value));
-//            table_set(&parser.lexeme_table, as_string(value), str_index);
-//            return as_int(str_index);
-//        }
-//    }
     int index = add_constant(current_chunk(), value);
     return index;
 }
@@ -1435,8 +1425,6 @@ static inline void emit_two_bytes(uint8_t byte1, uint8_t byte2) {
 static inline void emit_uint16(uint16_t value) {
     uint8_t i0, i1;
     u16_to_u8(value, &i0, &i1);
-    // uint8_t i0 = value & 0xff;
-    // uint8_t i1 = (value >> 8) & 0xff;
     emit_two_bytes(i0, i1);
 }
 
@@ -1643,14 +1631,6 @@ static void set_new_scope(Scope *scope, FunctionType type) {
         scope->enclosing = current_scope;
     }
 
-//    if (type == TYPE_FUNCTION) {
-//        scope->enclosing = current_scope;
-//    } else if (type == TYPE_LAMBDA) {
-//        scope->enclosing = current_scope;
-//    } else {
-//        scope->enclosing = NULL;
-//    }
-
     current_scope = scope;
 
     // 一个初始的占位符，对于function，代表当前scope的函数; 对于method，则是this
@@ -1667,7 +1647,6 @@ static void set_new_scope(Scope *scope, FunctionType type) {
 }
 
 static void init_parser(Parser *the_parser) {
-//    init_table(&the_parser->lexeme_table);
     the_parser->continue_point = -1;
     the_parser->break_point = -1;
 }
@@ -1684,8 +1663,6 @@ LoxFunction *compile(const char *src) {
     init_scanner(src);
     init_parser(&parser);
 
-//    init_map(&label_map, int_hash, int_equal);
-
     Scope scope;
     set_new_scope(&scope, TYPE_MAIN);
 
@@ -1697,7 +1674,6 @@ LoxFunction *compile(const char *src) {
 
     LoxFunction *function = end_compiler();
 
-//    free_table(&parser.lexeme_table);
     compiling = false;
 
     if (parser.has_error) {

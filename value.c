@@ -29,7 +29,7 @@ inline void end_color() {
 }
 
 void print_value_with_color(Value value) {
-    char *str = to_print_chars(value, NULL);
+    char *str = value_to_chars(value, NULL);
     switch (value.type) {
         case VAL_INT:
         case VAL_FLOAT:
@@ -63,7 +63,7 @@ void print_value_with_color(Value value) {
     free(str);
 }
 
-static char *to_print_ref(Value value, int *len);
+static char *ref_to_chars(Value value, int *len);
 
 void init_ValueArray(ValueArray *array) {
     array->values = NULL;
@@ -190,7 +190,7 @@ bool object_equal(Object *a, Object *b) {
     }
 }
 
-static char *to_print_ref(Value value, int *len) {
+static char *ref_to_chars(Value value, int *len) {
     char *buffer;
     ObjectType type = as_ref(value)->type;
     switch (type) {
@@ -256,7 +256,7 @@ static char *to_print_ref(Value value, int *len) {
  * @param value 想要打印的 value
  */
 void print_value(Value value) {
-    char *str = to_print_chars(value, NULL);
+    char *str = value_to_chars(value, NULL);
     printf("%s", str);
     free(str);
 }
@@ -265,7 +265,7 @@ void print_value(Value value) {
  * 获取目标 value 的char*表达。调用者需要自己 free 之。
  * 如果传入的len不为NULL，则将生成的字符串长度储存在其中
  * */
-char *to_print_chars(Value value, int *len) {
+char *value_to_chars(Value value, int *len) {
     char *buffer;
     int dummy;
     if (len == NULL) {
@@ -305,7 +305,7 @@ char *to_print_chars(Value value, int *len) {
             break;
         }
         case VAL_REF: {
-            buffer = to_print_ref(value, len);
+            buffer = ref_to_chars(value, len);
             break;
         }
         default:

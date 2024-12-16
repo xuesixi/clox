@@ -72,8 +72,8 @@ String *string_allocate(char *chars, int length) {
  * */
 String *string_concat(Value a, Value b) {
     int len_a, len_b;
-    char *a_str = to_print_chars(a, &len_a);
-    char *b_str = to_print_chars(b, &len_b);
+    char *a_str = value_to_chars(a, &len_a);
+    char *b_str = value_to_chars(b, &len_b);
     char *buffer = malloc(len_a + len_b + 1);
     memcpy(buffer, a_str, len_a);
     memcpy(buffer + len_a, b_str, len_b + 1);

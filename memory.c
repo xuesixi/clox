@@ -105,7 +105,7 @@ static void blacken_object(Object *object) {
         case OBJ_INSTANCE: {
             Instance *instance = (Instance *) object;
             mark_object((Object *) instance->class);
-            table_mark(& instance->fields);
+            table_mark(&instance->fields);
             break;
         }
         case OBJ_METHOD: {
@@ -250,7 +250,7 @@ void free_object(Object *object) {
         }
         case OBJ_CLASS: {
             Class *class = (Class *) object;
-            free_table(& class->methods);
+            free_table(&class->methods);
             re_allocate(object, sizeof(Class), 0);
             break;
         }

@@ -5,12 +5,10 @@
 #ifndef CLOX_VM_H
 #define CLOX_VM_H
 
-// #include "chunk.h"
 #include "table.h"
 #include "object.h"
 
 typedef struct CallFrame {
-//    LoxFunction *function;
     Closure *closure;
     uint8_t *PC; // program counter
     Value *FP; // frame pointer. The start of the frame
