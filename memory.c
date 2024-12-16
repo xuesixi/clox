@@ -52,6 +52,8 @@ static void mark_roots() {
         mark_object((Object *) vm.frames[i].closure);
     }
 
+    mark_object((Object *) vm.init_string);
+
 //    // mark open upvalues ? 暂时无法理解。理论上closure们应该可以引用这些值
 //    UpValueObject *curr = vm.open_upvalues;
 //    while (curr != NULL) {
@@ -97,12 +99,19 @@ static void blacken_object(Object *object) {
         case OBJ_CLASS: {
             Class *class = (Class *) object;
             mark_object((Object *) class->name);
+            table_mark(&class->methods);
             break;
         }
         case OBJ_INSTANCE: {
             Instance *instance = (Instance *) object;
             mark_object((Object *) instance->class);
             table_mark(& instance->fields);
+            break;
+        }
+        case OBJ_METHOD: {
+            Method *method = (Method *) object;
+            mark_value(method->receiver);
+            mark_object((Object *) method->closure);
             break;
         }
     }
@@ -240,6 +249,8 @@ void free_object(Object *object) {
             break;
         }
         case OBJ_CLASS: {
+            Class *class = (Class *) object;
+            free_table(& class->methods);
             re_allocate(object, sizeof(Class), 0);
             break;
         }
@@ -247,6 +258,10 @@ void free_object(Object *object) {
             Instance *instance = (Instance *) object;
             free_table(&instance->fields);
             re_allocate(object, sizeof(Instance), 0);
+            break;
+        }
+        case OBJ_METHOD: {
+            re_allocate(object, sizeof(Method), 0);
             break;
         }
         default:

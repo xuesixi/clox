@@ -1,12 +1,20 @@
-
-
 fun hey() {
-    class Animal {}
 
-    for (var i = 0; i < 200; i += 1) {
-        var dog = Animal();
-        print dog.name;
+    class Animal {
+    
+       init(name, age) {
+           this.name = name;
+           this.age = age;
+       }
+    
+       eat() {
+           print f("the animal # is eating", this.name);
+       }
     }
+    
+    var dog = Animal("anda", 10);
+    dog.eat();
+    
 }
 
 hey();

@@ -18,8 +18,6 @@
 #include "stdlib.h"
 #include "debug.h"
 
-bool compiling = true;
-
 typedef struct Parser {
     Token previous;
     Token current;
@@ -33,6 +31,10 @@ typedef struct Parser {
     bool has_error;
     bool panic_mode;
 } Parser;
+
+typedef struct ClassScope {
+    struct ClassScope *enclosing;
+} ClassScope;
 
 typedef enum {
     PREC_NONE,
@@ -84,9 +86,10 @@ typedef struct Scope {
     int depth;
 } Scope;
 
+bool compiling = true;
 Parser parser;
-//Map label_map;
 Scope *current_scope;
+ClassScope *current_class = NULL;
 
 
 static int argument_list();
@@ -137,7 +140,7 @@ static void emit_uint16(uint16_t value);
 
 static void emit_constant(int index);
 
-static void emit_return_nil();
+static void emit_return();
 
 static LoxFunction *end_compiler();
 
@@ -162,6 +165,8 @@ static void grouping(bool can_assign);
 static void binary(bool can_assign);
 
 static void string(bool can_assign);
+
+static void this_expression(bool can_assign);
 
 static void parse_continue(bool can_assign);
 
@@ -267,7 +272,7 @@ ParseRule rules[] = {
         [TOKEN_PRINT]         = {NULL, NULL, PREC_NONE},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
         [TOKEN_SUPER]         = {NULL, NULL, PREC_NONE},
-        [TOKEN_THIS]          = {NULL, NULL, PREC_NONE},
+        [TOKEN_THIS]          = {this_expression, NULL, PREC_NONE},
         [TOKEN_TRUE]          = {literal, NULL, PREC_NONE},
         [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
         [TOKEN_WHILE]         = {NULL, NULL, PREC_NONE},
@@ -320,6 +325,14 @@ static void string(bool can_assign) {
     emit_constant(index);
 }
 
+static void this_expression(bool can_assign) {
+    if (current_class == NULL) {
+        error_at_previous("Cannot use 'this' outside of a class");
+        return;
+    }
+    variable(false);
+}
+
 /**
  * 从curr开始，向后贪婪地解析所有连续的、优先级大于等于 precedence 的表达式
  * 以 1 + 2 * 3 * 4 - 5 为例，如果precedence 是+/-，那么会一直解析直到 curr 为-
@@ -358,11 +371,27 @@ static void label_statement() {
     }
 }
 
+inline static void method_statement() {
+//    parse_identifier_declaration(false);
+//    mark_initialized(); // 将函数名立刻标记为已初始化。
+    consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
+    FunctionType type = TYPE_METHOD;
+    if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
+        type = TYPE_INITIALIZER;
+    }
+    function_statement(type);
+    emit_byte(OP_METHOD);
+}
+
 static void class_declaration() {
 
     consume(TOKEN_IDENTIFIER, "An identifier is expected here");
 
     int name_index = identifier_constant(& parser.previous);
+
+    ClassScope new_class;
+    new_class.enclosing = current_class;
+    current_class = & new_class;
 
     if (current_scope->depth > 0) {
         declare_local(false);
@@ -371,12 +400,19 @@ static void class_declaration() {
 
     emit_two_bytes(OP_CLASS, name_index);
 
+    consume(TOKEN_LEFT_BRACE, "{ is needed after class");
+
+    while (check(TOKEN_RIGHT_BRACE) == false && check(TOKEN_EOF) == false) {
+        method_statement();
+    }
+
+    consume(TOKEN_RIGHT_BRACE, "} is needed to terminate class");
+
     if (current_scope->depth == 0) {
         emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
     }
 
-    consume(TOKEN_LEFT_BRACE, "{ is needed after class");
-    consume(TOKEN_RIGHT_BRACE, "} is needed to terminate class");
+    current_class = current_class->enclosing;
 }
 
 static void declaration() {
@@ -1071,7 +1107,9 @@ static inline void return_statement() {
         return;
     }
     if (match(TOKEN_SEMICOLON)) {
-        emit_return_nil();
+        emit_return();
+    } else if (current_scope->functionType == TYPE_INITIALIZER){
+        error_at_previous("cannot return a value inside an init() method");
     } else {
         expression();
         consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the statement");
@@ -1370,7 +1408,7 @@ static int make_constant(Value value) {
  * 将当前scope中的函数返回。切换回到上一层scope
  */
 static LoxFunction *end_compiler() {
-    emit_return_nil();
+    emit_return();
     LoxFunction *function = current_scope->function;
     if (SHOW_COMPILE_RESULT && !parser.has_error) {
         disassemble_chunk(current_chunk(), function->name == NULL ? "<main>" : function->name->chars);
@@ -1412,8 +1450,16 @@ static void emit_constant(int index) {
     }
 }
 
-static inline void emit_return_nil() {
-    emit_two_bytes(OP_NIL, OP_RETURN);
+/**
+ * 如果是构造函数，那么return this；否则return nil
+ */
+static inline void emit_return() {
+    if (current_scope->functionType == TYPE_INITIALIZER) {
+        emit_two_bytes(OP_GET_LOCAL, 0);
+    } else {
+        emit_byte(OP_NIL);
+    }
+    emit_byte(OP_RETURN);
 }
 
 /**
@@ -1565,35 +1611,53 @@ void show_tokens(const char *src) {
 }
 
 /**
- * 将指定的scope设置成current_scope，然后初始化之：
+ * 将指定的scope设置成current_scope，然后初始化之。
+ * 这开启了一个新的函数。该函数的函数名取决于parser.previous
  */
 static void set_new_scope(Scope *scope, FunctionType type) {
 
 
     scope->functionType = type;
+
+    /* new_function() may cause gc.
+     * Set function to NULL first so that the gc won't mark or sweep invalid memory */
     scope->function = NULL;
     scope->depth = 0;
     scope->local_count = 0;
 
-    String *name = type == TYPE_FUNCTION ? string_copy(parser.previous.start, parser.previous.length) : NULL;
+    String *name = NULL;
+    if (type == TYPE_FUNCTION || type == TYPE_METHOD || type == TYPE_INITIALIZER) {
+        name = string_copy(parser.previous.start, parser.previous.length);
+    }
     scope->function = new_function(type);
     scope->function->name = name;
 
-    if (type == TYPE_FUNCTION) {
-        scope->enclosing = current_scope;
-    } else if (type == TYPE_LAMBDA) {
-        scope->enclosing = current_scope;
-    } else {
+    if (type == TYPE_MAIN) {
         scope->enclosing = NULL;
+    } else {
+        scope->enclosing = current_scope;
     }
+
+//    if (type == TYPE_FUNCTION) {
+//        scope->enclosing = current_scope;
+//    } else if (type == TYPE_LAMBDA) {
+//        scope->enclosing = current_scope;
+//    } else {
+//        scope->enclosing = NULL;
+//    }
 
     current_scope = scope;
 
-    // 一个初始的占位符，代表当前scope的函数
+    // 一个初始的占位符，对于function，代表当前scope的函数; 对于method，则是this
     Local *local = &current_scope->locals[current_scope->local_count++];
     local->depth = 0;
-    local->name.start = "";
-    local->name.length = 0;
+    if (type == TYPE_METHOD || type == TYPE_INITIALIZER) {
+        local->name.start = "this";
+        local->name.length = 4;
+    } else {
+        local->name.start = "";
+        local->name.length = 0;
+    }
     local->is_captured = false;
 }
 

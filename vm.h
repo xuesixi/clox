@@ -5,7 +5,7 @@
 #ifndef CLOX_VM_H
 #define CLOX_VM_H
 
-#include "chunk.h"
+// #include "chunk.h"
 #include "table.h"
 #include "object.h"
 
@@ -31,6 +31,7 @@ typedef struct VM{
     Object **gray_stack;
     size_t allocated_size;
     size_t next_gc;
+    String *init_string;
 } VM ;
 
 typedef enum {

@@ -1,0 +1,14 @@
+
+fun fbnc(num) {
+    if (num < 2) {
+        return num;
+    } else {
+        return fbnc(num -1) + fbnc(num - 2);
+    }
+}
+
+var start = clock();
+print fbnc(35);
+print clock() - start;
+
+

@@ -29,12 +29,12 @@ static Value read_constant();
 static Value read_constant2();
 static InterpretResult run();
 static void show_stack();
-static Value peek_stack(int distance);
+static Value stack_peek(int distance);
 static void binary_number_op(Value a, Value b, char operator);
 static void call_value(Value value, int arg_count);
 static void runtime_error(const char *format, ...);
-void catch();
-void runtime_error_and_catch(const char *format, ...);
+static void catch();
+static void runtime_error_and_catch(const char *format, ...);
 
 
 
@@ -207,7 +207,7 @@ static inline void reset_stack() {
     vm.open_upvalues = NULL;
 }
 
-static inline Value peek_stack(int distance) {
+static inline Value stack_peek(int distance) {
     return vm.stack_top[-1 - distance];
 }
 
@@ -243,7 +243,7 @@ void runtime_error(const char *format, ...) {
  * 跳转到错误处理处。
  * 该函数只应该用在runtime_error()后面。
  */
-inline void catch() {
+static inline void catch() {
     longjmp(error_buf, 1);
 }
 
@@ -251,7 +251,7 @@ inline void catch() {
  * 输出错误消息（会自动添加换行符）
  * 打印调用栈消息。清空栈。然后跳转至错误处理处
  */
-void runtime_error_and_catch(const char *format, ...) {
+static void runtime_error_and_catch(const char *format, ...) {
     fputs("\nRuntime Error: ", stderr);
     va_list args;
     va_start(args, format);
@@ -271,7 +271,6 @@ void runtime_error_and_catch(const char *format, ...) {
             fprintf(stderr, "%s()\n", function->name->chars);
         }
     }
-
     reset_stack();
     catch();
 }
@@ -360,6 +359,17 @@ static void close_upvalue(Value *position) {
     vm.open_upvalues = curr;
 }
 
+
+static Method *bind_method(Class *class, String *name, Value receiver) {
+    Value value;
+    if (table_get(&class->methods, name, &value) == false) {
+        runtime_error_and_catch("no such method: %s", name->chars);
+    }
+    Method *method = new_method(as_closure(value), receiver);
+    return method;
+}
+
+
 /**
  * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之
  * @return 执行的结果
@@ -409,7 +419,7 @@ static InterpretResult run() {
                 break;
             }
             case OP_NEGATE: {
-                Value value = peek_stack(0);
+                Value value = stack_peek(0);
                 if (is_int(value)) {
                     stack_push(int_value(-as_int(stack_pop())));
                     break;
@@ -519,13 +529,13 @@ static InterpretResult run() {
                 break;
             case OP_DEFINE_GLOBAL: {
                 String *name = read_constant_string();
-                table_set(&vm.globals, name, peek_stack(0));
+                table_set(&vm.globals, name, stack_peek(0));
                 stack_pop();
                 break;
             }
             case OP_DEFINE_GLOBAL_CONST: {
                 String *name = read_constant_string();
-                table_set(&vm.globals, name, peek_stack(0));
+                table_set(&vm.globals, name, stack_peek(0));
                 table_set(&vm.const_table, name, bool_value(true));
                 stack_pop();
                 break;
@@ -545,7 +555,7 @@ static InterpretResult run() {
                 if (table_has(&vm.const_table, name)) {
                     runtime_error_and_catch("The const variable %s cannot be re-assigned", name->chars);
                 }
-                if (table_set(&vm.globals, name, peek_stack(0))) {
+                if (table_set(&vm.globals, name, stack_peek(0))) {
                     break;
                 } else {
                     table_delete(&vm.globals, name);
@@ -559,19 +569,19 @@ static InterpretResult run() {
             }
             case OP_SET_LOCAL: {
                 int index = read_byte();
-                curr_frame()->FP[index] = peek_stack(0);
+                curr_frame()->FP[index] = stack_peek(0);
                 break;
             }
             case OP_JUMP_IF_FALSE: {
                 uint16_t offset = read_uint16();
-                if (is_falsy(peek_stack(0))) {
+                if (is_falsy(stack_peek(0))) {
                     curr_frame()->PC += offset;
                 }
                 break;
             }
             case OP_JUMP_IF_TRUE: {
                 uint16_t offset = read_uint16();
-                if (!is_falsy(peek_stack(0))) {
+                if (!is_falsy(stack_peek(0))) {
                     curr_frame()->PC += offset;
                 }
                 break;
@@ -588,8 +598,8 @@ static InterpretResult run() {
             }
             case OP_JUMP_IF_NOT_EQUAL: {
                 uint16_t offset = read_uint16();
-                Value b = peek_stack(0);
-                Value a = peek_stack(1);
+                Value b = stack_peek(0);
+                Value a = stack_peek(1);
                 if (!value_equal(a, b)) {
                     curr_frame()->PC += offset;
                 }
@@ -611,7 +621,7 @@ static InterpretResult run() {
             }
             case OP_CALL: {
                 int count = read_byte();
-                Value callee = peek_stack(count);
+                Value callee = stack_peek(count);
                 call_value(callee, count);
                 break;
             }
@@ -624,7 +634,6 @@ static InterpretResult run() {
                 Value f = read_constant();
                 Closure *closure = new_closure(as_function(f));
                 stack_push(ref_value((Object *) closure));
-
                 for (int i = 0; i < closure->upvalue_count; ++i) {
                     bool is_local = read_byte();
                     int index = read_byte();
@@ -644,7 +653,7 @@ static InterpretResult run() {
             }
             case OP_SET_UPVALUE: {
                 int index = read_byte();
-                * curr_frame()->closure->upvalues[index]->position = peek_stack(0);
+                * curr_frame()->closure->upvalues[index]->position = stack_peek(0);
                 break;
             }
             case OP_CLOSE_UPVALUE: {
@@ -658,7 +667,7 @@ static InterpretResult run() {
                 break;
             }
             case OP_GET_PROPERTY: {
-                Value value = stack_pop();
+                Value value = stack_pop(); // instance
                 if (is_ref_of(value,OBJ_INSTANCE) == false) {
                     char *str = to_print_chars(value);
                     runtime_error("%s is not an object and does not have property", str);
@@ -667,25 +676,36 @@ static InterpretResult run() {
                 }
                 String *field = read_constant_string();
                 Instance *instance = as_instance(value);
-                Value result = nil_value(); // undefined property is nil
-                table_get(&instance->fields, field, &result);
+                Value result = nil_value();
+                bool found = table_get(&instance->fields, field, &result);
+                if (found == false) {
+                    Method *method = bind_method(instance->class, field, value);
+                    result = ref_value((Object *) method);
+                }
                 stack_push(result);
                 break;
             }
             case OP_SET_PROPERTY: {
-                Value target = peek_stack(1); // prevent being gc
-                Value value = peek_stack(0);
+                Value target = stack_peek(1); // prevent being gc
+                Value value = stack_peek(0);
+                String *field = read_constant_string();
                 if (is_ref_of(target, OBJ_INSTANCE) == false) {
-                    char *str = to_print_chars(value);
-                    runtime_error("%s is not an object and does not have property", str);
+                    char *str = to_print_chars(target);
+                    runtime_error("%s is not an object and does not have the property: %s", str, field->chars);
                     free(str);
                     catch();
                 }
-                String *field = read_constant_string();
                 Instance *instance = as_instance(target);
                 table_set(&instance->fields, field, value); // potential gc
                 vm.stack_top -= 2;
                 stack_push(value);
+                break;
+            }
+            case OP_METHOD: {
+                Closure *closure = as_closure(stack_peek(0));
+                Class *class = as_class(stack_peek(1));
+                table_set(&class->methods, closure->function->name, ref_value((Object *) closure));
+                stack_pop();
                 break;
             }
             default: {
@@ -703,39 +723,65 @@ static InterpretResult run() {
  * @param arg_count 传入的参数的个数
  */
 static void call_value(Value value, int arg_count) {
-    if (is_ref_of(value, OBJ_CLOSURE)) {
-        LoxFunction *function = as_closure(value)->function;
-        if (function->arity != arg_count) {
-            runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
-        }
-        if (vm.frame_count == FRAME_MAX) {
-            runtime_error_and_catch("Stack overflow.");
-        }
-        vm.frame_count ++;
-        CallFrame *frame = curr_frame();
-        frame->FP = vm.stack_top - arg_count - 1;
-        frame->PC = function->chunk.code;
-        frame->closure = as_closure(value);
-    } else if (is_ref_of(value, OBJ_NATIVE)) {
-        NativeFunction *native = as_native(value);
-        if (native->arity != arg_count && native->arity != -1) {
-            runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity, arg_count);
-        }
-        Value result = native->impl(arg_count, vm.stack_top - arg_count);
-        vm.stack_top -= arg_count + 1;
-        stack_push(result);
-    } else if (is_ref_of(value, OBJ_CLASS)) {
-        Class *class = as_class(value);
-        Instance *instance = new_instance(class);
-
-        vm.stack_top -= arg_count + 1;
-        stack_push(ref_value((Object *) instance));
-
-    } else {
+    if (!is_ref(value)) {
         char *name = to_print_chars(value);
         runtime_error("%s is not callable", name);
         free(name);
         catch();
+    }
+    switch (as_ref(value)->type) {
+        case OBJ_CLOSURE: {
+            LoxFunction *function = as_closure(value)->function;
+            if (function->arity != arg_count) {
+                runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
+            }
+            if (vm.frame_count == FRAME_MAX) {
+                runtime_error_and_catch("Stack overflow.");
+            }
+            vm.frame_count ++;
+            CallFrame *frame = curr_frame();
+            frame->FP = vm.stack_top - arg_count - 1;
+            frame->PC = function->chunk.code;
+            frame->closure = as_closure(value);
+            break;
+        }
+        case OBJ_NATIVE: {
+            NativeFunction *native = as_native(value);
+            if (native->arity != arg_count && native->arity != -1) {
+                runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity, arg_count);
+            }
+            Value result = native->impl(arg_count, vm.stack_top - arg_count);
+            vm.stack_top -= arg_count + 1;
+            stack_push(result);
+            break;
+        }
+        case OBJ_CLASS: {
+            Class *class = as_class(value);
+            Instance *instance = new_instance(class);
+            Value init_closure;
+            if (table_get(&class->methods, vm.init_string, &init_closure)) {
+                Method *initializer = new_method(as_closure(init_closure), ref_value((Object *) instance));
+                call_value(ref_value((Object *) initializer), arg_count);
+            } else if (arg_count != 0) {
+                runtime_error_and_catch("%s does not define init() but got %d arguments", class->name->chars, arg_count);
+            } else {
+                stack_pop();
+                stack_push(ref_value((Object *) instance));
+            }
+            break;
+        }
+        case OBJ_METHOD: {
+            Method *method = as_method(value);
+            vm.stack_top[-arg_count - 1] = method->receiver;
+            call_value(ref_value((Object *) method->closure), arg_count);
+            break;
+        }
+        default: {
+            char *name = to_print_chars(value);
+            runtime_error("%s is not callable", name);
+            free(name);
+            catch();
+        }
     }
 }
 
@@ -931,6 +977,8 @@ void init_VM() {
     init_table(&vm.string_table);
     init_table(&vm.globals);
     init_table(&vm.const_table);
+    vm.init_string = NULL;
+    vm.init_string = string_copy("init", 4);
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
     define_native("float", native_float, 1);
@@ -957,7 +1005,6 @@ void free_VM() {
     free_table(&vm.globals);
     free_table(&vm.const_table);
     free(vm.gray_stack);
-//    free_map(&label_map);
 }
 
 /**

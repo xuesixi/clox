@@ -45,6 +45,7 @@ void print_value_with_color(Value value) {
                 case OBJ_CLOSURE:
                 case OBJ_NATIVE:
                 case OBJ_FUNCTION:
+                case OBJ_METHOD:
                     start_color(BLUE);
                     break;
                 case OBJ_UPVALUE:
@@ -232,6 +233,11 @@ static char *to_print_ref(Value value) {
         case OBJ_INSTANCE: {
             Instance *instance = as_instance(value);
             asprintf(&buffer, "<obj: %s>", instance->class->name->chars);
+            break;
+        }
+        case OBJ_METHOD: {
+            Method *method = as_method(value);
+            asprintf(&buffer, "<method: %s>", method->closure->function->name->chars);
             break;
         }
         default:

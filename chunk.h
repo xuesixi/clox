@@ -49,6 +49,8 @@ typedef enum OpCode{
     OP_CLASS,
     OP_GET_PROPERTY,
     OP_SET_PROPERTY,
+    OP_METHOD,
+    OP_METHOD_INVOKE,
 } OpCode;
 
 typedef struct Chunk{

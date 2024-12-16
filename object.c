@@ -12,7 +12,7 @@ inline bool is_ref_of(Value value, ObjectType type) {
 }
 
 inline String *as_string(Value value) {
-    return (String *)as_ref(value);
+    return (String *) as_ref(value);
 }
 
 inline LoxFunction *as_function(Value value) {
@@ -24,7 +24,7 @@ inline NativeFunction *as_native(Value value) {
 }
 
 inline Closure *as_closure(Value value) {
-    return (Closure*) as_ref(value);
+    return (Closure *) as_ref(value);
 }
 
 /**
@@ -48,11 +48,11 @@ String *string_allocate(char *chars, int length) {
     String *interned = table_find_string(&vm.string_table, chars, length, hash);
 
     if (interned != NULL) {
-        FREE_ARRAY(char , chars, length + 1);
+        FREE_ARRAY(char, chars, length + 1);
         return interned;
     }
 
-    String *str = (String *)allocate_object(sizeof(String), OBJ_STRING);
+    String *str = (String *) allocate_object(sizeof(String), OBJ_STRING);
 
     stack_push(ref_value((Object *) str)); // prevent being gc
 
@@ -99,7 +99,7 @@ Object *allocate_object(size_t size, ObjectType type) {
 static uint32_t chars_hash(const char *key, int length) {
     uint32_t hash = 2166136261u;
     for (int i = 0; i < length; i++) {
-        hash ^= (uint8_t)key[i];
+        hash ^= (uint8_t) key[i];
         hash *= 16777619;
     }
     return hash;
@@ -154,6 +154,7 @@ NativeFunction *new_native(NativeImplementation impl, String *name, int arity) {
 Class *new_class(String *name) {
     Class *class = (Class *) allocate_object(sizeof(Class), OBJ_CLASS);
     class->name = name;
+    init_table(&class->methods);
     return class;
 }
 
@@ -171,3 +172,17 @@ Instance *new_instance(Class *class) {
 Instance *as_instance(Value value) {
     return (Instance *) as_ref(value);
 }
+
+Method *new_method(Closure *closure, Value value) {
+    Method *method = (Method *) allocate_object(sizeof(Method), OBJ_METHOD);
+    method->closure = closure;
+    method->receiver = value;
+    return method;
+}
+
+inline Method *as_method(Value value) {
+    return (Method *) as_ref(value);
+}
+
+
+

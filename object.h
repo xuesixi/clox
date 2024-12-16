@@ -14,6 +14,7 @@ typedef enum {
   OBJ_UPVALUE,
   OBJ_CLASS,
   OBJ_INSTANCE,
+  OBJ_METHOD,
 } ObjectType;
 
 typedef struct Object{
@@ -24,8 +25,10 @@ typedef struct Object{
 
 typedef enum FunctionType {
     TYPE_FUNCTION,
+    TYPE_METHOD,
     TYPE_MAIN,
     TYPE_LAMBDA,
+    TYPE_INITIALIZER,
 } FunctionType;
 
 typedef struct String{
@@ -58,9 +61,16 @@ typedef struct Closure {
     int upvalue_count;
 } Closure;
 
+typedef struct Method {
+    Object object;
+    Closure *closure;
+    Value receiver;
+} Method;
+
 typedef struct Class {
     Object object;
     String *name;
+    Table methods;
 } Class;
 
 typedef struct Instance {
@@ -102,4 +112,7 @@ Class *as_class(Value value);
 
 Instance *new_instance(Class *class);
 Instance *as_instance(Value value);
+
+Method *new_method(Closure *closure, Value value);
+Method *as_method(Value value);
 #endif
