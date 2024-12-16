@@ -44,7 +44,7 @@ void append_ValueArray(ValueArray *array, Value value);
 void free_ValueArray(ValueArray *array);
 
 void print_value(Value value);
-char *to_print_chars(Value value);
+char *to_print_chars(Value value, int *len);
 
 bool is_bool(Value value);
 bool is_float(Value value);

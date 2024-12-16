@@ -71,13 +71,15 @@ String *string_allocate(char *chars, int length) {
  * 将a 和 b 的字符串表达拼接在一起，产生一个 String
  * */
 String *string_concat(Value a, Value b) {
-    char *a_str = to_print_chars(a);
-    char *b_str = to_print_chars(b);
-    char *buffer;
-    int length = asprintf(&buffer, "%s%s", a_str, b_str);
+    int len_a, len_b;
+    char *a_str = to_print_chars(a, &len_a);
+    char *b_str = to_print_chars(b, &len_b);
+    char *buffer = malloc(len_a + len_b + 1);
+    memcpy(buffer, a_str, len_a);
+    memcpy(buffer + len_a, b_str, len_b + 1);
     free(a_str);
     free(b_str);
-    return string_allocate(buffer, length);
+    return string_allocate(buffer, len_a + len_b);
 }
 
 /**
@@ -96,7 +98,7 @@ Object *allocate_object(size_t size, ObjectType type) {
     return obj;
 }
 
-static uint32_t chars_hash(const char *key, int length) {
+static inline uint32_t chars_hash(const char *key, int length) {
     uint32_t hash = 2166136261u;
     for (int i = 0; i < length; i++) {
         hash ^= (uint8_t) key[i];

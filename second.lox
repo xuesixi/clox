@@ -6,8 +6,9 @@ class Animal {
    }
 
    eat() {
-       // return f("the name is #", this.name);
-       return "the name is" + this.name;
+        //return f("the name is #", this.name);
+        return f("the name is #, age is #, double age is #", this.name, this.age, this.age * 2);
+        //return "the name is" + this.name + ", age is " + this.age + ", double age is " + this.age * 2;
    }
 }
 

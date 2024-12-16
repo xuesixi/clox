@@ -165,8 +165,8 @@ static void binary_number_op(Value a, Value b, char operator) {
         stack_push(ref_value(&str->object));
         return;
     } else {
-        char *a_text = to_print_chars(a);
-        char *b_text = to_print_chars(b);
+        char *a_text = to_print_chars(a, NULL);
+        char *b_text = to_print_chars(b, NULL);
         runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
         free(a_text);
         free(b_text);
@@ -468,8 +468,8 @@ static InterpretResult run() {
                 if (is_number(a) && is_number(b)) {
                     stack_push(float_value(pow(AS_NUMBER(a), AS_NUMBER(b))));
                 } else {
-                    char *a_text = to_print_chars(a);
-                    char *b_text = to_print_chars(b);
+                    char *a_text = to_print_chars(a, NULL);
+                    char *b_text = to_print_chars(b, NULL);
                     runtime_error("the operands, %s and %s, do not support the power operation", a_text, b_text);
                     free(a_text);
                     free(b_text);
@@ -671,7 +671,7 @@ static InterpretResult run() {
             case OP_GET_PROPERTY: {
                 Value value = stack_pop(); // instance
                 if (is_ref_of(value,OBJ_INSTANCE) == false) {
-                    char *str = to_print_chars(value);
+                    char *str = to_print_chars(value, NULL);
                     runtime_error("%s is not an object and does not have property", str);
                     free(str);
                     catch();
@@ -692,7 +692,7 @@ static InterpretResult run() {
                 Value value = stack_peek(0);
                 String *field = read_constant_string();
                 if (is_ref_of(target, OBJ_INSTANCE) == false) {
-                    char *str = to_print_chars(target);
+                    char *str = to_print_chars(target, NULL);
                     runtime_error("%s is not an object and does not have the property: %s", str, field->chars);
                     free(str);
                     catch();
@@ -717,7 +717,7 @@ static InterpretResult run() {
                 int arg_count = read_byte();
                 Value receiver = stack_peek(arg_count);
                 if (!is_ref_of(receiver, OBJ_INSTANCE)) {
-                    char *str = to_print_chars(receiver);
+                    char *str = to_print_chars(receiver, NULL);
                     runtime_error("%s is not object and does not have property %s", str, name->chars);
                     free(str);
                     catch();
@@ -751,7 +751,7 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
     Value closure_value;
     if (!table_get(&class->methods, name, &closure_value)){
         Value receiver = stack_peek(arg_count);
-        char *str = to_print_chars(receiver);
+        char *str = to_print_chars(receiver, NULL);
         runtime_error("%s does not have the property or method %s", str, name->chars);
         free(str);
         catch();
@@ -783,7 +783,7 @@ static void call_closure(Closure *closure, int arg_count) {
  */
 static void call_value(Value value, int arg_count) {
     if (!is_ref(value)) {
-        char *name = to_print_chars(value);
+        char *name = to_print_chars(value, NULL);
         runtime_error("%s is not callable", name);
         free(name);
         catch();
@@ -792,19 +792,6 @@ static void call_value(Value value, int arg_count) {
         case OBJ_CLOSURE: {
             call_closure(as_closure(value), arg_count);
             break;
-//            LoxFunction *function = as_closure(value)->function;
-//            if (function->arity != arg_count) {
-//                runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
-//            }
-//            if (vm.frame_count == FRAME_MAX) {
-//                runtime_error_and_catch("Stack overflow.");
-//            }
-//            vm.frame_count ++;
-//            CallFrame *frame = curr_frame();
-//            frame->FP = vm.stack_top - arg_count - 1;
-//            frame->PC = function->chunk.code;
-//            frame->closure = as_closure(value);
-//            break;
         }
         case OBJ_NATIVE: {
             NativeFunction *native = as_native(value);
@@ -839,7 +826,7 @@ static void call_value(Value value, int arg_count) {
             break;
         }
         default: {
-            char *name = to_print_chars(value);
+            char *name = to_print_chars(value, NULL);
             runtime_error("%s is not callable", name);
             free(name);
             catch();
@@ -880,8 +867,9 @@ static inline int max(int a, int b) {
 
 static Value native_format(int count, Value *values) {
     const char *format = as_string(*values)->chars;
-    int capacity = 25;
-    char *buf = malloc(capacity);
+    static int capacity = 0;
+    static char *buf = NULL;
+//    char *buf = malloc(capacity);
     int pre = 0;
     int curr = 0;
     int buf_len = 0;
@@ -918,15 +906,9 @@ static Value native_format(int count, Value *values) {
             }
 
             Value v = values[curr_v + 1];
-            char *v_chars = to_print_chars(v);
-
-            // buf overflow checking
             int v_chars_len;
-            if (is_ref_of(v, OBJ_STRING)) {
-                v_chars_len = as_string(v)->length;
-            } else {
-                v_chars_len = strlen(v_chars);
-            }
+            char *v_chars = to_print_chars(v, &v_chars_len);
+
             if (v_chars_len + buf_len > capacity) {
                 capacity = max(2 * capacity, v_chars_len + buf_len);
                 buf = realloc(buf, capacity);
@@ -941,7 +923,7 @@ static Value native_format(int count, Value *values) {
     }
 
     String *string = string_copy(buf, buf_len);
-    free(buf);
+//    free(buf);
     return ref_value((Object *) string);
 }
 

@@ -29,7 +29,7 @@ inline void end_color() {
 }
 
 void print_value_with_color(Value value) {
-    char *str = to_print_chars(value);
+    char *str = to_print_chars(value, NULL);
     switch (value.type) {
         case VAL_INT:
         case VAL_FLOAT:
@@ -63,7 +63,7 @@ void print_value_with_color(Value value) {
     free(str);
 }
 
-static char *to_print_ref(Value value);
+static char *to_print_ref(Value value, int *len);
 
 void init_ValueArray(ValueArray *array) {
     array->values = NULL;
@@ -190,7 +190,7 @@ bool object_equal(Object *a, Object *b) {
     }
 }
 
-static char *to_print_ref(Value value) {
+static char *to_print_ref(Value value, int *len) {
     char *buffer;
     ObjectType type = as_ref(value)->type;
     switch (type) {
@@ -198,49 +198,50 @@ static char *to_print_ref(Value value) {
             String *str = as_string(value);
             buffer = malloc(str->length + 1);
             memcpy(buffer, str->chars, str->length + 1);
+            *len = str->length;
             break;
         }
         case OBJ_CLOSURE: {
             LoxFunction *fun = as_closure(value)->function;
             if (fun->type == TYPE_MAIN) {
-                asprintf(&buffer, "<main>");
+                *len = asprintf(&buffer, "<main>");
             } else if (fun->type == TYPE_LAMBDA) {
-                asprintf(&buffer, "<lambda>");
+                *len = asprintf(&buffer, "<lambda>");
             } else {
-                asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
+                *len = asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
             }
             break;
         }
         case OBJ_NATIVE:
-            asprintf(&buffer, "<native: %s>", as_native(value)->name->chars);
+            *len = asprintf(&buffer, "<native: %s>", as_native(value)->name->chars);
             break;
         case OBJ_FUNCTION: {
             LoxFunction *fun = as_function(value);
             if (fun->type == TYPE_MAIN) {
-                asprintf(&buffer, "<proto: main>");
+                *len = asprintf(&buffer, "<proto: main>");
             } else if (fun->type == TYPE_LAMBDA) {
-                asprintf(&buffer, "<proto: lambda>");
+                *len = asprintf(&buffer, "<proto: lambda>");
             } else {
-                asprintf(&buffer, "<proto: %s>", fun->name->chars);
+                *len = asprintf(&buffer, "<proto: %s>", fun->name->chars);
             }
             break;
         }
         case OBJ_UPVALUE:
-            asprintf(&buffer, "<upvalue>");
+            *len = asprintf(&buffer, "<upvalue>");
             break;
         case OBJ_CLASS: {
             Class *class = as_class(value);
-            asprintf(&buffer, "<class: %s>", class->name->chars);
+            *len = asprintf(&buffer, "<class: %s>", class->name->chars);
             break;
         }
         case OBJ_INSTANCE: {
             Instance *instance = as_instance(value);
-            asprintf(&buffer, "<obj: %s>", instance->class->name->chars);
+            *len = asprintf(&buffer, "<obj: %s>", instance->class->name->chars);
             break;
         }
         case OBJ_METHOD: {
             Method *method = as_method(value);
-            asprintf(&buffer, "<method: %s>", method->closure->function->name->chars);
+            *len = asprintf(&buffer, "<method: %s>", method->closure->function->name->chars);
             break;
         }
         default:
@@ -255,48 +256,56 @@ static char *to_print_ref(Value value) {
  * @param value 想要打印的 value
  */
 void print_value(Value value) {
-    char *str = to_print_chars(value);
+    char *str = to_print_chars(value, NULL);
     printf("%s", str);
     free(str);
 }
 
 /**
- * 获取目标 value 的char*表达。调用者需要自己 free 之
+ * 获取目标 value 的char*表达。调用者需要自己 free 之。
+ * 如果传入的len不为NULL，则将生成的字符串长度储存在其中
  * */
-char *to_print_chars(Value value) {
+char *to_print_chars(Value value, int *len) {
     char *buffer;
+    int dummy;
+    if (len == NULL) {
+        len = &dummy;
+    }
 
     switch (value.type) {
         case VAL_FLOAT: {
             double decimal = as_float(value);
             if (decimal == (int) decimal) {
-                asprintf(&buffer, "%.1f", decimal);
+                *len = asprintf(&buffer, "%.1f", decimal);
             } else {
-                asprintf(&buffer, "%.10g", as_float(value));
+                *len = asprintf(&buffer, "%.10g", as_float(value));
             }
             break;
         }
         case VAL_INT: {
-            asprintf(&buffer, "%d", as_int(value));
+            *len = asprintf(&buffer, "%d", as_int(value));
             break;
         }
         case VAL_BOOL: {
             if (as_bool(value)) {
                 buffer = malloc(5);
                 memcpy(buffer, "true", 5);
+                *len = 4;
             } else {
                 buffer = malloc(6);
                 memcpy(buffer, "false", 6);
+                *len = 5;
             }
             break;
         }
         case VAL_NIL: {
             buffer = malloc(4);
             memcpy(buffer, "nil", 4);
+            *len = 3;
             break;
         }
         case VAL_REF: {
-            buffer = to_print_ref(value);
+            buffer = to_print_ref(value, len);
             break;
         }
         default:
