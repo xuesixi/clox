@@ -20,7 +20,7 @@ VM vm;
 
 jmp_buf error_buf;
 
-static CallFrame *curr_frame();
+static CallFrame *curr_frame;
 static uint8_t read_byte();
 static uint16_t read_uint16();
 static bool is_falsy(Value value);
@@ -43,10 +43,6 @@ static void call_closure(Closure *closure, int arg_count);
 
 /* ------------------上面是静态函数申明-----------------------
    ------------------下面是静态函数定义----------------------- */
-
-static inline CallFrame *curr_frame() {
-    return vm.frames + vm.frame_count - 1;
-}
 
 static void binary_number_op(Value a, Value b, char operator) {
     if (is_int(a) && is_int(b)) {
@@ -178,7 +174,7 @@ static void binary_number_op(Value a, Value b, char operator) {
 static void show_stack() {
     printf(" ");
     for (Value *i = vm.stack; i < vm.stack_top; i++) {
-        if (i == curr_frame()->FP) {
+        if (i == curr_frame->FP) {
             start_color(BOLD_RED);
             printf("@");
             end_color();
@@ -206,6 +202,7 @@ static inline bool is_falsy(Value value) {
 static inline void reset_stack() {
     vm.stack_top = vm.stack;
     vm.frame_count = 0;
+    curr_frame = NULL;
     vm.open_upvalues = NULL;
 }
 
@@ -282,7 +279,7 @@ static void runtime_error_and_catch(const char *format, ...) {
  * @return 下一个字节
  */
 static inline uint8_t read_byte() {
-    return *curr_frame()->PC ++;
+    return *curr_frame->PC ++;
 }
 
 static inline uint16_t read_uint16() {
@@ -296,11 +293,11 @@ static inline uint16_t read_uint16() {
  * @return 下一个字节代表的常数
  */
 static inline Value read_constant() {
-    return curr_frame()->closure->function->chunk.constants.values[read_byte()];
+    return curr_frame->closure->function->chunk.constants.values[read_byte()];
 }
 
 static inline Value read_constant2() {
-    return curr_frame()->closure->function->chunk.constants.values[read_uint16()];
+    return curr_frame->closure->function->chunk.constants.values[read_uint16()];
 }
 
 /**
@@ -389,7 +386,7 @@ static InterpretResult run() {
                 TRACE_SKIP = vm.frame_count - 1; // skip until the frame_count is equal to TRACE_SKIP
                 while (getchar() != '\n');
             } else {
-                CallFrame *frame = curr_frame();
+                CallFrame *frame = curr_frame;
                 disassemble_instruction(& frame->closure->function->chunk, (int)(frame->PC - frame->closure->function->chunk.code));
             }
         }
@@ -398,9 +395,11 @@ static InterpretResult run() {
         switch (instruction) {
             case OP_RETURN: {
                 Value result = stack_pop(); // 返回值
-                vm.stack_top = curr_frame()->FP;
+                vm.stack_top = curr_frame->FP;
                 close_upvalue(vm.stack_top);
                 vm.frame_count--;
+                curr_frame = vm.frames + vm.frame_count - 1;
+//                set_curr_frame();
                 if (vm.frame_count == TRACE_SKIP) {
                     TRACE_SKIP = -1; // no skip. Step by step
                 }
@@ -566,36 +565,36 @@ static InterpretResult run() {
             }
             case OP_GET_LOCAL: {
                 int index = read_byte();
-                stack_push(curr_frame()->FP[index]);
+                stack_push(curr_frame->FP[index]);
                 break;
             }
             case OP_SET_LOCAL: {
                 int index = read_byte();
-                curr_frame()->FP[index] = stack_peek(0);
+                curr_frame->FP[index] = stack_peek(0);
                 break;
             }
             case OP_JUMP_IF_FALSE: {
                 uint16_t offset = read_uint16();
                 if (is_falsy(stack_peek(0))) {
-                    curr_frame()->PC += offset;
+                    curr_frame->PC += offset;
                 }
                 break;
             }
             case OP_JUMP_IF_TRUE: {
                 uint16_t offset = read_uint16();
                 if (!is_falsy(stack_peek(0))) {
-                    curr_frame()->PC += offset;
+                    curr_frame->PC += offset;
                 }
                 break;
             }
             case OP_JUMP: {
                 uint16_t offset = read_uint16();
-                curr_frame()->PC += offset;
+                curr_frame->PC += offset;
                 break;
             }
             case OP_JUMP_BACK: {
                 uint16_t offset = read_uint16();
-                curr_frame()->PC -= offset;
+                curr_frame->PC -= offset;
                 break;
             }
             case OP_JUMP_IF_NOT_EQUAL: {
@@ -603,21 +602,21 @@ static InterpretResult run() {
                 Value b = stack_peek(0);
                 Value a = stack_peek(1);
                 if (!value_equal(a, b)) {
-                    curr_frame()->PC += offset;
+                    curr_frame->PC += offset;
                 }
                 break;
             }
             case OP_JUMP_IF_FALSE_POP: {
                 uint16_t offset = read_uint16();
                 if (is_falsy(stack_pop())) {
-                    curr_frame()->PC += offset;
+                    curr_frame->PC += offset;
                 }
                 break;
             }
             case OP_JUMP_IF_TRUE_POP: {
                 uint16_t offset = read_uint16();
                 if (!is_falsy(stack_pop())) {
-                    curr_frame()->PC += offset;
+                    curr_frame->PC += offset;
                 }
                 break;
             }
@@ -640,9 +639,9 @@ static InterpretResult run() {
                     bool is_local = read_byte();
                     int index = read_byte();
                     if (is_local) {
-                        closure->upvalues[i] = capture_upvalue(curr_frame()->FP + index);
+                        closure->upvalues[i] = capture_upvalue(curr_frame->FP + index);
                     } else {
-                        closure->upvalues[i] = curr_frame()->closure->upvalues[index];
+                        closure->upvalues[i] = curr_frame->closure->upvalues[index];
                     }
                 }
                 
@@ -650,12 +649,12 @@ static InterpretResult run() {
             }
             case OP_GET_UPVALUE: {
                 int index = read_byte();
-                stack_push(* curr_frame()->closure->upvalues[index]->position);
+                stack_push(* curr_frame->closure->upvalues[index]->position);
                 break;
             }
             case OP_SET_UPVALUE: {
                 int index = read_byte();
-                * curr_frame()->closure->upvalues[index]->position = stack_peek(0);
+                * curr_frame->closure->upvalues[index]->position = stack_peek(0);
                 break;
             }
             case OP_CLOSE_UPVALUE: {
@@ -769,7 +768,8 @@ static void call_closure(Closure *closure, int arg_count) {
         runtime_error_and_catch("Stack overflow.");
     }
     vm.frame_count ++;
-    CallFrame *frame = curr_frame();
+    curr_frame = vm.frames + vm.frame_count - 1;
+    CallFrame *frame = curr_frame;
     frame->FP = vm.stack_top - arg_count - 1;
     frame->PC = function->chunk.code;
     frame->closure = closure;
@@ -1081,7 +1081,8 @@ InterpretResult interpret(const char *src) {
     stack_push(ref_value((Object *) function));
 
     vm.frame_count++;
-    CallFrame *frame = curr_frame();
+    curr_frame = vm.frames + vm.frame_count - 1;
+    CallFrame *frame = curr_frame;
 
     Closure *closure = new_closure(function);
     frame->closure = closure;
@@ -1128,7 +1129,8 @@ InterpretResult read_run_bytecode(const char *path) {
 
     stack_push(ref_value((Object *) function));
     vm.frame_count++;
-    CallFrame *frame = curr_frame();
+    curr_frame = vm.frames + vm.frame_count - 1;
+    CallFrame *frame = curr_frame;
 
     Closure *closure = new_closure(function);
     frame->closure = closure;
