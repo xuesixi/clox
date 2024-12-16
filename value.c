@@ -194,14 +194,17 @@ static char *to_print_ref(Value value) {
     char *buffer;
     ObjectType type = as_ref(value)->type;
     switch (type) {
-        case OBJ_STRING:
-            asprintf(&buffer, "%s", as_string(value)->chars);
+        case OBJ_STRING: {
+            String *str = as_string(value);
+            buffer = malloc(str->length + 1);
+            memcpy(buffer, str->chars, str->length + 1);
             break;
+        }
         case OBJ_CLOSURE: {
             LoxFunction *fun = as_closure(value)->function;
             if (fun->type == TYPE_MAIN) {
                 asprintf(&buffer, "<main>");
-            } else if (fun->type == TYPE_LAMBDA){
+            } else if (fun->type == TYPE_LAMBDA) {
                 asprintf(&buffer, "<lambda>");
             } else {
                 asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
@@ -215,7 +218,7 @@ static char *to_print_ref(Value value) {
             LoxFunction *fun = as_function(value);
             if (fun->type == TYPE_MAIN) {
                 asprintf(&buffer, "<proto: main>");
-            } else if (fun->type == TYPE_LAMBDA){
+            } else if (fun->type == TYPE_LAMBDA) {
                 asprintf(&buffer, "<proto: lambda>");
             } else {
                 asprintf(&buffer, "<proto: %s>", fun->name->chars);
@@ -226,7 +229,7 @@ static char *to_print_ref(Value value) {
             asprintf(&buffer, "<upvalue>");
             break;
         case OBJ_CLASS: {
-            Class *class = as_class(value) ;
+            Class *class = as_class(value);
             asprintf(&buffer, "<class: %s>", class->name->chars);
             break;
         }
@@ -262,28 +265,44 @@ void print_value(Value value) {
  * */
 char *to_print_chars(Value value) {
     char *buffer;
-    if (is_float(value)) {
-        double decimal = as_float(value);
-        if (decimal == (int ) decimal) {
-            asprintf(&buffer, "%.1f", decimal);
-        } else {
-            asprintf(&buffer, "%.10g", as_float(value));
+
+    switch (value.type) {
+        case VAL_FLOAT: {
+            double decimal = as_float(value);
+            if (decimal == (int) decimal) {
+                asprintf(&buffer, "%.1f", decimal);
+            } else {
+                asprintf(&buffer, "%.10g", as_float(value));
+            }
+            break;
         }
-    } else if (is_int(value)) {
-        asprintf(&buffer, "%d", as_int(value));
-    } else if (is_bool(value)) {
-        if (as_bool(value)) {
-            asprintf(&buffer, "true");
-        } else {
-            asprintf(&buffer, "false");
+        case VAL_INT: {
+            asprintf(&buffer, "%d", as_int(value));
+            break;
         }
-    } else if (is_nil(value)) {
-        asprintf(&buffer, "nil");
-    } else if (is_ref(value)) {
-        buffer = to_print_ref(value);
-    } else {
-        printf("error: encountering a value with unknown type: %d\n", value.type);
-        buffer = NULL;
+        case VAL_BOOL: {
+            if (as_bool(value)) {
+                buffer = malloc(5);
+                memcpy(buffer, "true", 5);
+            } else {
+                buffer = malloc(6);
+                memcpy(buffer, "false", 6);
+            }
+            break;
+        }
+        case VAL_NIL: {
+            buffer = malloc(4);
+            memcpy(buffer, "nil", 4);
+            break;
+        }
+        case VAL_REF: {
+            buffer = to_print_ref(value);
+            break;
+        }
+        default:
+            printf("error: encountering a value with unknown type: %d\n", value.type);
+            buffer = NULL;
+            break;
     }
     return buffer;
 }

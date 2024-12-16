@@ -35,6 +35,8 @@ static void call_value(Value value, int arg_count);
 static void runtime_error(const char *format, ...);
 static void catch();
 static void runtime_error_and_catch(const char *format, ...);
+static void invoke_from_class(Class *class, String *name, int arg_count);
+static void call_closure(Closure *closure, int arg_count);
 
 
 
@@ -708,12 +710,69 @@ static InterpretResult run() {
                 stack_pop();
                 break;
             }
+            case OP_PROPERTY_INVOKE: {
+                // stack: obj, arg1, arg2, top
+                // code: op, name_index, arg_count
+                String *name = read_constant_string();
+                int arg_count = read_byte();
+                Value receiver = stack_peek(arg_count);
+                if (!is_ref_of(receiver, OBJ_INSTANCE)) {
+                    char *str = to_print_chars(receiver);
+                    runtime_error("%s is not object and does not have property %s", str, name->chars);
+                    free(str);
+                    catch();
+                }
+                Instance *instance = as_instance(receiver);
+                Value closure_value;
+                if (! table_get(&instance->fields, name, &closure_value)) {
+                    Class *class = instance->class;
+                    invoke_from_class(class, name, arg_count);
+                } else {
+                    call_closure(as_closure(closure_value), arg_count);
+                }
+                break;
+            }
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;
             }
         }
     }
+}
+
+/**
+ * 在指定的class中寻找对应method，然后调用之。
+ * 在调用该函数时，请确保stack_peek(arg_count)为method的receiver
+ */
+static void invoke_from_class(Class *class, String *name, int arg_count) {
+
+    // stack: obj, arg1, arg2, top
+    // code: op, name_index, arg_count
+    Value closure_value;
+    if (!table_get(&class->methods, name, &closure_value)){
+        Value receiver = stack_peek(arg_count);
+        char *str = to_print_chars(receiver);
+        runtime_error("%s does not have the property or method %s", str, name->chars);
+        free(str);
+        catch();
+    }
+    call_closure(as_closure(closure_value), arg_count);
+//    call_value(closure_value, arg_count);
+}
+
+static void call_closure(Closure *closure, int arg_count) {
+    LoxFunction *function = closure->function;
+    if (function->arity != arg_count) {
+        runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
+    }
+    if (vm.frame_count == FRAME_MAX) {
+        runtime_error_and_catch("Stack overflow.");
+    }
+    vm.frame_count ++;
+    CallFrame *frame = curr_frame();
+    frame->FP = vm.stack_top - arg_count - 1;
+    frame->PC = function->chunk.code;
+    frame->closure = closure;
 }
 
 /**
@@ -731,19 +790,21 @@ static void call_value(Value value, int arg_count) {
     }
     switch (as_ref(value)->type) {
         case OBJ_CLOSURE: {
-            LoxFunction *function = as_closure(value)->function;
-            if (function->arity != arg_count) {
-                runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
-            }
-            if (vm.frame_count == FRAME_MAX) {
-                runtime_error_and_catch("Stack overflow.");
-            }
-            vm.frame_count ++;
-            CallFrame *frame = curr_frame();
-            frame->FP = vm.stack_top - arg_count - 1;
-            frame->PC = function->chunk.code;
-            frame->closure = as_closure(value);
+            call_closure(as_closure(value), arg_count);
             break;
+//            LoxFunction *function = as_closure(value)->function;
+//            if (function->arity != arg_count) {
+//                runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
+//            }
+//            if (vm.frame_count == FRAME_MAX) {
+//                runtime_error_and_catch("Stack overflow.");
+//            }
+//            vm.frame_count ++;
+//            CallFrame *frame = curr_frame();
+//            frame->FP = vm.stack_top - arg_count - 1;
+//            frame->PC = function->chunk.code;
+//            frame->closure = as_closure(value);
+//            break;
         }
         case OBJ_NATIVE: {
             NativeFunction *native = as_native(value);
@@ -773,7 +834,8 @@ static void call_value(Value value, int arg_count) {
         case OBJ_METHOD: {
             Method *method = as_method(value);
             vm.stack_top[-arg_count - 1] = method->receiver;
-            call_value(ref_value((Object *) method->closure), arg_count);
+            call_closure(method->closure, arg_count);
+//            call_value(ref_value((Object *) method->closure), arg_count);
             break;
         }
         default: {

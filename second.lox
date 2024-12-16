@@ -1,20 +1,22 @@
-fun hey() {
+class Animal {
 
-    class Animal {
-    
-       init(name, age) {
-           this.name = name;
-           this.age = age;
-       }
-    
-       eat() {
-           print f("the animal # is eating", this.name);
-       }
-    }
-    
-    var dog = Animal("anda", 10);
-    dog.eat();
-    
+   init(name, age) {
+       this.name = name;
+       this.age = age;
+   }
+
+   eat() {
+       // return f("the name is #", this.name);
+       return "the name is" + this.name;
+   }
 }
 
-hey();
+var dog = Animal("anda", 10);
+
+var start = clock();
+
+for (var i = 0; i < 1000000; i += 1) {
+    dog.eat();
+}
+
+print clock() - start;

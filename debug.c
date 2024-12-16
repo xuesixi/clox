@@ -40,6 +40,17 @@ static int constant_instruction(const char *name, const Chunk *chunk, int offset
     return offset + 2;
 }
 
+static int invoke_instruction(const char *name, const Chunk *chunk, int offset) {
+    uint8_t name_index = chunk->code[offset + 1];
+    uint8_t arg_count = chunk->code[offset + 2];
+    Value method_name = chunk->constants.values[name_index];
+    printf("%-23s    ", name);
+    print_value_with_color(method_name);
+    printf(" %d", arg_count);
+    NEW_LINE();
+    return offset + 3;
+}
+
 static int constant2_instruction(const char *name, const Chunk *chunk, int offset) {
     uint8_t i0 = chunk->code[offset + 1];
     uint8_t i1 = chunk->code[offset + 2];
@@ -179,6 +190,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return constant_instruction("OP_SET_PROPERTY", chunk, offset);
         case OP_METHOD:
             return simple_instruction("OP_METHOD", offset);
+        case OP_PROPERTY_INVOKE:
+            return invoke_instruction("OP_PROPERTY_INVOKE", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

@@ -1139,11 +1139,16 @@ static inline void expression() {
 
 static void dot(bool can_assign) {
     consume(TOKEN_IDENTIFIER, "An identifier is expected here");
-    int index = identifier_constant(& parser.previous);
+    int name_index = identifier_constant(& parser.previous);
     if (can_assign && match_assign()) {
-        arithmetic_equal(OP_SET_PROPERTY, OP_GET_PROPERTY, index);
+        arithmetic_equal(OP_SET_PROPERTY, OP_GET_PROPERTY, name_index);
+    } else if (match(TOKEN_LEFT_PAREN)) {
+        int arg_count = argument_list();
+        emit_byte(OP_PROPERTY_INVOKE);
+        emit_byte(name_index);
+        emit_byte(arg_count);
     } else {
-        emit_two_bytes(OP_GET_PROPERTY, index);
+        emit_two_bytes(OP_GET_PROPERTY, name_index);
     }
 }
 
