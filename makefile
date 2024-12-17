@@ -32,8 +32,6 @@ file: $(TARGET)
 debug: $(OBJ)
 	@$(CC) -g $(OBJ) -o $(TARGET) -l readline
 	@lldb $(TARGET)
-	@trash-put *.dSYM
-	@trash-put $(OBJ)
 
 clion_debug: $(OBJ)
 	@$(CC) -g $(OBJ) -o $(TARGET) -l readline

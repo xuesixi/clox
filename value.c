@@ -19,6 +19,8 @@ char *GRAY = "\033[0;90m";
 char *MAGENTA = "\033[35m";
 char *BLUE = "\033[38;5;32m";
 char *YELLOW = "\033[1;33m";
+char *BOLD_BLUE = "\033[1;94m";
+char *BOLD_MAGENTA = "\033[1;95m";
 
 inline void start_color(char *color) {
     printf("%s", color);
@@ -51,6 +53,8 @@ void print_value_with_color(Value value) {
                 case OBJ_UPVALUE:
                     break;
                 case OBJ_CLASS:
+                    start_color(BOLD_BLUE);
+                    break;
                 case OBJ_INSTANCE:
                     start_color(BOLD_CYAN);
                     break;
@@ -231,7 +235,7 @@ static char *ref_to_chars(Value value, int *len) {
             break;
         case OBJ_CLASS: {
             Class *class = as_class(value);
-            *len = asprintf(&buffer, "<class: %s>", class->name->chars);
+            *len = asprintf(&buffer, "<cls: %s>", class->name->chars);
             break;
         }
         case OBJ_INSTANCE: {
@@ -241,7 +245,7 @@ static char *ref_to_chars(Value value, int *len) {
         }
         case OBJ_METHOD: {
             Method *method = as_method(value);
-            *len = asprintf(&buffer, "<method: %s>", method->closure->function->name->chars);
+            *len = asprintf(&buffer, "<mthd: %s>", method->closure->function->name->chars);
             break;
         }
         default:

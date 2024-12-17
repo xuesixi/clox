@@ -1,4 +1,4 @@
-*() {
+fun hey() {
     class Animal {
     
         init(name, age) {
@@ -40,4 +40,6 @@
     
     var bd = BigDog("hunan", 3);
     bd.bow();
-}();
+}
+
+hey();

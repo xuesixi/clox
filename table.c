@@ -25,7 +25,7 @@ static inline bool need_resize(Table *table) {
 
 static void table_resize(Table *table) {
     int old_capacity = table->capacity;
-    int new_capacity = old_capacity < 11 ? 11 : table->capacity * 2 + 1;
+    int new_capacity = old_capacity < 8 ? 8 : table->capacity * 2;
 
     Entry *old_backing = table->backing;
     Entry *new_backing = ALLOCATE(Entry, new_capacity);

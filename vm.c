@@ -195,9 +195,9 @@ static void show_stack() {
         } else {
             printf(" ");
         }
-        printf("[ ");
+        printf("[");
         print_value_with_color(*i);
-        printf(" ]");
+        printf("]");
     }
     NEW_LINE();
 
@@ -775,6 +775,15 @@ static InterpretResult run() {
                 // stack: method, top
                 break;
             }
+            case OP_SUPER_INVOKE: {
+                // [receiver, args1, arg2, superclass, top]
+                // op, name, arg_count
+                String *name = read_constant_string();
+                int arg_count = read_byte();
+                Class *class = as_class(stack_pop());
+                invoke_from_class(class, name, arg_count);
+                break;
+            }
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;
@@ -785,7 +794,8 @@ static InterpretResult run() {
 
 /**
  * 在指定的class中寻找对应method，然后调用之。
- * 在调用该函数时，请确保stack_peek(arg_count)为method的receiver
+ * 在调用该函数时，请确保stack_peek(arg_count)为method的receiver。
+ * 如果没有找到对应的method，该函数自己会发出runtime error
  */
 static void invoke_from_class(Class *class, String *name, int arg_count) {
 

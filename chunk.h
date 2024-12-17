@@ -34,8 +34,8 @@ typedef enum OpCode{
     OP_SET_GLOBAL, // OP, index: 为一个全局变量赋值为栈顶的值。变量名为const[index]。不消耗栈顶的值。
     OP_GET_LOCAL, // OP, index: 将stack[index]的值置入栈顶
     OP_SET_LOCAL, // op, index: 将栈顶的值赋值给stack[index]。不消耗栈顶的值。
-    OP_GET_UPVALUE,
-    OP_SET_UPVALUE,
+    OP_GET_UPVALUE, // op, index: 将当前closure的upvalues[index]置入栈顶
+    OP_SET_UPVALUE, // op, index: 将栈顶的值赋值给当前closure的upvalues[index]。不消耗栈顶的值。
     OP_JUMP_IF_FALSE, // op, offset16: 如果栈顶的值是false，那么ip += offset16。不消耗栈顶的值
     OP_JUMP_IF_TRUE, // op, offset16: 如果栈顶的值是true, 那么ip += offset16。不消耗栈顶的值
     OP_JUMP_BACK, // op, offset16: ip -= offset16. 不消耗栈顶的值
@@ -43,16 +43,17 @@ typedef enum OpCode{
     OP_JUMP_IF_NOT_EQUAL, // op, offset16: 如果栈顶的两个值不相等，则跳转
     OP_JUMP_IF_FALSE_POP,
     OP_JUMP_IF_TRUE_POP,
-    OP_CALL, // op, arg_count:
-    OP_CLOSURE,
-    OP_CLOSE_UPVALUE,
-    OP_CLASS,
-    OP_GET_PROPERTY,
-    OP_SET_PROPERTY,
-    OP_METHOD,
-    OP_PROPERTY_INVOKE,
-    OP_INHERIT,
-    OP_SUPER_ACCESS,
+    OP_CALL, // op, arg_count: 将栈顶的值视为一个可调用对象，调用之。
+    OP_CLOSURE, // op, index: const[index]是一个函数，使用那个函数创建一个closure
+    OP_CLOSE_UPVALUE, // op：将栈顶的值视为一个upvalue，将其close，然后从栈中移除之
+    OP_CLASS, // op，index：创建一个class对象，它的名字是const[index]。将这个class置入栈顶
+    OP_GET_PROPERTY, // op, index：将栈顶的值视为一个instance，获取其名为const[index]的字段或者方法，置入栈顶
+    OP_SET_PROPERTY, // op, index: [instance, value, top], 将value赋值给这个instance的名为const[index]的字段。该指令移除instance，但保留栈顶的value
+    OP_METHOD, // op：[class, closure, top], 将closure储存为class的一个method。移除closure
+    OP_PROPERTY_INVOKE, // op, index, arg_count: [receiver, args..., top]：从receiver中寻找名为const[index]的属性，然后调用之
+    OP_INHERIT, // op: [superclass, subclass, top]: 让subclass继承superclass。移除subclass
+    OP_SUPER_ACCESS, // op, index: [receiver, superclass, top]: 从superclass中寻找名为const[index]的方法，然后绑定给receiver。receiver和superclass都被移除，将帮绑定后的method置入栈顶。
+    OP_SUPER_INVOKE, // op, index, arg_count: [receiver, args..., superclass, top]: 从superclass中寻找名为const[index]的方法，立刻调用之。
 } OpCode;
 
 typedef struct Chunk{

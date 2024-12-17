@@ -77,6 +77,8 @@ extern char *GRAY;
 extern char *MAGENTA;
 extern char *BLUE;
 extern char *YELLOW;
+extern char *BOLD_BLUE;
+extern char *BOLD_MAGENTA;
 
 void start_color(char *color);
 void end_color();

@@ -109,7 +109,7 @@ static void declare_local(bool is_const, Token *token);
 
 static inline void mark_initialized();
 
-static void super_access(bool can_assign);
+static void super_expression(bool can_assign);
 
 static void function_statement(FunctionType type);
 
@@ -276,7 +276,7 @@ ParseRule rules[] = {
         [TOKEN_OR]            = {NULL, or, PREC_OR},
         [TOKEN_PRINT]         = {NULL, NULL, PREC_NONE},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
-        [TOKEN_SUPER]         = {super_access, NULL, PREC_NONE},
+        [TOKEN_SUPER]         = {super_expression, NULL, PREC_NONE},
         [TOKEN_THIS]          = {this_expression, NULL, PREC_NONE},
         [TOKEN_TRUE]          = {literal, NULL, PREC_NONE},
         [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
@@ -331,6 +331,7 @@ static void string(bool can_assign) {
 }
 
 static void this_expression(bool can_assign) {
+    (void )can_assign;
     if (current_class == NULL) {
         error_at_previous("Cannot use 'this' outside of a class");
         return;
@@ -1402,7 +1403,8 @@ static void unary(bool can_assign) {
     }
 }
 
-static void super_access(bool can_assign) {
+static void super_expression(bool can_assign) {
+    (void ) can_assign;
     if (current_class == NULL) {
         error_at_previous("cannot use super outside of a class");
         return;
@@ -1417,9 +1419,16 @@ static void super_access(bool can_assign) {
     Token this = literal_token("this");
     Token super = literal_token("super");
     named_variable(&this, false);
-    named_variable(&super, false);
-    // super.eat();
-    emit_two_bytes(OP_SUPER_ACCESS, method);
+    if (match(TOKEN_LEFT_PAREN)) {
+        int arg_count = argument_list();
+        named_variable(&super, false);
+        emit_byte(OP_SUPER_INVOKE);
+        emit_byte(method);
+        emit_byte(arg_count);
+    } else {
+        named_variable(&super, false);
+        emit_two_bytes(OP_SUPER_ACCESS, method);
+    }
 }
 
 static inline void float_num(bool can_assign) {
