@@ -11,6 +11,9 @@ static inline bool empty_entry(Entry *entry) {
     return entry->key == NULL && is_nil(entry->value);
 }
 
+#define MODULO(a, b) ((a) & ((b) - 1))
+
+
 /**
  * del marker：如果key为NULL，值为bool，认为是一个del marker
  * @return 该entry是否是del marker
@@ -53,9 +56,11 @@ static void table_resize(Table *table) {
  * @return 如果key存在，返回对应的entry。如果不存在，返回第一个空位
  */
 static Entry *find_entry(Table *table, String *key) {
-    int index = key->hash % table->capacity;
+//    int index = key->hash % table->capacity;
+    int index = MODULO(key->hash, table->capacity);
     for (int i = 0; i < table->capacity; ++i) {
-        int curr = (index + i) % table->capacity;
+//        int curr = (index + i) % table->capacity;
+        int curr = MODULO(index + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             return entry;
@@ -105,9 +110,11 @@ bool table_set(Table *table, String *key, Value value) {
         table_resize(table);
     }
     Entry *mark = NULL;
-    int index = key->hash % table->capacity;
+//    int index = key->hash % table->capacity;
+    int index = MODULO(key->hash, table->capacity);
     for (int i = 0; i < table->capacity; ++i) {
-        int curr = (index + i) % table->capacity;
+//        int curr = (index + i) % table->capacity;
+        int curr = MODULO(index + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             if (mark == NULL) {
@@ -185,9 +192,11 @@ String *table_find_string(Table *table, const char *name, int length, uint32_t h
     if (table->count == 0) {
         return NULL;
     }
-    int index = hash % table->capacity;
+//    int index = hash % table->capacity;
+    int index = MODULO(hash, table->capacity);
     for (int i = 0; i < table->capacity; ++i) {
-        int curr = (i + index) % table->capacity;
+//        int curr = (i + index) % table->capacity;
+        int curr = MODULO(index + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             return NULL;

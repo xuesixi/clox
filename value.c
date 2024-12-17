@@ -90,69 +90,70 @@ void free_ValueArray(ValueArray *array) {
     FREE_ARRAY(Value, array->values, array->capacity);
     init_ValueArray(array);
 }
+//
+//inline bool is_bool(Value value) {
+//    return value.type == VAL_BOOL;
+//}
+//
+//inline bool is_float(Value value) {
+//    return value.type == VAL_FLOAT;
+//}
+//
+//inline bool is_int(Value value) {
+//    return value.type == VAL_INT;
+//}
+//
+///**
+// * int 或者 float
+// * */
+//inline bool is_number(Value value) {
+//    return is_int(value) || is_float(value);
+//}
+//
+//inline bool is_nil(Value value) {
+//    return value.type == VAL_NIL;
+//}
+//
+//inline bool is_ref(Value value) {
+//    return value.type == VAL_REF;
+//}
 
-inline bool is_bool(Value value) {
-    return value.type == VAL_BOOL;
-}
+//inline double as_float(Value value) {
+//    return value.as.decimal;
+//}
+//
+//inline int as_int(Value value) {
+//    return value.as.integer;
+//}
+//
+//inline bool as_bool(Value value) {
+//    return value.as.boolean;
+//}
+//
+//inline Object *as_ref(Value value) {
+//    return value.as.reference;
+//}
 
-inline bool is_float(Value value) {
-    return value.type == VAL_FLOAT;
-}
-
-inline bool is_int(Value value) {
-    return value.type == VAL_INT;
-}
-
-/**
- * int 或者 float
- * */
-inline bool is_number(Value value) {
-    return is_int(value) || is_float(value);
-}
-
-inline bool is_nil(Value value) {
-    return value.type == VAL_NIL;
-}
-
-inline bool is_ref(Value value) {
-    return value.type == VAL_REF;
-}
-
-inline double as_float(Value value) {
-    return value.as.decimal;
-}
-
-inline int as_int(Value value) {
-    return value.as.integer;
-}
-
-inline bool as_bool(Value value) {
-    return value.as.boolean;
-}
-
-inline Object *as_ref(Value value) {
-    return value.as.reference;
-}
-
-inline Value bool_value(bool value) {
-    return (Value) {.type = VAL_BOOL, .as = {.boolean = value}};
-}
-
-inline Value float_value(double value) {
-    return (Value) {.type = VAL_FLOAT, .as = {.decimal = value}};
-}
-
-inline Value int_value(int value) {
-    return (Value) {.type = VAL_INT, .as = {.integer = value}};
-}
-
-inline Value nil_value() {
-    return (Value) {.type = VAL_NIL, .as = {}};
-}
-
-inline Value ref_value(Object *value) {
-    return (Value) {.type = VAL_REF, .as = {.reference = value}};
-}
+//
+//inline Value bool_value(bool value) {
+//    return (Value) {.type = VAL_BOOL, .as = {.boolean = value}};
+//}
+//
+//inline Value float_value(double value) {
+//    return (Value) {.type = VAL_FLOAT, .as = {.decimal = value}};
+//}
+//
+//inline Value int_value(int value) {
+//    return (Value) {.type = VAL_INT, .as = {.integer = value}};
+//}
+//
+//inline Value nil_value() {
+//    return (Value) {.type = VAL_NIL, .as = {}};
+//}
+//
+//inline Value ref_value(Object *value) {
+//    return (Value) {.type = VAL_REF, .as = {.reference = value}};
+//}
 
 bool value_equal(Value a, Value b) {
     if (a.type != b.type) {

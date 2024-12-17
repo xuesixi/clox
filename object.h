@@ -88,7 +88,14 @@ typedef struct NativeFunction {
     int arity; // -1 means variable amount of arguments
 } NativeFunction;
 
-bool is_ref_of(Value value, ObjectType type);
+//bool is_ref_of(Value value, ObjectType type);
+
+//inline bool is_ref_of(Value value, ObjectType type) {
+//    return is_ref(value) && as_ref(value)->type == type;
+//}
+
+#define is_ref_of(value, ref_type) (is_ref(value) && as_ref(value)->type == (ref_type))
+
 String *as_string(Value value);
 String *string_copy(const char *src, int length);
 String *string_allocate(char *chars, int length);

@@ -64,14 +64,6 @@ static TokenType check_keyword(int start, int length, const char *rest, TokenTyp
     } else {
         return TOKEN_IDENTIFIER;
     }
-    if (scanner.current - scanner.start != start + length) {
-        return TOKEN_IDENTIFIER;
-    }
-    if (memcmp(scanner.start + start, rest, length) == 0) {
-        return type;
-    } else {
-        return TOKEN_IDENTIFIER;
-    }
 }
 
 

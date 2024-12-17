@@ -77,6 +77,7 @@ void write_to_chunk(Chunk *c, uint8_t data, int line) {
 void free_chunk(Chunk *c) {
     FREE_ARRAY(uint8_t, c->code, c->count);
     FREE_ARRAY(int, c->lines, c->count);
+    free_ValueArray(&c->constants);
 //    init_chunk(c);
 }
 

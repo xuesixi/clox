@@ -7,9 +7,9 @@
 
 static uint32_t chars_hash(const char *key, int length);
 
-inline bool is_ref_of(Value value, ObjectType type) {
-    return is_ref(value) && as_ref(value)->type == type;
-}
+//inline bool is_ref_of(Value value, ObjectType type) {
+//    return is_ref(value) && as_ref(value)->type == type;
+//}
 
 inline String *as_string(Value value) {
     return (String *) as_ref(value);
