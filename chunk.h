@@ -51,6 +51,8 @@ typedef enum OpCode{
     OP_SET_PROPERTY,
     OP_METHOD,
     OP_PROPERTY_INVOKE,
+    OP_INHERIT,
+    OP_SUPER_ACCESS,
 } OpCode;
 
 typedef struct Chunk{

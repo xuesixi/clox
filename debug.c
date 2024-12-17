@@ -192,6 +192,10 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("OP_METHOD", offset);
         case OP_PROPERTY_INVOKE:
             return invoke_instruction("OP_PROPERTY_INVOKE", chunk, offset);
+        case OP_INHERIT:
+            return simple_instruction("OP_INHERIT", offset);
+        case OP_SUPER_ACCESS:
+            return constant_instruction("OP_SUPER_ACCESS", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

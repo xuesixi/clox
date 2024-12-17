@@ -1,0 +1,37 @@
+
+
+class Animal {
+
+   init(name, age) {
+       this.name = name;
+       this.age = age;
+   }
+
+   eat() {
+       print f("the animal # is eating", this.name);
+   }
+
+   run() {
+       print f("the animal # is running", this.name);
+   }
+}
+
+class Dog: Animal
+{
+    var super;
+    init(name, age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    run() {
+        print f("the dog # is running", this.name);
+        super.run();
+    }
+}
+
+var dog = Dog("anda", 44);
+dog.eat();
+var r = dog.run;
+r();
+

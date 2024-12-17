@@ -660,7 +660,6 @@ static InterpretResult run() {
                         closure->upvalues[i] = curr_frame->closure->upvalues[index];
                     }
                 }
-
                 break;
             }
             case OP_GET_UPVALUE: {
@@ -719,6 +718,8 @@ static InterpretResult run() {
                 break;
             }
             case OP_METHOD: {
+                // stack: class, closure,
+                // op-method
                 Closure *closure = as_closure(stack_peek(0));
                 Class *class = as_class(stack_peek(1));
                 table_set(&class->methods, closure->function->name, ref_value((Object *) closure));
@@ -745,6 +746,33 @@ static InterpretResult run() {
                 } else {
                     call_closure(as_closure(closure_value), arg_count);
                 }
+                break;
+            }
+            case OP_INHERIT: {
+                //  super,sub,top
+                Value super = stack_peek(1);
+                if (!is_ref_of(super, OBJ_CLASS)) {
+                    char *str = value_to_chars(super, NULL);
+                    runtime_error("%s cannot be used as a super class", str);
+                    free(str);
+                    catch();
+                }
+                Class *sub = as_class(stack_peek(0));
+                Class *super_class = as_class(super);
+                table_add_all(&super_class->methods, & sub->methods);
+                stack_pop();
+                // super, top
+                break;
+            }
+            case OP_SUPER_ACCESS: {
+                // stack: receiver, super_class, top
+                // code: op, name_index
+                String *name = read_constant_string();
+                Class *class = as_class(stack_pop());
+                Value receiver = stack_pop();
+                Method *method = bind_method(class, name, receiver);
+                stack_push(ref_value((Object *) method));
+                // stack: method, top
                 break;
             }
             default: {

@@ -1,24 +1,43 @@
-class Animal {
+*() {
+    class Animal {
+    
+        init(name, age) {
+            this.name = name;
+            this.age = age;
+        }
+    
+        eat() {
+            print f("the animal # is eating", this.name);
+        }
+    
+        run() {
+            print f("the animal # is running", this.name);
+        }
+    }
+    
+    class Dog: Animal {
+    
+        init(name, age) {
+            this.name = name;
+            this.age = age;
+        }
+    
+        run() {
+            print f("the dog # is running", this.name);
+            super.run();
+        }
+    }
 
-   init(name, age) {
-       this.name = name;
-       this.age = age;
-   }
+    class BigDog: Dog {
+        init(name, age) {
+            super.init(name, age);
+        }
 
-   eat() {
-        return "the name is " + this.name;
-        return f("the name is #", this.name);
-        return f("the name is #, age is #, double age is #", this.name, this.age, this.age * 2);
-        return "the name is" + this.name + ", age is " + this.age + ", double age is " + this.age * 2;
-   }
-}
-
-var dog = Animal("anda", 10);
-
-var start = clock();
-
-for (var i = 0; i < 1000000; i += 1) {
-    dog.eat();
-}
-
-print clock() - start;
+        bow() {
+            this.run();
+        }
+    }
+    
+    var bd = BigDog("hunan", 3);
+    bd.bow();
+}();

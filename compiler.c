@@ -34,6 +34,7 @@ typedef struct Parser {
 
 typedef struct ClassScope {
     struct ClassScope *enclosing;
+    bool has_super;
 } ClassScope;
 
 typedef enum {
@@ -92,6 +93,8 @@ Scope *current_scope;
 ClassScope *current_class = NULL;
 
 
+static Token literal_token(const char *text);
+
 static int argument_list();
 
 static inline bool match_assign();
@@ -102,9 +105,11 @@ static inline bool lexeme_equal(Token *a, Token *b);
 
 static inline void begin_scope();
 
-static void declare_local(bool is_const);
+static void declare_local(bool is_const, Token *token);
 
 static inline void mark_initialized();
+
+static void super_access(bool can_assign);
 
 static void function_statement(FunctionType type);
 
@@ -271,7 +276,7 @@ ParseRule rules[] = {
         [TOKEN_OR]            = {NULL, or, PREC_OR},
         [TOKEN_PRINT]         = {NULL, NULL, PREC_NONE},
         [TOKEN_RETURN]        = {NULL, NULL, PREC_NONE},
-        [TOKEN_SUPER]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_SUPER]         = {super_access, NULL, PREC_NONE},
         [TOKEN_THIS]          = {this_expression, NULL, PREC_NONE},
         [TOKEN_TRUE]          = {literal, NULL, PREC_NONE},
         [TOKEN_VAR]           = {NULL, NULL, PREC_NONE},
@@ -367,13 +372,10 @@ static void label_statement() {
         char *text = ALLOCATE(char, label.length + 1);
         memcpy(text, label.start, label.length);
         text[label.length] = '\0';
-//        map_set(&label_map, (void *) (current_chunk()->count + 1), text);
     }
 }
 
-inline static void method_statement() {
-//    parse_identifier_declaration(false);
-//    mark_initialized(); // 将函数名立刻标记为已初始化。
+static void method_statement() {
     consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
     FunctionType type = TYPE_METHOD;
     if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
@@ -385,32 +387,79 @@ inline static void method_statement() {
 
 static void class_declaration() {
 
-    consume(TOKEN_IDENTIFIER, "An identifier is expected here");
+    consume(TOKEN_IDENTIFIER, "An identifier is expected class");
 
+    Token class_name = parser.previous;
+    Token super_class_name;
     int name_index = identifier_constant(& parser.previous);
 
     ClassScope new_class;
     new_class.enclosing = current_class;
+    new_class.has_super = false;
     current_class = & new_class;
-
-    if (current_scope->depth > 0) {
-        declare_local(false);
-        mark_initialized();
-    }
 
     emit_two_bytes(OP_CLASS, name_index);
 
-    consume(TOKEN_LEFT_BRACE, "{ is needed after class");
+    if (current_scope->depth > 0) {
+        declare_local(false, &class_name);
+        mark_initialized();
+    } else {
+        emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
+    }
+
+    // top
+
+    if (match(TOKEN_COLON)) {
+        consume(TOKEN_IDENTIFIER, "Expect super class name");
+        super_class_name = parser.previous;
+        if (lexeme_equal(&class_name, &parser.previous)) {
+            error_at_previous("A class cannot inherit from itself");
+            return;
+        }
+
+        named_variable(&super_class_name, false);
+        named_variable(&class_name, false);
+
+        // inheritance: super, sub, top
+
+        emit_byte(OP_INHERIT);
+
+        // inheritance: super, top
+
+        current_class->has_super = true;
+        begin_scope();
+        Token super = literal_token("super");
+        declare_local(true, &super);
+        mark_initialized();
+    }
+
+    consume(TOKEN_LEFT_BRACE, "{ is needed to start a class definition");
+
+    named_variable(&class_name, false);
+
+    // no inheritance: sub, top
+    // inheritance: sub, super, top
 
     while (check(TOKEN_RIGHT_BRACE) == false && check(TOKEN_EOF) == false) {
         method_statement();
     }
 
-    consume(TOKEN_RIGHT_BRACE, "} is needed to terminate class");
+    // no inheritance: sub, top
+    // inheritance: sub, super, top
 
-    if (current_scope->depth == 0) {
-        emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
+    consume(TOKEN_RIGHT_BRACE, "} is needed to terminate a class definition");
+
+    emit_byte(OP_POP);
+
+    // no inheritance: top
+    // inheritance: super, top
+
+    if (current_class->has_super) {
+        end_scope();
     }
+
+    // no inheritance: top
+    // inheritance: top
 
     current_class = current_class->enclosing;
 }
@@ -540,7 +589,7 @@ static void const_declaration() {
  * 将previous作为本地变量进行申明（检查不存在同层同名变量后，将其添加到locals中）。申明后，尚未标记初始化。
  * @param is_const 是否为const变量
  */
-static void declare_local(bool is_const) {
+static void declare_local(bool is_const, Token *token) {
 /**
  * clox中，当一个语句（statement）执行完毕后，它必然会消耗掉期间产生的所有栈元素。
  * 本地变量的申明是唯一的可以产生“超单一语句”的栈元素的语句。它会在block结束后被全部清除。
@@ -552,7 +601,7 @@ static void declare_local(bool is_const) {
         return;
     }
 
-    Token *token = &parser.previous;
+//    Token *token = &parser.previous;
 
     // 检查同一层scope中是否存在同名的变量
     for (int i = current_scope->local_count - 1; i >= 0; i--) {
@@ -567,7 +616,7 @@ static void declare_local(bool is_const) {
 
     // 添加新的local变量
     Local *local = current_scope->locals + current_scope->local_count;
-    local->name = parser.previous;
+    local->name = *token;
     local->is_const = is_const;
     local->is_captured = false;
     local->depth = -1; // 在完成初始化之后，再设置为正确值。这是为了防止初始化中用到自己，比如`var num = num + 10;`
@@ -608,7 +657,6 @@ static int resolve_upvalue(Scope *scope, Token *identifier, bool *is_const) {
     if (scope->enclosing == NULL) {
         return -1;
     }
-//    bool is_const;
     int index = resolve_local(scope->enclosing, identifier, is_const);
     if (index != -1) {
         scope->enclosing->locals[index].is_captured = true;
@@ -634,12 +682,11 @@ static int add_upvalue(Scope *scope, int index, bool is_local) {
     }
     scope->upvalues[count].index = index;
     scope->upvalues[count].is_local = is_local;
-//    scope->upvalues[count].is_const = is_const;
     return scope->function->upvalue_count ++;
 }
 
 /**
- * 解析一个标识符，如果是全局变量，则将标识符添加为常量。如果是局部变量，申明之（尚未初始化）
+ * 解析一个标识符的申明，如果是全局变量，则将标识符添加为常量。如果是局部变量，申明之（尚未初始化）
  * @return 如果是全局变量，返回索引。否则，返回-1
  */
 static inline int parse_identifier_declaration(bool is_const) {
@@ -647,7 +694,7 @@ static inline int parse_identifier_declaration(bool is_const) {
 
     if (current_scope->depth > 0) {
         // 如果是local
-        declare_local(is_const);
+        declare_local(is_const, &parser.previous);
         return -1;
     } else {
         // 否则是global
@@ -1070,6 +1117,13 @@ static void end_scope() {
     clear_scope(current_scope->depth);
 }
 
+static Token literal_token(const char *text) {
+    Token token;
+    token.start = text;
+    token.length = strlen(text);
+    return token;
+}
+
 static int argument_list() {
     int count = 0;
     if (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_PAREN)) {
@@ -1218,7 +1272,9 @@ static inline bool match_assign() {
 }
 
 /**
- * 将token视为一个变量，解析其get/set
+ * 将token视为一个变量，解析其get/set. 该函数会自动根据环境来决定变量是local, upvalue, 或是global.
+ * 该函数不是用来申明变量，而是用来使用变量的。
+ * 值得注意的是，虽然这里允许指定token，但set系列的解析假设token是parser.previous
  */
 static void named_variable(Token *name, bool can_assign) {
     int set_op;
@@ -1346,6 +1402,26 @@ static void unary(bool can_assign) {
     }
 }
 
+static void super_access(bool can_assign) {
+    if (current_class == NULL) {
+        error_at_previous("cannot use super outside of a class");
+        return;
+    }
+    if (!current_class->has_super) {
+        error_at_previous("the class does not have super class");
+        return;
+    }
+    consume(TOKEN_DOT, "super is always followed by a '.'");
+    consume(TOKEN_IDENTIFIER, "expect an identifier");
+    int method = identifier_constant(&parser.previous);
+    Token this = literal_token("this");
+    Token super = literal_token("super");
+    named_variable(&this, false);
+    named_variable(&super, false);
+    // super.eat();
+    emit_two_bytes(OP_SUPER_ACCESS, method);
+}
+
 static inline void float_num(bool can_assign) {
     (void) can_assign;
     double value = strtod(parser.previous.start, NULL);
@@ -1406,7 +1482,13 @@ static LoxFunction *end_compiler() {
     emit_return();
     LoxFunction *function = current_scope->function;
     if (SHOW_COMPILE_RESULT && !parser.has_error) {
-        disassemble_chunk(current_chunk(), function->name == NULL ? "<main>" : function->name->chars);
+        if (function->type == TYPE_MAIN) {
+            disassemble_chunk(current_chunk(), "<main>");
+        } else if (function->type == TYPE_LAMBDA) {
+            disassemble_chunk(current_chunk(), "<lambda>");
+        } else {
+            disassemble_chunk(current_chunk(), function->name->chars);
+        }
     }
     current_scope = current_scope->enclosing;
     return function;
