@@ -100,79 +100,81 @@ int disassemble_instruction(Chunk *chunk, int offset) {
     int instruction = chunk->code[offset];
     switch (instruction) {
         case OP_RETURN:
-            return simple_instruction("OP_RETURN", offset);
+            return simple_instruction("RETURN", offset);
         case OP_CONSTANT:
-            return constant_instruction("OP_CONSTANT", chunk, offset);
+            return constant_instruction("CONSTANT", chunk, offset);
         case OP_CONSTANT2:
-            return constant2_instruction("OP_CONSTANT2", chunk, offset);
+            return constant2_instruction("CONSTANT2", chunk, offset);
         case OP_NEGATE:
-            return simple_instruction("OP_NEGATE", offset);
+            return simple_instruction("NEGATE", offset);
         case OP_ADD:
-            return simple_instruction("OP_ADD", offset);
+            return simple_instruction("ADD", offset);
         case OP_SUBTRACT:
-            return simple_instruction("OP_SUBTRACT", offset);
+            return simple_instruction("SUBTRACT", offset);
         case OP_MULTIPLY:
-            return simple_instruction("OP_MULTIPLY", offset);
+            return simple_instruction("MULTIPLY", offset);
         case OP_DIVIDE:
-            return simple_instruction("OP_DIVIDE", offset);
+            return simple_instruction("DIVIDE", offset);
         case OP_MOD:
-            return simple_instruction("OP_MOD", offset);
+            return simple_instruction("MOD", offset);
+        case OP_POWER:
+            return simple_instruction("POWER", offset);
         case OP_NIL:
-            return simple_instruction("OP_NIL", offset);
+            return simple_instruction("NIL", offset);
         case OP_TRUE:
-            return simple_instruction("OP_TRUE", offset);
+            return simple_instruction("TRUE", offset);
         case OP_FALSE:
-            return simple_instruction("OP_FALSE", offset);
+            return simple_instruction("FALSE", offset);
         case OP_NOT:
-            return simple_instruction("OP_NOT", offset);
+            return simple_instruction("NOT", offset);
         case OP_EQUAL:
-            return simple_instruction("OP_EQUAL", offset);
+            return simple_instruction("EQUAL", offset);
         case OP_LESS:
-            return simple_instruction("OP_LESS", offset);
+            return simple_instruction("LESS", offset);
         case OP_GREATER:
-            return simple_instruction("OP_GREATER", offset);
+            return simple_instruction("GREATER", offset);
         case OP_PRINT:
-            return simple_instruction("OP_PRINT", offset);
+            return simple_instruction("PRINT", offset);
         case OP_EXPRESSION_PRINT:
-            return simple_instruction("OP_EXPRESSION_PRINT", offset);
+            return simple_instruction("EXPRESSION_PRINT", offset);
         case OP_POP:
-            return simple_instruction("OP_POP", offset);
+            return simple_instruction("POP", offset);
         case OP_DEFINE_GLOBAL:
-            return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
+            return constant_instruction("DEFINE_GLOBAL", chunk, offset);
         case OP_DEFINE_GLOBAL_CONST:
-            return constant_instruction("OP_DEFINE_GLOBAL_CONST", chunk, offset);
+            return constant_instruction("DEFINE_GLOBAL_CONST", chunk, offset);
         case OP_GET_GLOBAL:
-            return constant_instruction("OP_GET_GLOBAL", chunk, offset);
+            return constant_instruction("GET_GLOBAL", chunk, offset);
         case OP_SET_GLOBAL:
-            return constant_instruction("OP_SET_GLOBAL", chunk, offset);
+            return constant_instruction("SET_GLOBAL", chunk, offset);
         case OP_GET_LOCAL:
-            return byte_instruction("OP_GET_LOCAL", chunk, offset);
+            return byte_instruction("GET_LOCAL", chunk, offset);
         case OP_SET_LOCAL:
-            return byte_instruction("OP_SET_LOCAL", chunk, offset);
+            return byte_instruction("SET_LOCAL", chunk, offset);
         case OP_JUMP:
-            return jump_instruction("OP_JUMP", chunk, offset, true);
+            return jump_instruction("JUMP", chunk, offset, true);
         case OP_JUMP_IF_FALSE:
-            return jump_instruction("OP_JUMP_IF_FALSE", chunk, offset, true);
+            return jump_instruction("JUMP_IF_FALSE", chunk, offset, true);
         case OP_JUMP_IF_TRUE:
-            return jump_instruction("OP_JUMP_IF_TRUE", chunk, offset, true);
+            return jump_instruction("JUMP_IF_TRUE", chunk, offset, true);
         case OP_JUMP_BACK:
-            return jump_instruction("OP_JUMP_BACK", chunk, offset, false);
+            return jump_instruction("JUMP_BACK", chunk, offset, false);
         case OP_JUMP_IF_NOT_EQUAL:
-            return jump_instruction("OP_JUMP_IF_NOT_EQUAL", chunk, offset, true);
+            return jump_instruction("JUMP_IF_NOT_EQUAL", chunk, offset, true);
         case OP_JUMP_IF_FALSE_POP:
-            return jump_instruction("OP_JUMP_IF_FALSE_POP", chunk, offset, true);
+            return jump_instruction("JUMP_IF_FALSE_POP", chunk, offset, true);
         case OP_JUMP_IF_TRUE_POP:
-            return jump_instruction("OP_JUMP_IF_TRUE_POP", chunk, offset, true);
+            return jump_instruction("JUMP_IF_TRUE_POP", chunk, offset, true);
         case OP_CALL:
-            return byte_instruction("OP_CALL", chunk, offset);
+            return byte_instruction("CALL", chunk, offset);
         case OP_GET_UPVALUE:
-            return constant_instruction("OP_GET_UPVALUE", chunk, offset);
+            return constant_instruction("GET_UPVALUE", chunk, offset);
         case OP_SET_UPVALUE:
-            return constant_instruction("OP_SET_UPVALUE", chunk, offset);
+            return constant_instruction("SET_UPVALUE", chunk, offset);
         case OP_CLOSURE: {
             offset++;
             int index = chunk->code[offset ++];
-            printf("%-23s %4d : ", "OP_CLOSURE", index);
+            printf("%-23s %4d : ", "CLOSURE", index);
             Value value = chunk->constants.values[index];
             print_value_with_color(value);
             NEW_LINE();
@@ -181,23 +183,33 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return offset;
         }
         case OP_CLOSE_UPVALUE:
-            return simple_instruction("OP_CLOSE_UPVALUE", offset);
+            return simple_instruction("CLOSE_UPVALUE", offset);
         case OP_CLASS:
-            return constant_instruction("OP_CLASS", chunk, offset);
+            return constant_instruction("CLASS", chunk, offset);
         case OP_GET_PROPERTY:
-            return constant_instruction("OP_GET_PROPERTY", chunk, offset);
+            return constant_instruction("GET_PROPERTY", chunk, offset);
+        case OP_COPY:
+            return simple_instruction("COPY", offset);
+        case OP_COPY2:
+            return simple_instruction("COPY2", offset);
         case OP_SET_PROPERTY:
-            return constant_instruction("OP_SET_PROPERTY", chunk, offset);
+            return constant_instruction("SET_PROPERTY", chunk, offset);
         case OP_METHOD:
-            return simple_instruction("OP_METHOD", offset);
+            return simple_instruction("METHOD", offset);
         case OP_PROPERTY_INVOKE:
-            return invoke_instruction("OP_PROPERTY_INVOKE", chunk, offset);
+            return invoke_instruction("PROPERTY_INVOKE", chunk, offset);
         case OP_INHERIT:
-            return simple_instruction("OP_INHERIT", offset);
+            return simple_instruction("INHERIT", offset);
         case OP_SUPER_ACCESS:
-            return constant_instruction("OP_SUPER_ACCESS", chunk, offset);
+            return constant_instruction("SUPER_ACCESS", chunk, offset);
         case OP_SUPER_INVOKE:
-            return invoke_instruction("OP_SUPER_INVOKE", chunk, offset);
+            return invoke_instruction("SUPER_INVOKE", chunk, offset);
+        case OP_ARRAY:
+            return constant_instruction("ARRAY", chunk, offset);
+        case OP_INDEXING_GET:
+            return simple_instruction("INDEXING_GET", offset);
+        case OP_INDEXING_SET:
+            return simple_instruction("INDEXING_SET", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

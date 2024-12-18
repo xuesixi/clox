@@ -30,6 +30,7 @@ typedef struct VM{
     size_t allocated_size;
     size_t next_gc;
     String *init_string;
+    String *length_string;
 } VM ;
 
 typedef enum {

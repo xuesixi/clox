@@ -56,6 +56,7 @@ void print_value_with_color(Value value) {
                     start_color(BOLD_BLUE);
                     break;
                 case OBJ_INSTANCE:
+                case OBJ_ARRAY:
                     start_color(BOLD_CYAN);
                     break;
             }
@@ -196,7 +197,7 @@ bool object_equal(Object *a, Object *b) {
 }
 
 static char *ref_to_chars(Value value, int *len) {
-    char *buffer;
+    char *buffer = NULL;
     ObjectType type = as_ref(value)->type;
     switch (type) {
         case OBJ_STRING: {
@@ -247,6 +248,11 @@ static char *ref_to_chars(Value value, int *len) {
         case OBJ_METHOD: {
             Method *method = as_method(value);
             *len = asprintf(&buffer, "<mthd: %s>", method->closure->function->name->chars);
+            break;
+        }
+        case OBJ_ARRAY: {
+            Array *array = as_array(value);
+            *len = asprintf(&buffer, "<array: %d>", array->length);
             break;
         }
         default:

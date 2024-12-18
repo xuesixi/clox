@@ -53,6 +53,7 @@ static void mark_roots() {
     }
 
     mark_object((Object *) vm.init_string);
+    mark_object((Object *) vm.length_string);
 
 //    // mark open upvalues ? 暂时无法理解。理论上closure们应该可以引用这些值
 //    UpValueObject *curr = vm.open_upvalues;
@@ -112,6 +113,13 @@ static void blacken_object(Object *object) {
             Method *method = (Method *) object;
             mark_value(method->receiver);
             mark_object((Object *) method->closure);
+            break;
+        }
+        case OBJ_ARRAY: {
+            Array *array = (Array *) object;
+            for (int i = 0; i < array->length; ++i) {
+                mark_value(array->values[i]);
+            }
             break;
         }
     }
@@ -262,6 +270,12 @@ void free_object(Object *object) {
         }
         case OBJ_METHOD: {
             re_allocate(object, sizeof(Method), 0);
+            break;
+        }
+        case OBJ_ARRAY: {
+            Array *array = (Array *) object;
+            FREE_ARRAY(Value, array->values, array->length);
+            re_allocate(object, sizeof(Array), 0);
             break;
         }
         default:

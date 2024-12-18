@@ -12,10 +12,10 @@
 typedef struct Object Object;
 
 typedef enum {
+    VAL_NIL,
     VAL_FLOAT,
     VAL_BOOL,
     VAL_INT,
-    VAL_NIL,
     VAL_REF,
 } ValueType;
 

@@ -11,21 +11,21 @@ static uint32_t chars_hash(const char *key, int length);
 //    return is_ref(value) && as_ref(value)->type == type;
 //}
 
-inline String *as_string(Value value) {
-    return (String *) as_ref(value);
-}
+//inline String *as_string(Value value) {
+//    return (String *) as_ref(value);
+//}
 
-inline LoxFunction *as_function(Value value) {
-    return (LoxFunction *) as_ref(value);
-}
-
-inline NativeFunction *as_native(Value value) {
-    return (NativeFunction *) as_ref(value);
-}
-
-inline Closure *as_closure(Value value) {
-    return (Closure *) as_ref(value);
-}
+//inline LoxFunction *as_function(Value value) {
+//    return (LoxFunction *) as_ref(value);
+//}
+//
+//inline NativeFunction *as_native(Value value) {
+//    return (NativeFunction *) as_ref(value);
+//}
+//
+//inline Closure *as_closure(Value value) {
+//    return (Closure *) as_ref(value);
+//}
 
 /**
  * 从指定的 src 处产生一个新的 String。原 char*不会被修改。
@@ -159,11 +159,11 @@ Class *new_class(String *name) {
     init_table(&class->methods);
     return class;
 }
-
-inline Class *as_class(Value value) {
-    return (Class *) as_ref(value);
-}
-
+//
+//inline Class *as_class(Value value) {
+//    return (Class *) as_ref(value);
+//}
+//
 Instance *new_instance(Class *class) {
     Instance *instance = (Instance *) allocate_object(sizeof(Instance), OBJ_INSTANCE);
     instance->class = class;
@@ -171,9 +171,9 @@ Instance *new_instance(Class *class) {
     return instance;
 }
 
-Instance *as_instance(Value value) {
-    return (Instance *) as_ref(value);
-}
+//Instance *as_instance(Value value) {
+//    return (Instance *) as_ref(value);
+//}
 
 Method *new_method(Closure *closure, Value value) {
     Method *method = (Method *) allocate_object(sizeof(Method), OBJ_METHOD);
@@ -182,9 +182,21 @@ Method *new_method(Closure *closure, Value value) {
     return method;
 }
 
-inline Method *as_method(Value value) {
-    return (Method *) as_ref(value);
+//inline Method *as_method(Value value) {
+//    return (Method *) as_ref(value);
+//}
+
+Array *new_array(int length) {
+    Value *values = ALLOCATE(Value, length);
+    Array *array = (Array *) allocate_object(sizeof(Array), OBJ_ARRAY);
+    array->length = length;
+    array->values = values;
+    return array;
 }
+//
+//Array *as_array(Value value) {
+//
+//}
 
 
 

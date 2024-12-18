@@ -15,6 +15,7 @@ typedef enum {
   OBJ_CLASS,
   OBJ_INSTANCE,
   OBJ_METHOD,
+  OBJ_ARRAY,
 } ObjectType;
 
 typedef struct Object{
@@ -22,6 +23,12 @@ typedef struct Object{
     Object *next;
     bool is_marked;
 } Object;
+
+typedef struct Array {
+    Object object;
+    int length;
+    Value *values;
+} Array;
 
 typedef enum FunctionType {
     TYPE_FUNCTION,
@@ -96,7 +103,16 @@ typedef struct NativeFunction {
 
 #define is_ref_of(value, ref_type) (is_ref(value) && as_ref(value)->type == (ref_type))
 
-String *as_string(Value value);
+#define as_string(v) ((String *)(as_ref(v)))
+#define as_function(v) ((LoxFunction *)(as_ref(v)))
+#define as_native(v) ((NativeFunction *)(as_ref(v)))
+#define as_closure(v) ((Closure *)(as_ref(v)))
+#define as_class(v) ((Class *)(as_ref(v)))
+#define as_instance(v) ((Instance *)(as_ref(v)))
+#define as_method(v) ((Method *)(as_ref(v)))
+#define as_array(v) ((Array *)(as_ref(v)))
+
+
 String *string_copy(const char *src, int length);
 String *string_allocate(char *chars, int length);
 String *string_concat(Value a, Value b);
@@ -104,22 +120,25 @@ String *string_concat(Value a, Value b);
 Object *allocate_object(size_t size, ObjectType type);
 
 LoxFunction *new_function(FunctionType type);
-LoxFunction *as_function(Value value);
+//LoxFunction *as_function(Value value);
 
 NativeFunction *new_native(NativeImplementation impl, String *name, int arity);
-NativeFunction *as_native(Value value);
+//NativeFunction *as_native(Value value);
 
-Closure *as_closure(Value value);
+//Closure *as_closure(Value value);
 Closure *new_closure(LoxFunction *function);
 
 UpValue *new_upvalue(Value *position);
 
 Class *new_class(String *name);
-Class *as_class(Value value);
+//Class *as_class(Value value);
 
 Instance *new_instance(Class *class);
-Instance *as_instance(Value value);
+//Instance *as_instance(Value value);
 
 Method *new_method(Closure *closure, Value value);
-Method *as_method(Value value);
+//Method *as_method(Value value);
+
+Array *new_array(int length);
+//Array *as_array(Value value);
 #endif

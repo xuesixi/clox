@@ -92,7 +92,6 @@ Parser parser;
 Scope *current_scope;
 ClassScope *current_class = NULL;
 
-
 static Token literal_token(const char *text);
 
 static int argument_list();
@@ -100,6 +99,8 @@ static int argument_list();
 static inline bool match_assign();
 
 static void call(bool can_assign);
+
+static void indexing(bool can_assign);
 
 static inline bool lexeme_equal(Token *a, Token *b);
 
@@ -153,7 +154,9 @@ static void parse_precedence(Precedence precedence);
 
 static void expression();
 
-static void arithmetic_equal(OpCode set_op, OpCode get_op, int index);
+static void arithmetic_equal(OpCode set_op, OpCode get_op, int index, int copy);
+
+static void make_array(bool can_assign);
 
 static void float_num(bool can_assign);
 
@@ -286,6 +289,8 @@ ParseRule rules[] = {
         [TOKEN_LABEL]         = {NULL, NULL, PREC_NONE},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACKET]  = {make_array, indexing, PREC_CALL},
+        [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
 };
 
 void mark_compiler_roots() {
@@ -321,7 +326,6 @@ static inline void restore_break_point() {
     parser.break_point = parser.old_break_point;
 }
 
-
 static void string(bool can_assign) {
     (void) can_assign;
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
@@ -331,7 +335,7 @@ static void string(bool can_assign) {
 }
 
 static void this_expression(bool can_assign) {
-    (void )can_assign;
+    (void) can_assign;
     if (current_class == NULL) {
         error_at_previous("Cannot use 'this' outside of a class");
         return;
@@ -392,12 +396,12 @@ static void class_declaration() {
 
     Token class_name = parser.previous;
     Token super_class_name;
-    int name_index = identifier_constant(& parser.previous);
+    int name_index = identifier_constant(&parser.previous);
 
     ClassScope new_class;
     new_class.enclosing = current_class;
     new_class.has_super = false;
-    current_class = & new_class;
+    current_class = &new_class;
 
     emit_two_bytes(OP_CLASS, name_index);
 
@@ -472,9 +476,9 @@ static void declaration() {
         const_declaration();
     } else if (match(TOKEN_LABEL)) {
         label_statement();
-    } else if (match(TOKEN_FUN)){
+    } else if (match(TOKEN_FUN)) {
         fun_declaration();
-    } else if (match(TOKEN_CLASS)){
+    } else if (match(TOKEN_CLASS)) {
         class_declaration();
     } else {
         statement();
@@ -509,7 +513,7 @@ static void function_statement(FunctionType type) {
         do {
             parse_identifier_declaration(false);
             mark_initialized();
-            current_scope->function->arity ++;
+            current_scope->function->arity++;
             if (current_scope->function->arity > 255) {
                 error_at_previous("cannot have more than 255 parameters");
                 return;
@@ -526,7 +530,7 @@ static void function_statement(FunctionType type) {
     LoxFunction *function = end_compiler(); // 完成了函数的解析，返回上级
 
     // 将这个函数作为一个常量储存起来
-    int index = make_constant(ref_value((Object*)function));
+    int index = make_constant(ref_value((Object *) function));
 
     // OP_closure 后面紧跟着的是一个function，而非closure对象。这个function对象会在运行时被包装成closure
     emit_two_bytes(OP_CLOSURE, index);
@@ -538,7 +542,7 @@ static void function_statement(FunctionType type) {
 }
 
 static void lambda(bool can_assign) {
-    (void ) can_assign;
+    (void) can_assign;
     function_statement(TYPE_LAMBDA);
 }
 
@@ -683,7 +687,7 @@ static int add_upvalue(Scope *scope, int index, bool is_local) {
     }
     scope->upvalues[count].index = index;
     scope->upvalues[count].is_local = is_local;
-    return scope->function->upvalue_count ++;
+    return scope->function->upvalue_count++;
 }
 
 /**
@@ -727,7 +731,7 @@ static void statement() {
         for_statement();
     } else if (match(TOKEN_SWITCH)) {
         switch_statement();
-    } else if (match(TOKEN_RETURN)){
+    } else if (match(TOKEN_RETURN)) {
         return_statement();
     } else {
         expression_statement();
@@ -1133,7 +1137,7 @@ static int argument_list() {
                 error_at_previous("Cannot have more than 255 arguments");
             }
             expression();
-            count ++;
+            count++;
         } while (match(TOKEN_COMMA));
     }
     consume(TOKEN_RIGHT_PAREN, "A ) is expected to terminate the argument list");
@@ -1141,7 +1145,7 @@ static int argument_list() {
 }
 
 static void call(bool can_assign) {
-    (void ) can_assign;
+    (void) can_assign;
     int arg_count = argument_list();
     emit_two_bytes(OP_CALL, arg_count);
 }
@@ -1163,7 +1167,7 @@ static inline void return_statement() {
     }
     if (match(TOKEN_SEMICOLON)) {
         emit_return();
-    } else if (current_scope->functionType == TYPE_INITIALIZER){
+    } else if (current_scope->functionType == TYPE_INITIALIZER) {
         error_at_previous("cannot return a value inside an init() method");
     } else {
         expression();
@@ -1194,9 +1198,9 @@ static inline void expression() {
 
 static void dot(bool can_assign) {
     consume(TOKEN_IDENTIFIER, "An identifier is expected here");
-    int name_index = identifier_constant(& parser.previous);
+    int name_index = identifier_constant(&parser.previous);
     if (can_assign && match_assign()) {
-        arithmetic_equal(OP_SET_PROPERTY, OP_GET_PROPERTY, name_index);
+        arithmetic_equal(OP_SET_PROPERTY, OP_GET_PROPERTY, name_index, 1);
     } else if (match(TOKEN_LEFT_PAREN)) {
         int arg_count = argument_list();
         emit_byte(OP_PROPERTY_INVOKE);
@@ -1214,52 +1218,82 @@ static inline void variable(bool can_assign) {
     named_variable(&parser.previous, can_assign);
 }
 
-static void arithmetic_equal(OpCode set_op, OpCode get_op, int index) {
-    switch (parser.previous.type) {
-        case TOKEN_EQUAL: {
-            expression();
-            emit_two_bytes(set_op, index);
-            break;
-        }
+static void indexing_arithmetic_equal() {
+    TokenType type = parser.previous.type;
+    if (type == TOKEN_EQUAL) {
+        expression();
+        emit_byte(OP_INDEXING_SET);
+        return;
+    }
+    emit_byte(OP_COPY2); // [arr, index, arr, index,]
+    emit_byte(OP_INDEXING_GET);
+    expression();
+    switch (type) {
         case TOKEN_PLUS_EQUAL: {
-            emit_two_bytes(get_op, index);
-            expression();
             emit_byte(OP_ADD);
-            emit_two_bytes(set_op, index);
             break;
         }
         case TOKEN_MINUS_EQUAL: {
-            emit_two_bytes(get_op, index);
-            expression();
             emit_byte(OP_SUBTRACT);
-            emit_two_bytes(set_op, index);
             break;
         }
         case TOKEN_STAR_EQUAL: {
-            emit_two_bytes(get_op, index);
-            expression();
             emit_byte(OP_MULTIPLY);
-            emit_two_bytes(set_op, index);
             break;
         }
         case TOKEN_SLASH_EQUAL: {
-            emit_two_bytes(get_op, index);
-            expression();
             emit_byte(OP_DIVIDE);
-            emit_two_bytes(set_op, index);
             break;
         }
         case TOKEN_PERCENT_EQUAL: {
-            emit_two_bytes(get_op, index);
-            expression();
             emit_byte(OP_MOD);
-            emit_two_bytes(set_op, index);
             break;
         }
         default:
             IMPLEMENTATION_ERROR("this should not happen");
             return;
     }
+    emit_byte(OP_INDEXING_SET);
+}
+
+static void arithmetic_equal(OpCode set_op, OpCode get_op, int index, int copy) {
+    TokenType type = parser.previous.type;
+    if (type == TOKEN_EQUAL) {
+        expression();
+        emit_two_bytes(set_op, index);
+        return;
+    }
+    if (copy == 1) {
+        emit_byte(OP_COPY);
+    }
+    emit_two_bytes(get_op, index);
+    expression();
+    switch (type) {
+        case TOKEN_PLUS_EQUAL: {
+            emit_byte(OP_ADD);
+            break;
+        }
+        case TOKEN_MINUS_EQUAL: {
+            emit_byte(OP_SUBTRACT);
+            break;
+        }
+        case TOKEN_STAR_EQUAL: {
+            emit_byte(OP_MULTIPLY);
+            break;
+        }
+        case TOKEN_SLASH_EQUAL: {
+            emit_byte(OP_DIVIDE);
+            break;
+        }
+        case TOKEN_PERCENT_EQUAL: {
+            emit_byte(OP_MOD);
+            break;
+        }
+        default:
+            IMPLEMENTATION_ERROR("this should not happen");
+            return;
+    }
+    emit_two_bytes(set_op, index);
 
 }
 
@@ -1298,9 +1332,19 @@ static void named_variable(Token *name, bool can_assign) {
             error_at_previous("cannot re-assign a const variable");
             return;
         }
-        arithmetic_equal(set_op, get_op, index);
+        arithmetic_equal(set_op, get_op, index, 0);
     } else {
         emit_two_bytes(get_op, index);
+    }
+}
+
+static void indexing(bool can_assign) {
+    expression();
+    consume(TOKEN_RIGHT_BRACKET, "Expect ]");
+    if (can_assign && match_assign()) {
+        indexing_arithmetic_equal();
+    } else {
+        emit_byte(OP_INDEXING_GET);
     }
 }
 
@@ -1404,7 +1448,7 @@ static void unary(bool can_assign) {
 }
 
 static void super_expression(bool can_assign) {
-    (void ) can_assign;
+    (void) can_assign;
     if (current_class == NULL) {
         error_at_previous("cannot use super outside of a class");
         return;
@@ -1429,6 +1473,19 @@ static void super_expression(bool can_assign) {
         named_variable(&super, false);
         emit_two_bytes(OP_SUPER_ACCESS, method);
     }
+}
+
+static void make_array(bool can_assign) {
+    (void) can_assign;
+    expression();
+    consume(TOKEN_RIGHT_BRACKET, "Expect a ]");
+    int dimension = 1;
+    while (!check(TOKEN_EOF) && match(TOKEN_LEFT_BRACKET)) {
+        expression();
+        dimension ++;
+        consume(TOKEN_RIGHT_BRACKET, "Expect a ]");
+    }
+    emit_two_bytes(OP_ARRAY, dimension);
 }
 
 static inline void float_num(bool can_assign) {

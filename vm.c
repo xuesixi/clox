@@ -46,6 +46,8 @@ static void call_value(Value value, int arg_count);
 
 static void runtime_error(const char *format, ...);
 
+static void runtime_error_with_one_value_then_catch(const char *format, Value value);
+
 static void catch();
 
 static void runtime_error_and_catch(const char *format, ...);
@@ -55,8 +57,26 @@ static void invoke_from_class(Class *class, String *name, int arg_count);
 static void call_closure(Closure *closure, int arg_count);
 
 
-/* ------------------上面是静态函数申明-----------------------
-   ------------------下面是静态函数定义----------------------- */
+
+// ------------------上面是静态函数申明-----------------------
+// ------------------下面是静态函数定义----------------------- 
+
+static Value multi_dimension_array(int dimension, Value *lens) {
+    Value len_value = *lens;
+    if (!is_int(len_value)) {
+        runtime_error_with_one_value_then_catch("%s cannot be used as array length", len_value);
+    }
+    int len = as_int(*lens);
+    Array *arr = new_array(len);
+    if (dimension == 1) {
+        return ref_value((Object *)arr);
+    }
+    for (int i = 0; i < len; ++i) {
+        arr->values[i] = multi_dimension_array(dimension - 1, lens + 1);
+    }
+    return ref_value((Object *) arr);
+
+}
 
 static void binary_number_op(Value a, Value b, char operator) {
     if (is_int(a) && is_int(b)) {
@@ -228,7 +248,7 @@ static inline Value stack_peek(int distance) {
  * 输出错误消息（会自动添加换行符）
  * 打印调用栈消息。清空栈。
  */
-void runtime_error(const char *format, ...) {
+static void runtime_error(const char *format, ...) {
     fputs("\nRuntime Error: ", stderr);
     va_list args;
     va_start(args, format);
@@ -250,6 +270,13 @@ void runtime_error(const char *format, ...) {
     }
 
     reset_stack();
+}
+
+static void runtime_error_with_one_value_then_catch(const char *format, Value value) {
+    char *str = value_to_chars(value, NULL);
+    runtime_error(format, str);
+    free(str);
+    catch();
 }
 
 /**
@@ -684,13 +711,19 @@ static InterpretResult run() {
             }
             case OP_GET_PROPERTY: {
                 Value value = stack_pop(); // instance
-                if (is_ref_of(value, OBJ_INSTANCE) == false) {
-                    char *str = value_to_chars(value, NULL);
-                    runtime_error("%s is not an object and does not have property", str);
-                    free(str);
-                    catch();
-                }
                 String *field = read_constant_string();
+                if (is_ref_of(value, OBJ_INSTANCE) == false) {
+                    if (is_ref_of(value, OBJ_ARRAY) && field == vm.length_string) {
+                        Array *array = as_array(value);
+                        stack_push(int_value(array->length));
+                        break;
+                    } else {
+                        char *str = value_to_chars(value, NULL);
+                        runtime_error("%s is not an object and does not have property", str);
+                        free(str);
+                        catch();
+                    }
+                }
                 Instance *instance = as_instance(value);
                 Value result = nil_value();
                 bool found = table_get(&instance->fields, field, &result);
@@ -782,6 +815,69 @@ static InterpretResult run() {
                 int arg_count = read_byte();
                 Class *class = as_class(stack_pop());
                 invoke_from_class(class, name, arg_count);
+                break;
+            }
+            case OP_ARRAY: {
+                // [len1, len2, top]
+                int dimension = read_byte();
+                Value arr = multi_dimension_array(dimension, vm.stack_top - dimension);
+                for (int i = 0; i < dimension; ++i) {
+                    stack_pop();
+                }
+                stack_push(arr);
+                break;
+            }
+            case OP_COPY: {
+                stack_push(stack_peek(0));
+                break;
+            }
+            case OP_COPY2: {
+                stack_push(stack_peek(1));
+                stack_push(stack_peek(1));
+                break;
+            }
+            case OP_INDEXING_GET: {
+                // [arr, index, top]
+                Value index_value = stack_pop();
+                if (!is_int(index_value)) {
+                    char *str = value_to_chars(index_value, NULL);
+                    runtime_error("%s is not an integer and cannot be used as an index");
+                    free(str);
+                    catch();
+                }
+                Value arr_value = stack_pop();
+                if (!is_ref_of(arr_value, OBJ_ARRAY)) {
+                    char *str = value_to_chars(arr_value, NULL);
+                    runtime_error("%s is not an array and does not support indexing");
+                    free(str);
+                    catch();
+                }
+                Array *array = as_array(arr_value);
+                int index = as_int(index_value);
+                stack_push(array->values[index]);
+                break;
+            }
+            case OP_INDEXING_SET: {
+                // op: [array, index, value, top]
+                Value value = stack_pop();
+                Value index_value = stack_pop();
+                if (!is_int(index_value)) {
+                    char *str = value_to_chars(index_value, NULL);
+                    runtime_error("%s is not an integer and cannot be used as an index");
+                    free(str);
+                    catch();
+                }
+                Value arr_value = stack_pop();
+                if (!is_ref_of(arr_value, OBJ_ARRAY)) {
+                    char *str = value_to_chars(arr_value, NULL);
+                    runtime_error("%s is not an array and does not support indexing");
+                    free(str);
+                    catch();
+                }
+                Array *array = as_array(arr_value);
+                int index = as_int(index_value);
+                array->values[index] = value;
+                stack_push(value);
                 break;
             }
             default: {
@@ -1078,6 +1174,8 @@ void init_VM() {
     init_table(&vm.const_table);
     vm.init_string = NULL; // prevent invalid address in gc
     vm.init_string = string_copy("init", 4);
+    vm.length_string = NULL;
+    vm.length_string = string_copy("length", 6);
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
     define_native("float", native_float, 1);

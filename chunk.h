@@ -47,13 +47,18 @@ typedef enum OpCode{
     OP_CLOSURE, // op, index: const[index]是一个函数，使用那个函数创建一个closure
     OP_CLOSE_UPVALUE, // op：将栈顶的值视为一个upvalue，将其close，然后从栈中移除之
     OP_CLASS, // op，index：创建一个class对象，它的名字是const[index]。将这个class置入栈顶
-    OP_GET_PROPERTY, // op, index：将栈顶的值视为一个instance，获取其名为const[index]的字段或者方法，置入栈顶
+    OP_GET_PROPERTY, // op, index：将栈顶的值视为一个instance，移除之，然后获取其名为const[index]的字段或者方法，置入栈顶
     OP_SET_PROPERTY, // op, index: [instance, value, top], 将value赋值给这个instance的名为const[index]的字段。该指令移除instance，但保留栈顶的value
     OP_METHOD, // op：[class, closure, top], 将closure储存为class的一个method。移除closure
     OP_PROPERTY_INVOKE, // op, index, arg_count: [receiver, args..., top]：从receiver中寻找名为const[index]的属性，然后调用之
     OP_INHERIT, // op: [superclass, subclass, top]: 让subclass继承superclass。移除subclass
     OP_SUPER_ACCESS, // op, index: [receiver, superclass, top]: 从superclass中寻找名为const[index]的方法，然后绑定给receiver。receiver和superclass都被移除，将帮绑定后的method置入栈顶。
     OP_SUPER_INVOKE, // op, index, arg_count: [receiver, args..., superclass, top]: 从superclass中寻找名为const[index]的方法，立刻调用之。
+    OP_COPY, // op: 复制栈顶的值，将其置入栈顶. [a, top] -> [a, a, top]
+    OP_COPY2, // op: 赋值栈顶的两个值，将他们置入栈顶。[a, b, top] -> [a, b, a, b, top]
+    OP_ARRAY, // op, dimension,
+    OP_INDEXING_GET, // op: [array, index, top]
+    OP_INDEXING_SET, // op: [array, index, value, top]
 } OpCode;
 
 typedef struct Chunk{
