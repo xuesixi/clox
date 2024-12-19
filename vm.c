@@ -18,6 +18,9 @@
 
 VM vm;
 
+String *INIT = NULL;
+String *LENGTH = NULL;
+
 jmp_buf error_buf;
 
 static CallFrame *curr_frame;
@@ -721,7 +724,7 @@ static InterpretResult run() {
                 Value value = stack_pop(); // instance
                 String *field = read_constant_string();
                 if (is_ref_of(value, OBJ_INSTANCE) == false) {
-                    if (is_ref_of(value, OBJ_ARRAY) && field == vm.length_string) {
+                    if (is_ref_of(value, OBJ_ARRAY) && field == LENGTH) {
                         Array *array = as_array(value);
                         stack_push(int_value(array->length));
                         break;
@@ -992,7 +995,7 @@ static void call_value(Value value, int arg_count) {
             Class *class = as_class(value);
             Instance *instance = new_instance(class);
             Value init_closure;
-            if (table_get(&class->methods, vm.init_string, &init_closure)) {
+            if (table_get(&class->methods, INIT, &init_closure)) {
                 Method *initializer = new_method(as_closure(init_closure), ref_value((Object *) instance));
                 call_value(ref_value((Object *) initializer), arg_count);
             } else if (arg_count != 0) {
@@ -1187,6 +1190,16 @@ static Value native_rand(int count, Value *value) {
 /* ------------------上面是静态函数定义-----------------------
    ------------------下面是申明在头文件中的函数定义----------------- */
 
+static String *auto_length_string_copy(const char *name) {
+    int len = strlen(name);
+    return string_copy(name, len);
+}
+
+static void init_vm_static_strings() {
+    INIT = auto_length_string_copy("init");
+    LENGTH = auto_length_string_copy("length");
+}
+
 void init_VM() {
     reset_stack();
     vm.objects = NULL;
@@ -1200,10 +1213,8 @@ void init_VM() {
     init_table(&vm.string_table);
     init_table(&vm.globals);
     init_table(&vm.const_table);
-    vm.init_string = NULL; // prevent invalid address in gc
-    vm.init_string = string_copy("init", 4);
-    vm.length_string = NULL;
-    vm.length_string = string_copy("length", 6);
+    init_vm_static_strings();
+
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
     define_native("float", native_float, 1);

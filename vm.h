@@ -29,9 +29,12 @@ typedef struct VM{
     Object **gray_stack;
     size_t allocated_size;
     size_t next_gc;
-    String *init_string;
-    String *length_string;
+//    String *init_string;
+//    String *length_string;
 } VM ;
+
+extern String *INIT;
+extern String *LENGTH;
 
 typedef enum {
     INTERPRET_OK,

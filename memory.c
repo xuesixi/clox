@@ -52,10 +52,10 @@ static void mark_roots() {
         mark_object((Object *) vm.frames[i].closure);
     }
 
-    mark_object((Object *) vm.init_string);
-    mark_object((Object *) vm.length_string);
+    mark_object((Object *) INIT);
+    mark_object((Object *) LENGTH);
 
-//    // mark open upvalues ? 暂时无法理解。理论上closure们应该可以引用这些值
+//    // mark open upvalues ? 暂时无法理解。这些值是open的，意味着它们仍然在作用域内，要么是在stack上，要么是在globals中。我认为没必要额外标记
 //    UpValueObject *curr = vm.open_upvalues;
 //    while (curr != NULL) {
 //        mark_object((Object *) curr);
