@@ -1158,7 +1158,7 @@ static int argument_list() {
             if (count == 255) {
                 error_at_previous("Cannot have more than 255 arguments");
             }
-            expression();
+            parse_precedence(PREC_ASSIGNMENT);
             count++;
         } while (match(TOKEN_COMMA));
     }

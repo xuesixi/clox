@@ -1,12 +1,25 @@
 
+class Animal {
+    init(name, age) {
+        this.name = name;
+        this.age = age;
+    }
 
-fun get(num) {
-    return num, num * 2;
+    run() {
+        print f("the animal # is running", this.name);
+    }
+
+    new() {
+        return Animal(f("son of #", this.name), 1);
+    }
 }
 
-var x = 10;
-var a = x = 20, 4;
+var dog = Animal("anda", 10);
+var cat = dog.new();
 
-set a, b = a;
+var arr = dog, cat;
+for (var i = 0; i < arr.length; i += 1) {
+    arr[i].run();
+}
 
 
