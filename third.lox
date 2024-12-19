@@ -1,12 +1,20 @@
 
 class Animal {
+
+    static types;
+
+    static show() {
+        print "this is the show() of animal!";
+    }
+
     init(name, age) {
         this.name = name;
         this.age = age;
     }
 
     run() {
-        print f("the animal # is running", this.name);
+        Animal.show();
+        print f("the animal # is running, and type is #", this.name, Animal.types);
     }
 
     new() {
@@ -15,11 +23,15 @@ class Animal {
 }
 
 var dog = Animal("anda", 10);
-var cat = dog.new();
+dog.run();
+Animal.types = 24;
+dog.run();
+Animal.show();
+// var cat = dog.new();
 
-var arr = dog, cat;
-for (var i = 0; i < arr.length; i += 1) {
-    arr[i].run();
-}
+// var arr = dog, cat;
+// for (var i = 0; i < arr.length; i += 1) {
+//     arr[i].run();
+// }
 
 

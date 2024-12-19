@@ -725,6 +725,14 @@ static InterpretResult run() {
                         Array *array = as_array(value);
                         stack_push(int_value(array->length));
                         break;
+                    } else if (is_ref_of(value, OBJ_CLASS)) {
+                        Class *class = as_class(value);
+                        Value static_field;
+                        if (! table_get(&class->static_fields, field, &static_field)) {
+                            runtime_error_catch_2("the class %s does not have the field %s", ref_value((Object *)class), ref_value((Object *)field));
+                        }
+                        stack_push(static_field);
+                        break;
                     } else {
                         runtime_error_catch_2("%s is not an object and does not have property %s", value, ref_value((Object *) field));
                     }
@@ -744,7 +752,17 @@ static InterpretResult run() {
                 Value value = stack_peek(0);
                 String *field = read_constant_string();
                 if (is_ref_of(target, OBJ_INSTANCE) == false) {
-                    runtime_error_catch_2("%s is not an object and does not have the property: %s", target, ref_value((Object*)field));
+                    if (is_ref_of(target, OBJ_CLASS)) {
+                        Class *class = as_class(target);
+                        Value static_field;
+                        if (! table_set(&class->static_fields, field, value)) {
+                            table_delete(&class->static_fields, field);
+                            runtime_error_catch_2("the class %s does not have the field %s", ref_value((Object *)class), ref_value((Object *)field));
+                        }
+                        break;
+                    } else {
+                        runtime_error_catch_2("%s is not an object and does not have the property: %s", target, ref_value((Object*)field));
+                    }
                 }
                 Instance *instance = as_instance(target);
                 table_set(&instance->fields, field, value); // potential gc
@@ -768,7 +786,17 @@ static InterpretResult run() {
                 int arg_count = read_byte();
                 Value receiver = stack_peek(arg_count);
                 if (!is_ref_of(receiver, OBJ_INSTANCE)) {
-                    runtime_error_catch_2("%s is not an object and does not have property %s", receiver, ref_value((Object *) name));
+                    if (is_ref_of(receiver, OBJ_CLASS)) {
+                        Class *class = as_class(receiver);
+                        Value static_field;
+                        if (! table_get(&class->static_fields, name, &static_field)) {
+                            runtime_error_catch_2("the class %s does not have the field %s", ref_value((Object *)class), ref_value((Object *)name));
+                        }
+                        call_value(static_field, arg_count);
+                        break;
+                    } else {
+                        runtime_error_catch_2("%s is not an object and does not have property %s", receiver, ref_value((Object *) name));
+                    }
                 }
                 Instance *instance = as_instance(receiver);
                 Value closure_value;
@@ -881,6 +909,15 @@ static InterpretResult run() {
             }
             case OP_UNPACK_ARRAY: {
                 int length = read_byte();
+                break;
+            }
+            case OP_CLASS_STATIC_FIELD: {
+                // [class, field, top]
+                String *name = read_constant_string();
+                Value field = stack_peek(0);
+                Class *class = as_class(stack_peek(1));
+                table_set(&class->static_fields, name, field);
+                stack_pop();
                 break;
             }
             default: {

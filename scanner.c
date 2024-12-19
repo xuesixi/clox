@@ -100,6 +100,7 @@ static TokenType identifier_type() {
                 switch (scanner.start[1]) {
                     case 'u': return check_keyword(2, 3, "per", TOKEN_SUPER);
                     case 'w': return check_keyword(2, 4, "itch", TOKEN_SWITCH);
+                    case 't': return check_keyword(2, 4, "atic", TOKEN_STATIC);
                 }
             }
         case 'v': return check_keyword(1, 2, "ar", TOKEN_VAR);

@@ -61,6 +61,7 @@ typedef enum OpCode{
     OP_DIMENSION_ARRAY, // op, dimension,
     OP_BUILD_ARRAY, // op, length
     OP_UNPACK_ARRAY, // op, length
+    OP_CLASS_STATIC_FIELD, // op, name_index: [class, field, top] -> [class, top]
 } OpCode;
 
 typedef struct Chunk{

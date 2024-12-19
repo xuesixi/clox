@@ -402,14 +402,35 @@ static void label_statement() {
     }
 }
 
-static void method_statement() {
-    consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
-    FunctionType type = TYPE_METHOD;
-    if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
-        type = TYPE_INITIALIZER;
+static void class_member() {
+    if (match(TOKEN_STATIC)) {
+        consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
+        int name = identifier_constant(&parser.previous);
+        if (check(TOKEN_LEFT_PAREN)) {
+            // static function
+            function_statement(TYPE_FUNCTION);
+            emit_two_bytes(OP_CLASS_STATIC_FIELD, name);
+        } else {
+            // static field
+            // static num = 10;
+            if (match(TOKEN_EQUAL)) {
+                expression();
+                consume(TOKEN_SEMICOLON, "Expect semicolon");
+            } else {
+                consume(TOKEN_SEMICOLON, "Expect expression or semicolon");
+                emit_byte(OP_NIL);
+            }
+            emit_two_bytes(OP_CLASS_STATIC_FIELD, name);
+        }
+    } else {
+        consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
+        FunctionType type = TYPE_METHOD;
+        if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
+            type = TYPE_INITIALIZER;
+        }
+        function_statement(type);
+        emit_byte(OP_METHOD);
     }
-    function_statement(type);
-    emit_byte(OP_METHOD);
 }
 
 static void class_declaration() {
@@ -465,14 +486,14 @@ static void class_declaration() {
     named_variable(&class_name, false);
 
     // no inheritance: sub, top
-    // inheritance: sub, super, top
+    // inheritance: super, sub, top
 
     while (check(TOKEN_RIGHT_BRACE) == false && check(TOKEN_EOF) == false) {
-        method_statement();
+        class_member();
     }
 
     // no inheritance: sub, top
-    // inheritance: sub, super, top
+    // inheritance: super, sub, top
 
     consume(TOKEN_RIGHT_BRACE, "} is needed to terminate a class definition");
 
@@ -520,6 +541,9 @@ static inline void mark_initialized() {
     }
 }
 
+/**
+ * 解析函数的参数列表和函数体，但不包括函数名的申明。将函数储存入常数中，然后产生op-closure以及upvalue指令
+ */
 static void function_statement(FunctionType type) {
 
     // 函数具有新的scope

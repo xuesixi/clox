@@ -157,6 +157,7 @@ Class *new_class(String *name) {
     Class *class = (Class *) allocate_object(sizeof(Class), OBJ_CLASS);
     class->name = name;
     init_table(&class->methods);
+    init_table(&class->static_fields);
     return class;
 }
 //

@@ -78,6 +78,7 @@ typedef struct Class {
     Object object;
     String *name;
     Table methods;
+    Table static_fields;
 } Class;
 
 typedef struct Instance {

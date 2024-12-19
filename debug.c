@@ -214,6 +214,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("INDEXING_GET", offset);
         case OP_INDEXING_SET:
             return simple_instruction("INDEXING_SET", offset);
+        case OP_CLASS_STATIC_FIELD:
+            return simple_instruction("CLASS_STATIC_FIELD", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;
