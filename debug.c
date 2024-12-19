@@ -204,8 +204,12 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return constant_instruction("SUPER_ACCESS", chunk, offset);
         case OP_SUPER_INVOKE:
             return invoke_instruction("SUPER_INVOKE", chunk, offset);
-        case OP_ARRAY:
-            return constant_instruction("ARRAY", chunk, offset);
+        case OP_DIMENSION_ARRAY:
+            return constant_instruction("DIMENSION_ARRAY", chunk, offset);
+        case OP_BUILD_ARRAY:
+            return constant_instruction("BUILD_ARRAY", chunk, offset);
+        case OP_UNPACK_ARRAY:
+            return constant_instruction("UNPACK_ARRAY", chunk, offset);
         case OP_INDEXING_GET:
             return simple_instruction("INDEXING_GET", offset);
         case OP_INDEXING_SET:

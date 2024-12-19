@@ -1,45 +1,14 @@
-fun hey() {
-    class Animal {
-    
-        init(name, age) {
-            this.name = name;
-            this.age = age;
-        }
-    
-        eat() {
-            print f("the animal # is eating", this.name);
-        }
-    
-        run() {
-            print f("the animal # is running", this.name);
-        }
-    }
-    
-    class Dog: Animal {
-    
-        init(name, age) {
-            this.name = name;
-            this.age = age;
-        }
-    
-        run() {
-            print f("the dog # is running", this.name);
-            super.run();
-        }
-    }
 
-    class BigDog: Dog {
-        init(name, age) {
-            super.init(name, age);
-        }
-
-        bow() {
-            this.run();
-        }
+fun one(len) {
+    var arr = [len];
+    for (var i = 0; i < len; i += 1) {
+        arr[i] = 1;
     }
-    
-    var bd = BigDog("hunan", 3);
-    bd.bow();
+    return arr;
 }
 
-hey();
+var a = one(5);
+for (var i = 0; i < a.length; i += 1) {
+    print a[i];
+}
+

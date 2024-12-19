@@ -46,7 +46,9 @@ static void call_value(Value value, int arg_count);
 
 static void runtime_error(const char *format, ...);
 
-static void runtime_error_with_one_value_then_catch(const char *format, Value value);
+static void runtime_error_catch_1(const char *format, Value value);
+
+static void runtime_error_catch_2(const char *format, Value v1, Value v2);
 
 static void catch();
 
@@ -56,15 +58,17 @@ static void invoke_from_class(Class *class, String *name, int arg_count);
 
 static void call_closure(Closure *closure, int arg_count);
 
+static Value multi_dimension_array(int dimension, Value *lens);
+
 
 
 // ------------------上面是静态函数申明-----------------------
-// ------------------下面是静态函数定义----------------------- 
+// ------------------下面是静态函数定义-----------------------
 
 static Value multi_dimension_array(int dimension, Value *lens) {
     Value len_value = *lens;
     if (!is_int(len_value)) {
-        runtime_error_with_one_value_then_catch("%s cannot be used as array length", len_value);
+        runtime_error_catch_1("%s cannot be used as the array length", len_value);
     }
     int len = as_int(*lens);
     Array *arr = new_array(len);
@@ -272,10 +276,19 @@ static void runtime_error(const char *format, ...) {
     reset_stack();
 }
 
-static void runtime_error_with_one_value_then_catch(const char *format, Value value) {
+static void runtime_error_catch_1(const char *format, Value value) {
     char *str = value_to_chars(value, NULL);
     runtime_error(format, str);
     free(str);
+    catch();
+}
+
+static void runtime_error_catch_2(const char *format, Value v1, Value v2) {
+    char *str1 = value_to_chars(v1, NULL);
+    char *str2 = value_to_chars(v2, NULL);
+    runtime_error(format, str1, str2);
+    free(str1);
+    free(str2);
     catch();
 }
 
@@ -510,12 +523,7 @@ static InterpretResult run() {
                 if (is_number(a) && is_number(b)) {
                     stack_push(float_value(pow(AS_NUMBER(a), AS_NUMBER(b))));
                 } else {
-                    char *a_text = value_to_chars(a, NULL);
-                    char *b_text = value_to_chars(b, NULL);
-                    runtime_error("the operands, %s and %s, do not support the power operation", a_text, b_text);
-                    free(a_text);
-                    free(b_text);
-                    catch();
+                    runtime_error_catch_2("the operands, %s and %s, do not support the power operation", a, b);
                 }
                 break;
             }
@@ -718,10 +726,7 @@ static InterpretResult run() {
                         stack_push(int_value(array->length));
                         break;
                     } else {
-                        char *str = value_to_chars(value, NULL);
-                        runtime_error("%s is not an object and does not have property", str);
-                        free(str);
-                        catch();
+                        runtime_error_catch_2("%s is not an object and does not have property %s", value, ref_value((Object *) field));
                     }
                 }
                 Instance *instance = as_instance(value);
@@ -739,10 +744,7 @@ static InterpretResult run() {
                 Value value = stack_peek(0);
                 String *field = read_constant_string();
                 if (is_ref_of(target, OBJ_INSTANCE) == false) {
-                    char *str = value_to_chars(target, NULL);
-                    runtime_error("%s is not an object and does not have the property: %s", str, field->chars);
-                    free(str);
-                    catch();
+                    runtime_error_catch_2("%s is not an object and does not have the property: %s", target, ref_value((Object*)field));
                 }
                 Instance *instance = as_instance(target);
                 table_set(&instance->fields, field, value); // potential gc
@@ -766,10 +768,7 @@ static InterpretResult run() {
                 int arg_count = read_byte();
                 Value receiver = stack_peek(arg_count);
                 if (!is_ref_of(receiver, OBJ_INSTANCE)) {
-                    char *str = value_to_chars(receiver, NULL);
-                    runtime_error("%s is not object and does not have property %s", str, name->chars);
-                    free(str);
-                    catch();
+                    runtime_error_catch_2("%s is not an object and does not have property %s", receiver, ref_value((Object *) name));
                 }
                 Instance *instance = as_instance(receiver);
                 Value closure_value;
@@ -785,10 +784,7 @@ static InterpretResult run() {
                 //  super,sub,top
                 Value super = stack_peek(1);
                 if (!is_ref_of(super, OBJ_CLASS)) {
-                    char *str = value_to_chars(super, NULL);
-                    runtime_error("%s cannot be used as a super class", str);
-                    free(str);
-                    catch();
+                    runtime_error_catch_1("%s cannot be used as a super class", super);
                 }
                 Class *sub = as_class(stack_peek(0));
                 Class *super_class = as_class(super);
@@ -817,7 +813,7 @@ static InterpretResult run() {
                 invoke_from_class(class, name, arg_count);
                 break;
             }
-            case OP_ARRAY: {
+            case OP_DIMENSION_ARRAY: {
                 // [len1, len2, top]
                 int dimension = read_byte();
                 Value arr = multi_dimension_array(dimension, vm.stack_top - dimension);
@@ -840,20 +836,17 @@ static InterpretResult run() {
                 // [arr, index, top]
                 Value index_value = stack_pop();
                 if (!is_int(index_value)) {
-                    char *str = value_to_chars(index_value, NULL);
-                    runtime_error("%s is not an integer and cannot be used as an index");
-                    free(str);
-                    catch();
+                    runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
                 }
                 Value arr_value = stack_pop();
                 if (!is_ref_of(arr_value, OBJ_ARRAY)) {
-                    char *str = value_to_chars(arr_value, NULL);
-                    runtime_error("%s is not an array and does not support indexing");
-                    free(str);
-                    catch();
+                    runtime_error_catch_1("%s is not an array and does not support indexing", arr_value);
                 }
                 Array *array = as_array(arr_value);
                 int index = as_int(index_value);
+                if (index < 0 || index >= array->length) {
+                    runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
+                }
                 stack_push(array->values[index]);
                 break;
             }
@@ -862,22 +855,32 @@ static InterpretResult run() {
                 Value value = stack_pop();
                 Value index_value = stack_pop();
                 if (!is_int(index_value)) {
-                    char *str = value_to_chars(index_value, NULL);
-                    runtime_error("%s is not an integer and cannot be used as an index");
-                    free(str);
-                    catch();
+                    runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
                 }
                 Value arr_value = stack_pop();
                 if (!is_ref_of(arr_value, OBJ_ARRAY)) {
-                    char *str = value_to_chars(arr_value, NULL);
-                    runtime_error("%s is not an array and does not support indexing");
-                    free(str);
-                    catch();
+                    runtime_error_catch_1("%s is not an array and does not support indexing", arr_value);
                 }
                 Array *array = as_array(arr_value);
                 int index = as_int(index_value);
+                if (index < 0 || index >= array->length) {
+                    runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
+                }
                 array->values[index] = value;
                 stack_push(value);
+                break;
+            }
+            case OP_BUILD_ARRAY: {
+                int length = read_byte();
+                Array *array = new_array(length);
+                for (int i = length - 1; i >= 0; i --) {
+                    array->values[i] = stack_pop();
+                }
+                stack_push(ref_value((Object *) array));
+                break;
+            }
+            case OP_UNPACK_ARRAY: {
+                int length = read_byte();
                 break;
             }
             default: {
@@ -900,10 +903,7 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
     Value closure_value;
     if (!table_get(&class->methods, name, &closure_value)) {
         Value receiver = stack_peek(arg_count);
-        char *str = value_to_chars(receiver, NULL);
-        runtime_error("%s does not have the property or method %s", str, name->chars);
-        free(str);
-        catch();
+        runtime_error_catch_2("%s does not have the property or method %s", receiver, ref_value((Object *) name));
     }
     call_closure(as_closure(closure_value), arg_count);
 }
@@ -933,10 +933,7 @@ static void call_closure(Closure *closure, int arg_count) {
  */
 static void call_value(Value value, int arg_count) {
     if (!is_ref(value)) {
-        char *name = value_to_chars(value, NULL);
-        runtime_error("%s is not callable", name);
-        free(name);
-        catch();
+        runtime_error_catch_1("%s is not callable", value);
     }
     switch (as_ref(value)->type) {
         case OBJ_CLOSURE: {
@@ -977,19 +974,13 @@ static void call_value(Value value, int arg_count) {
             break;
         }
         default: {
-            char *name = value_to_chars(value, NULL);
-            runtime_error("%s is not callable", name);
-            free(name);
-            catch();
+            runtime_error_catch_1("%s is not callable", value);
         }
     }
 }
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
-//    String *str = string_copy(name, len);
-//    NativeFunction *nativeFunction = new_native(impl);
-//    table_set(&vm.globals, str, ref_value((Object*)nativeFunction));
 
     stack_push(ref_value((Object *) string_copy(name, len)));
     stack_push(ref_value((Object *) new_native(impl, as_string(vm.stack[0]), arity)));

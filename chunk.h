@@ -56,9 +56,11 @@ typedef enum OpCode{
     OP_SUPER_INVOKE, // op, index, arg_count: [receiver, args..., superclass, top]: 从superclass中寻找名为const[index]的方法，立刻调用之。
     OP_COPY, // op: 复制栈顶的值，将其置入栈顶. [a, top] -> [a, a, top]
     OP_COPY2, // op: 赋值栈顶的两个值，将他们置入栈顶。[a, b, top] -> [a, b, a, b, top]
-    OP_ARRAY, // op, dimension,
     OP_INDEXING_GET, // op: [array, index, top]
     OP_INDEXING_SET, // op: [array, index, value, top]
+    OP_DIMENSION_ARRAY, // op, dimension,
+    OP_BUILD_ARRAY, // op, length
+    OP_UNPACK_ARRAY, // op, length
 } OpCode;
 
 typedef struct Chunk{

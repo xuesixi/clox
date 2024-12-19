@@ -39,6 +39,7 @@ typedef struct ClassScope {
 
 typedef enum {
     PREC_NONE,
+    PREC_COMMA,
     PREC_ASSIGNMENT,  // =
     PREC_OR,          // or
     PREC_AND,         // and
@@ -156,7 +157,7 @@ static void expression();
 
 static void arithmetic_equal(OpCode set_op, OpCode get_op, int index, int copy);
 
-static void make_array(bool can_assign);
+static void dimension_array(bool can_assign);
 
 static void float_num(bool can_assign);
 
@@ -187,6 +188,8 @@ static void and(bool can_assign);
 static void or(bool can_assign);
 
 static void dot(bool can_assign);
+
+static void array_literal(bool can_assign);
 
 static void lambda(bool can_assign);
 
@@ -242,12 +245,13 @@ static int add_upvalue(Scope *scope, int index, bool is_local);
 
 //-------------------------------------------------------------------------
 
+// 该数组决定一个token用作expression时如何解析。不涉及statement
 ParseRule rules[] = {
         [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
-        [TOKEN_COMMA]         = {NULL, NULL, PREC_NONE},
+        [TOKEN_COMMA]         = {NULL, array_literal, PREC_COMMA},
         [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
         [TOKEN_MINUS]         = {unary, binary, PREC_TERM},
         [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
@@ -289,7 +293,7 @@ ParseRule rules[] = {
         [TOKEN_LABEL]         = {NULL, NULL, PREC_NONE},
         [TOKEN_ERROR]         = {NULL, NULL, PREC_NONE},
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
-        [TOKEN_LEFT_BRACKET]  = {make_array, indexing, PREC_CALL},
+        [TOKEN_LEFT_BRACKET]  = {dimension_array, indexing, PREC_CALL},
         [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
 };
 
@@ -299,6 +303,24 @@ void mark_compiler_roots() {
         mark_object((Object *) curr->function);
         curr = curr->enclosing;
     }
+}
+
+static void array_literal(bool can_assign) {
+//    (void ) can_assign;
+    // a, b = 1, 2
+    // a, b = c, d = 1, 2
+    parse_precedence(PREC_COMMA + 1);
+    int length = 2;
+    while (!check(TOKEN_EOF) && match(TOKEN_COMMA)) {
+        parse_precedence(PREC_COMMA + 1);
+        length ++;
+    }
+//    if (can_assign && match(TOKEN_EQUAL)) {
+//        expression();
+//        emit_two_bytes(OP_UNPACK_ARRAY, length);
+//    } else {
+        emit_two_bytes(OP_BUILD_ARRAY, length);
+//    }
 }
 
 static inline bool lexeme_equal(Token *a, Token *b) {
@@ -1193,7 +1215,7 @@ static inline void expression_statement() {
 }
 
 static inline void expression() {
-    parse_precedence(PREC_ASSIGNMENT);
+    parse_precedence(PREC_COMMA);
 }
 
 static void dot(bool can_assign) {
@@ -1475,7 +1497,7 @@ static void super_expression(bool can_assign) {
     }
 }
 
-static void make_array(bool can_assign) {
+static void dimension_array(bool can_assign) {
     (void) can_assign;
     expression();
     consume(TOKEN_RIGHT_BRACKET, "Expect a ]");
@@ -1485,7 +1507,7 @@ static void make_array(bool can_assign) {
         dimension ++;
         consume(TOKEN_RIGHT_BRACKET, "Expect a ]");
     }
-    emit_two_bytes(OP_ARRAY, dimension);
+    emit_two_bytes(OP_DIMENSION_ARRAY, dimension);
 }
 
 static inline void float_num(bool can_assign) {
