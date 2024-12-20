@@ -106,6 +106,10 @@ static void main_run_bytecode(const char *code_path) {
 int main(int argc, char *const argv[]) {
 
     init_VM();
+#ifdef JUST_SCRIPT
+    run_file(argv[1]);
+    return 0;
+#endif
     char *options = "dlsc:bh";
     char op;
     while ((op = getopt(argc, argv, options)) != -1) {

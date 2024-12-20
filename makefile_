@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Wformat -g 
+CFLAGS = -Wall -Wextra -Wformat -g -Wno-clobbered 
 SRC = chunk.c compiler.c debug.c io.c main.c memory.c object.c scanner.c table.c value.c vm.c
 OBJ = $(SRC:.c=.o)
 TARGET = clox
@@ -7,7 +7,7 @@ TARGET = clox
 all: $(TARGET)
 
 $(TARGET): $(OBJ) 
-	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm
+	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm -l bsd
 
 o: $(SRC)
 	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm -l bsd
@@ -20,28 +20,22 @@ run: $(TARGET)
 
 f: file
 
-%.o: %.c common.h %.h
-	@$(CC) $(CFLAGS) -c $< -o $@
-
-.PHONY: lldb
-lldb: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm 
-	@lldb $(TARGET)
-
-.PHONY: gdb
-gdb: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm
-	@gdb $(TARGET)
-
-clion_debug: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm
-
-.PHONY: clean
-clean:
-	@rm *.o
-
 .PHONY: file
 file: $(TARGET)
 	@./$(TARGET) -ds test.lox
 	@rm $(OBJ)
 	@rm $(TARGET)
+
+%.o: %.c common.h %.h
+	@$(CC) $(CFLAGS) -c $< -o $@
+
+debug: $(OBJ)
+	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm -l bsd
+	# @lldb $(TARGET)
+
+clion_debug: $(OBJ)
+	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm -l bsd
+
+.PHONY: clean
+clean:
+	@rm *.o

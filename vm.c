@@ -490,6 +490,7 @@ static InterpretResult run() {
                 } else {
                     runtime_error_and_catch("the value of type: %d is cannot be negated", value.type);
                 }
+		break;
             }
             case OP_ADD: {
                 Value b = stack_pop();
@@ -1040,7 +1041,8 @@ static Value native_read(int count, Value *values) {
         print_value(*values);
     }
     size_t len;
-    char *line = fgetln(stdin, &len);
+    char *line;
+    getline(&line, &len, stdin);
     String *str = string_copy(line, len - 1); // NOLINT
     free(line);
     return ref_value((Object *) str);
@@ -1306,6 +1308,12 @@ InterpretResult import(const char *src) {
         return INTERPRET_COMPILE_ERROR;
     }
     stack_push(ref_value((Object *) function));
+
+    Table module_globals;
+    init_table(& module_globals);
+
+    Table old_globals = vm.globals;
+    vm.globals = module_globals;
 
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;

@@ -7,34 +7,33 @@
 
 static uint32_t chars_hash(const char *key, int length);
 
-//inline bool is_ref_of(Value value, ObjectType type) {
-//    return is_ref(value) && as_ref(value)->type == type;
-//}
-
-//inline String *as_string(Value value) {
-//    return (String *) as_ref(value);
-//}
-
-//inline LoxFunction *as_function(Value value) {
-//    return (LoxFunction *) as_ref(value);
-//}
-//
-//inline NativeFunction *as_native(Value value) {
-//    return (NativeFunction *) as_ref(value);
-//}
-//
-//inline Closure *as_closure(Value value) {
-//    return (Closure *) as_ref(value);
-//}
-
 /**
- * 从指定的 src 处产生一个新的 String。原 char*不会被修改。
+ * 使用指定的 src 产生一个 String。
+ * 如果同值的string已存在，那么直接返回那个对象。
+ * 否则，分配新的内存空间以复制那些字符，并创建一个string。
+ * 原char*不会被引用，也不会被修改。
  * */
 String *string_copy(const char *src, int length) {
+
+    uint32_t hash = chars_hash(src, length);
+
+    String *interned = table_find_string(&vm.string_table, src, length, hash);
+
+    if (interned != NULL) {
+        return interned;
+    }
+
+    String *str = (String *) allocate_object(sizeof(String), OBJ_STRING);
+    stack_push(ref_value((Object *) str));
     char *chars = ALLOCATE(char, length + 1);
     memcpy(chars, src, length);
     chars[length] = '\0';
-    return string_allocate(chars, length);
+    str->chars = chars;
+    str->length = length;
+    str->hash = hash;
+    table_set(&vm.string_table, str, nil_value());
+    stack_pop();
+    return str;
 }
 
 /**
@@ -160,21 +159,13 @@ Class *new_class(String *name) {
     init_table(&class->static_fields);
     return class;
 }
-//
-//inline Class *as_class(Value value) {
-//    return (Class *) as_ref(value);
-//}
-//
+
 Instance *new_instance(Class *class) {
     Instance *instance = (Instance *) allocate_object(sizeof(Instance), OBJ_INSTANCE);
     instance->class = class;
     init_table(&instance->fields);
     return instance;
 }
-
-//Instance *as_instance(Value value) {
-//    return (Instance *) as_ref(value);
-//}
 
 Method *new_method(Closure *closure, Value value) {
     Method *method = (Method *) allocate_object(sizeof(Method), OBJ_METHOD);
@@ -183,10 +174,6 @@ Method *new_method(Closure *closure, Value value) {
     return method;
 }
 
-//inline Method *as_method(Value value) {
-//    return (Method *) as_ref(value);
-//}
-
 Array *new_array(int length) {
     Value *values = ALLOCATE(Value, length);
     Array *array = (Array *) allocate_object(sizeof(Array), OBJ_ARRAY);
@@ -194,10 +181,6 @@ Array *new_array(int length) {
     array->values = values;
     return array;
 }
-//
-//Array *as_array(Value value) {
-//
-//}
 
 
 

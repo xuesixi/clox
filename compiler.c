@@ -310,6 +310,7 @@ static void array_literal(bool can_assign) {
     // a, b = 1, 2
     // a, b = c, d = 1, 2
     parse_precedence(PREC_COMMA + 1);
+    (void) can_assign;
     int length = 2;
     while (!check(TOKEN_EOF) && match(TOKEN_COMMA)) {
         parse_precedence(PREC_COMMA + 1);

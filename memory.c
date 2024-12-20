@@ -239,7 +239,7 @@ void free_object(Object *object) {
     switch (object->type) {
         case OBJ_STRING: {
             String *str = (String *) object;
-            FREE_ARRAY(char, 0, str->length + 1);
+            FREE_ARRAY(char, str->chars, str->length + 1);
             re_allocate(object, sizeof(String), 0);
             break;
         }
