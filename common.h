@@ -12,8 +12,9 @@
 //#define DEBUG_LOG_MARK_BLACKEN
 //#define DEBUG_LOG_GC_ALLOCATE
 //#define DEBUG_LOG_GC_FREE
+//#define DEBUG_LOG_GC_SUMMARY
 
-#define JUST_SCRIPT
+//#define JUST_SCRIPT
 
 #define FRAME_MAX 64
 #define STACK_MAX (FRAME_MAX * UINT8_MAX)

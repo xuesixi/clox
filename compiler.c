@@ -434,6 +434,26 @@ static void class_member() {
     }
 }
 
+static void import_statement() {
+    // import "path/to/module" as good;
+    consume(TOKEN_STRING, "Expect module path");
+    string(false);
+    consume(TOKEN_AS, "Expect as");
+
+    int name_index = parse_identifier_declaration(false);
+
+    consume(TOKEN_SEMICOLON, "Expect ;");
+    emit_byte(OP_IMPORT);
+    emit_byte(OP_RESTORE_MODULE);
+
+    if (current_scope->depth == 0) {
+        emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
+    } else {
+        mark_initialized();
+    }
+
+}
+
 static void class_declaration() {
 
     consume(TOKEN_IDENTIFIER, "An identifier is expected class");
@@ -524,6 +544,8 @@ static void declaration() {
         fun_declaration();
     } else if (match(TOKEN_CLASS)) {
         class_declaration();
+    } else if (match(TOKEN_IMPORT)){
+        import_statement();
     } else {
         statement();
     }
@@ -755,7 +777,7 @@ static inline int parse_identifier_declaration(bool is_const) {
 }
 
 /**
- * 将标识符token添加入常数中，然后返回其索引
+ * 根据标识符token产生一个String，将其添加入常数中，然后返回其索引
  * @return 常数中的索引
  */
 static inline int identifier_constant(Token *name) {

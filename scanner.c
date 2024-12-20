@@ -69,7 +69,15 @@ static TokenType check_keyword(int start, int length, const char *rest, TokenTyp
 
 static TokenType identifier_type() {
     switch (scanner.start[0]) {
-        case 'a': return check_keyword(1, 2, "nd", TOKEN_AND);
+        case 'a': {
+            if (is_keyword(1, 1, "s")) {
+                return TOKEN_AS;
+            } else if (is_keyword(1, 2, "nd")) {
+                return TOKEN_AND;
+            } else {
+                return TOKEN_IDENTIFIER;
+            }
+        }
         case 'b': return check_keyword(1, 4, "reak", TOKEN_BREAK);
         case 'c':
             if (scanner.current - scanner.start > 1) {
@@ -90,7 +98,15 @@ static TokenType identifier_type() {
             break;
         case 'e': return check_keyword(1, 3, "lse", TOKEN_ELSE);
         case 'd': return check_keyword(1, 6, "efault", TOKEN_DEFAULT);
-        case 'i': return check_keyword(1, 1, "f", TOKEN_IF);
+        case 'i': {
+            if (is_keyword(1, 1, "f")) {
+                return TOKEN_IF;
+            } else if (is_keyword(1, 5, "mport")) {
+                return TOKEN_IMPORT;
+            } else {
+                return TOKEN_IDENTIFIER;
+            }
+        }
         case 'n': return check_keyword(1, 2, "il", TOKEN_NIL);
         case 'o': return check_keyword(1, 1, "r", TOKEN_OR);
         case 'p': return check_keyword(1, 4, "rint", TOKEN_PRINT);

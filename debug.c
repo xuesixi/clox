@@ -216,6 +216,10 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("INDEXING_SET", offset);
         case OP_CLASS_STATIC_FIELD:
             return simple_instruction("CLASS_STATIC_FIELD", offset);
+        case OP_IMPORT:
+            return simple_instruction("IMPORT", offset);
+        case OP_RESTORE_MODULE:
+            return simple_instruction("RESTORE_MODULE", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

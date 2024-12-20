@@ -47,8 +47,10 @@ static void repl() {
 
 static char *read_file(const char *path) {
     FILE *file = fopen(path, "r");
-    assert(file != NULL);
-
+    if (file == NULL) {
+        printf("error when opening file %s\n", path);
+        exit(1);
+    }
     fseek(file, 0L, SEEK_END);
     size_t size = ftell(file);
     rewind(file);

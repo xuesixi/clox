@@ -10,7 +10,7 @@ $(TARGET): $(OBJ)
 	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm
 
 o: $(SRC)
-	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm -l bsd
+	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm
 
 .PHONY: run
 run: $(TARGET)
@@ -38,7 +38,7 @@ clion_debug: $(OBJ)
 
 .PHONY: clean
 clean:
-	@rm *.o
+	@rm -f *.o
 
 .PHONY: file
 file: $(TARGET)

@@ -201,12 +201,12 @@ void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
 #endif
 
     if (!compiling && vm.allocated_size > vm.next_gc) {
-#ifdef DEBUG_LOG_GC_FREE
+#ifdef DEBUG_LOG_GC_SUMMARY
         printf("gc begin >>> size before gc: %zu\n", vm.allocated_size);
 #endif
         gc();
         vm.next_gc = vm.allocated_size * GC_GROW_FACTOR;
-#ifdef DEBUG_LOG_GC_FREE
+#ifdef DEBUG_LOG_GC_SUMMARY
         printf("<<< gc end. size after gc: %zu, next gc threshold: %zu\n", vm.allocated_size, vm.next_gc);
         NEW_LINE();
 #endif
