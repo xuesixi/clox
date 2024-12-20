@@ -9,7 +9,8 @@
 #include "setjmp.h"
 
 //#define DEBUG_STRESS_GC
-//#define DEBUG_LOG_GC
+//#define DEBUG_LOG_MARK_BLACKEN
+//#define DEBUG_LOG_GC_ALLOCATE
 //#define DEBUG_LOG_GC_FREE
 
 #define FRAME_MAX 64

@@ -23,6 +23,7 @@ typedef struct VM{
     Object *objects; // 所有object的值
     Table string_table; // 同名的String只会创建一次。
     Table globals; // 储存所有全局变量
+    Table builtin;
     Table const_table;  // 储存所有const的全局变量。(const的全局变量会同时存在与globals和const_table中）
     int gray_count;
     int gray_capacity;
@@ -35,6 +36,7 @@ typedef struct VM{
 
 extern String *INIT;
 extern String *LENGTH;
+extern String *ARRAY_ITERATOR;
 
 typedef enum {
     INTERPRET_OK,

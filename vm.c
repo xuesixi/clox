@@ -20,6 +20,7 @@ VM vm;
 
 String *INIT = NULL;
 String *LENGTH = NULL;
+String *ARRAY_ITERATOR = NULL;
 
 jmp_buf error_buf;
 
@@ -600,6 +601,8 @@ static InterpretResult run() {
                 Value value;
                 if (table_get(&vm.globals, name, &value)) {
                     stack_push(value);
+                } else if (table_get(&vm.builtin, name, &value)){
+                    stack_push(value);
                 } else {
                     runtime_error_and_catch("Accessing an undefined variable: %s", name->chars);
                 }
@@ -1024,7 +1027,7 @@ static void define_native(const char *name, NativeImplementation impl, int arity
 
     stack_push(ref_value((Object *) string_copy(name, len)));
     stack_push(ref_value((Object *) new_native(impl, as_string(vm.stack[0]), arity)));
-    table_set(&vm.globals, as_string(vm.stack[0]), vm.stack[1]);
+    table_set(&vm.builtin, as_string(vm.stack[0]), vm.stack[1]);
     stack_pop();
     stack_pop();
 }
@@ -1038,7 +1041,7 @@ static Value native_read(int count, Value *values) {
     }
     size_t len;
     char *line = fgetln(stdin, &len);
-    String *str = string_copy(line, len - 1);
+    String *str = string_copy(line, len - 1); // NOLINT
     free(line);
     return ref_value((Object *) str);
 }
@@ -1066,7 +1069,7 @@ static Value native_format(int count, Value *values) {
         // buf overflow checking
         if (buf_len + new_len > capacity) {
             capacity = max(2 * capacity, buf_len + new_len);
-            buf = realloc(buf, capacity);
+            buf = realloc(buf, capacity); // NOLINT
         }
 
         memcpy(buf + buf_len, format + pre, new_len);
@@ -1093,7 +1096,7 @@ static Value native_format(int count, Value *values) {
 
             if (v_chars_len + buf_len > capacity) {
                 capacity = max(2 * capacity, v_chars_len + buf_len);
-                buf = realloc(buf, capacity);
+                buf = realloc(buf, capacity); // NOLINT
             }
             memcpy(buf + buf_len, v_chars, v_chars_len);
             buf_len += v_chars_len;
@@ -1128,7 +1131,7 @@ static Value native_int(int count, Value *value) {
             if (is_ref_of(*value, OBJ_STRING)) {
                 String *str = as_string(*value);
                 char *end;
-                int result = strtol(str->chars, &end, 10);
+                int result = strtol(str->chars, &end, 10); // NOLINT
                 if (end == str->chars) {
                     runtime_error_and_catch("not a valid int: %s", str->chars);
                 }
@@ -1183,22 +1186,29 @@ static Value native_rand(int count, Value *value) {
     if (!is_int(a) || !is_int(b)) {
         runtime_error_and_catch("arguments need to be int");
     }
-    return int_value(as_int(a) + rand() % as_int(b));
+    return int_value(as_int(a) + rand() % as_int(b)); // NOLINT(*-msc50-cpp)
 }
 
-
-/* ------------------上面是静态函数定义-----------------------
-   ------------------下面是申明在头文件中的函数定义----------------- */
+//Class *array_iterator_class() {
+//    Class *class = new_class(ARRAY_ITERATOR);
+//}
+//
+//Instance *get_arr_iter(Array *array) {
+//
+//}
 
 static String *auto_length_string_copy(const char *name) {
-    int len = strlen(name);
+    int len = strlen(name); // NOLINT
     return string_copy(name, len);
 }
 
 static void init_vm_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
+    ARRAY_ITERATOR = auto_length_string_copy("$ArrayIterator");
 }
+
+
 
 void init_VM() {
     reset_stack();
@@ -1209,7 +1219,8 @@ void init_VM() {
     vm.gray_stack = NULL;
     vm.allocated_size = 0;
     vm.next_gc = INITIAL_GC_SIZE;
-    srand(time(NULL));
+    srand(time(NULL)); // NOLINT(*-msc51-cpp)
+    init_table(&vm.builtin);
     init_table(&vm.string_table);
     init_table(&vm.globals);
     init_table(&vm.const_table);
@@ -1236,6 +1247,7 @@ void additional_repl_init() {
  */
 void free_VM() {
     free_all_objects();
+    free_table(&vm.builtin);
     free_table(&vm.string_table);
     free_table(&vm.globals);
     free_table(&vm.const_table);
@@ -1259,7 +1271,6 @@ inline Value stack_pop() {
 /**
  * 先调用 compile 将源代码编译成字节码，然后运行字节码.
  * 在repl中，每一次输入都将执行该函数.
- * Chunk会在该函数内部产生、消失
  * @return 执行结果（是否出错等）
  */
 InterpretResult interpret(const char *src) {
@@ -1269,6 +1280,31 @@ InterpretResult interpret(const char *src) {
         return INTERPRET_COMPILE_ERROR;
     }
 
+    stack_push(ref_value((Object *) function));
+
+    vm.frame_count++;
+    curr_frame = vm.frames + vm.frame_count - 1;
+    CallFrame *frame = curr_frame;
+
+    Closure *closure = new_closure(function);
+    frame->closure = closure;
+    frame->FP = vm.stack;
+    frame->PC = function->chunk.code;
+
+    stack_pop();
+
+    stack_push(ref_value((Object *) closure));
+
+    return run();
+}
+
+InterpretResult import(const char *src) {
+
+    LoxFunction *function = compile(src);
+
+    if (function == NULL) {
+        return INTERPRET_COMPILE_ERROR;
+    }
     stack_push(ref_value((Object *) function));
 
     vm.frame_count++;

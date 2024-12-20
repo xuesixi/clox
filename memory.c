@@ -15,7 +15,7 @@ void mark_object(Object *object) {
         return;
     }
 
-#ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_MARK_BLACKEN
     printf("%p mark ", (void*)object);
     print_value_with_color(ref_value(object));
     printf("\n");
@@ -45,6 +45,7 @@ static void mark_roots() {
     }
 
     // mark global
+    table_mark(&vm.builtin);
     table_mark(&vm.globals);
 
     // mark existing frames。否则调用中的函数可能会被回收
@@ -54,6 +55,7 @@ static void mark_roots() {
 
     mark_object((Object *) INIT);
     mark_object((Object *) LENGTH);
+    mark_object((Object *) ARRAY_ITERATOR);
 
 //    // mark open upvalues ? 暂时无法理解。这些值是open的，意味着它们仍然在作用域内，要么是在stack上，要么是在globals中。我认为没必要额外标记
 //    UpValueObject *curr = vm.open_upvalues;
@@ -67,7 +69,7 @@ static void mark_roots() {
 }
 
 static void blacken_object(Object *object) {
-#ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_MARK_BLACKEN
     printf("blacken %p ", object);
     print_value_with_color(ref_value(object));
     NEW_LINE();
@@ -166,19 +168,12 @@ static void sweep() {
 }
 
 static void gc() {
-#ifdef DEBUG_LOG_GC_FREE
-    printf("gc begin >>> size before gc: %zu\n", vm.allocated_size);
-#endif
 
     mark_roots();
     trace();
     table_delete_unreachable(&vm.string_table);
     sweep();
 
-#ifdef DEBUG_LOG_GC_FREE
-    printf("<<< gc end. size after gc: %zu\n", vm.allocated_size);
-    NEW_LINE();
-#endif
 }
 
 /**
@@ -201,9 +196,20 @@ void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
         return NULL;
     }
 
+#ifdef DEBUG_LOG_GC_ALLOCATE
+    printf("Allocate %zu\n", new_byte_size - old_size);
+#endif
+
     if (!compiling && vm.allocated_size > vm.next_gc) {
+#ifdef DEBUG_LOG_GC_FREE
+        printf("gc begin >>> size before gc: %zu\n", vm.allocated_size);
+#endif
         gc();
         vm.next_gc = vm.allocated_size * GC_GROW_FACTOR;
+#ifdef DEBUG_LOG_GC_FREE
+        printf("<<< gc end. size after gc: %zu, next gc threshold: %zu\n", vm.allocated_size, vm.next_gc);
+        NEW_LINE();
+#endif
     }
 
     void *new_ptr = realloc(ptr, new_byte_size);

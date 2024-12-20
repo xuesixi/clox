@@ -92,8 +92,8 @@ Object *allocate_object(size_t size, ObjectType type) {
     obj->next = vm.objects;
     obj->is_marked = false;
     vm.objects = obj;
-#ifdef DEBUG_LOG_GC
-    printf("%p is allocated with size %zu for type %d\n", obj, size, type);
+#ifdef DEBUG_LOG_GC_ALLOCATE
+    printf("%p is allocated with size %zu for type %d, now allocated size: %zu, next gc: %zu\n", obj, size, type, vm.allocated_size, vm.next_gc);
 #endif
     return obj;
 }

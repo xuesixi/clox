@@ -29,6 +29,9 @@ static inline bool need_resize(Table *table) {
 static void table_resize(Table *table) {
     int old_capacity = table->capacity;
     int new_capacity = old_capacity < 8 ? 8 : table->capacity * 2;
+#ifdef DEBUG_LOG_GC_ALLOCATE
+    printf("table resize. old capacity: %d, new: %d\n", old_capacity, new_capacity);
+#endif
 
     Entry *old_backing = table->backing;
     Entry *new_backing = ALLOCATE(Entry, new_capacity);
