@@ -192,6 +192,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("COPY", offset);
         case OP_COPY2:
             return simple_instruction("COPY2", offset);
+        case OP_COPY_N:
+            return constant_instruction("COPY_N", chunk, offset);
         case OP_SET_PROPERTY:
             return constant_instruction("SET_PROPERTY", chunk, offset);
         case OP_METHOD:
@@ -220,6 +222,10 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("IMPORT", offset);
         case OP_RESTORE_MODULE:
             return simple_instruction("RESTORE_MODULE", offset);
+        case NOP:
+            return simple_instruction("NOP", offset);
+        case OP_SWAP:
+            return constant_instruction("SWAP", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

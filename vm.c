@@ -423,8 +423,8 @@ static void close_upvalue(Value *position) {
  */
 static Method *bind_method(Class *class, String *name, Value receiver) {
     Value value;
-    if (table_get(&class->methods, name, &value) == false) {
-        runtime_error_and_catch("no such method: %s", name->chars);
+    if (class == NULL || table_get(&class->methods, name, &value) == false) {
+        runtime_error_and_catch("no such property: %s", name->chars);
     }
     Method *method = new_method(as_closure(value), receiver);
     return method;
@@ -432,11 +432,454 @@ static Method *bind_method(Class *class, String *name, Value receiver) {
 
 
 /**
+ * 在指定的class中寻找对应method，然后调用之。
+ * 在调用该函数时，请确保stack_peek(arg_count)为method的receiver。
+ * 如果没有找到对应的method，该函数自己会发出runtime error
+ */
+static void invoke_from_class(Class *class, String *name, int arg_count) {
+
+    // stack: obj, arg1, arg2, top
+    // code: op, name_index, arg_count
+    Value closure_value;
+    if (class == NULL || !table_get(&class->methods, name, &closure_value)) {
+        Value receiver = stack_peek(arg_count);
+        runtime_error_catch_2("%s does not have the property or method %s", receiver, ref_value((Object *) name));
+    }
+    call_closure(as_closure(closure_value), arg_count);
+}
+
+static void call_closure(Closure *closure, int arg_count) {
+    LoxFunction *function = closure->function;
+    if (function->arity != arg_count) {
+        runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity,
+                                arg_count);
+    }
+    if (vm.frame_count == FRAME_MAX) {
+        runtime_error_and_catch("Stack overflow.");
+    }
+    vm.frame_count++;
+    curr_frame = vm.frames + vm.frame_count - 1;
+    CallFrame *frame = curr_frame;
+    frame->FP = vm.stack_top - arg_count - 1;
+    frame->PC = function->chunk.code;
+    frame->closure = closure;
+}
+
+/**
+ * 创建一个call frame。
+ * 如果value不可调用，或者参数数量不匹配，则出现runtime错误
+ * @param value 要调用的closure、method、native、class
+ * @param arg_count 传入的参数的个数
+ */
+static void call_value(Value value, int arg_count) {
+    if (!is_ref(value)) {
+        runtime_error_catch_1("%s is not callable", value);
+    }
+    switch (as_ref(value)->type) {
+        case OBJ_CLOSURE: {
+            call_closure(as_closure(value), arg_count);
+            break;
+        }
+        case OBJ_NATIVE: {
+            NativeFunction *native = as_native(value);
+            if (native->arity != arg_count && native->arity != -1) {
+                runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity,
+                                        arg_count);
+            }
+            Value result = native->impl(arg_count, vm.stack_top - arg_count);
+            vm.stack_top -= arg_count + 1;
+            stack_push(result);
+            break;
+        }
+        case OBJ_CLASS: {
+            Class *class = as_class(value);
+            Instance *instance = new_instance(class);
+            Value init_closure;
+            if (table_get(&class->methods, INIT, &init_closure)) {
+                Method *initializer = new_method(as_closure(init_closure), ref_value((Object *) instance));
+                call_value(ref_value((Object *) initializer), arg_count);
+            } else if (arg_count != 0) {
+                runtime_error_and_catch("%s does not define init() but got %d arguments", class->name->chars,
+                                        arg_count);
+            } else {
+                stack_pop();
+                stack_push(ref_value((Object *) instance));
+            }
+            break;
+        }
+        case OBJ_METHOD: {
+            Method *method = as_method(value);
+            vm.stack_top[-arg_count - 1] = method->receiver;
+            call_closure(method->closure, arg_count);
+            break;
+        }
+        default: {
+            runtime_error_catch_1("%s is not callable", value);
+        }
+    }
+}
+
+static void define_native(const char *name, NativeImplementation impl, int arity) {
+    int len = (int) strlen(name);
+
+    stack_push(ref_value((Object *) string_copy(name, len)));
+    stack_push(ref_value((Object *) new_native(impl, as_string(vm.stack[0]), arity)));
+    table_set(&vm.builtin, as_string(vm.stack[0]), vm.stack[1]);
+    stack_pop();
+    stack_pop();
+}
+
+/**
+ * read a line. Return it as a String. the \n will not be included
+ * */
+static Value native_read(int count, Value *values) {
+    if (count > 0) {
+        print_value(*values);
+    }
+    size_t len;
+    char *line;
+    getline(&line, &len, stdin);
+    String *str = string_copy(line, len - 1); // NOLINT
+    free(line);
+    return ref_value((Object *) str);
+}
+
+static inline int max(int a, int b) {
+    return a > b ? a : b;
+}
+
+static Value native_format(int count, Value *values) {
+    const char *format = as_string(*values)->chars;
+    static int capacity = 0;
+    static char *buf = NULL;
+//    char *buf = malloc(capacity);
+    int pre = 0;
+    int curr = 0;
+    int buf_len = 0;
+    int curr_v = 0;
+
+    while (true) {
+        while (format[curr] != '\0' && format[curr] != '#') {
+            curr++;
+        }
+
+        int new_len = curr - pre;
+        // buf overflow checking
+        if (buf_len + new_len > capacity) {
+            capacity = max(2 * capacity, buf_len + new_len);
+            buf = realloc(buf, capacity); // NOLINT
+        }
+
+        memcpy(buf + buf_len, format + pre, new_len);
+        buf_len += new_len;
+        pre = curr;
+
+        if (format[curr] == '\0') {
+            if (curr_v != count - 1) {
+                free(buf);
+                runtime_error_and_catch("format: more arguments than placeholders");
+            }
+            break;
+        }
+
+        if (format[curr] == '#') {
+            if (curr_v == count - 1) {
+                free(buf);
+                runtime_error_and_catch("format: more placeholders than arguments");
+            }
+
+            Value v = values[curr_v + 1];
+            int v_chars_len;
+            char *v_chars = value_to_chars(v, &v_chars_len);
+
+            if (v_chars_len + buf_len > capacity) {
+                capacity = max(2 * capacity, v_chars_len + buf_len);
+                buf = realloc(buf, capacity); // NOLINT
+            }
+            memcpy(buf + buf_len, v_chars, v_chars_len);
+            buf_len += v_chars_len;
+            curr++;
+            pre = curr;
+            curr_v++;
+            free(v_chars);
+        }
+    }
+
+    String *string = string_copy(buf, buf_len);
+//    free(buf);
+    return ref_value((Object *) string);
+}
+
+static Value native_clock(int count, Value *value) {
+    (void) count;
+    (void) value;
+    return float_value((double) clock() / CLOCKS_PER_SEC);
+}
+
+static Value native_int(int count, Value *value) {
+    (void) count;
+    switch (value->type) {
+        case VAL_INT:
+            return *value;
+        case VAL_FLOAT:
+            return int_value((int) as_float(*value));
+        case VAL_BOOL:
+            return int_value((int) as_bool(*value));
+        default:
+            if (is_ref_of(*value, OBJ_STRING)) {
+                String *str = as_string(*value);
+                char *end;
+                int result = strtol(str->chars, &end, 10); // NOLINT
+                if (end == str->chars) {
+                    runtime_error_and_catch("not a valid int: %s", str->chars);
+                }
+                return int_value(result);
+            }
+            runtime_error_and_catch("not a valid input");
+            return nil_value();
+    }
+}
+
+static Value native_float(int count, Value *value) {
+    (void) count;
+    Value v = *value;
+    switch (v.type) {
+        case VAL_INT:
+            return float_value((double) as_int(v));
+        case VAL_FLOAT:
+            return v;
+        case VAL_BOOL:
+            return float_value((double) as_bool(v));
+        default:
+            if (is_ref_of(v, OBJ_STRING)) {
+                String *str = as_string(v);
+                char *end;
+                double result = strtod(str->chars, &end);
+                if (end == str->chars) {
+                    runtime_error_and_catch("not a valid float: %s", str->chars);
+                }
+                return float_value(result);
+            }
+            runtime_error_and_catch("not a valid input");
+            return nil_value();
+    }
+}
+
+static Value native_help(int count, Value *value) {
+    (void) count;
+    (void) value;
+    printf("You are in the REPL mode because you run clox directly without providing any arguments.\n");
+    printf("You can also do `clox path/to/script` to run a lox script.\n");
+    printf("Or do `clox -h` to see more options\n");
+    printf("In this REPL mode, expression results will be printed out automatically in gray color. \n");
+    printf("You may also omit the last semicolon for a statement.\n");
+    printf("Use ctrl+C or ctrl+D to quit.\n");
+    return nil_value();
+}
+
+static Value native_rand(int count, Value *value) {
+    (void) count;
+    Value a = value[0];
+    Value b = value[1];
+    if (!is_int(a) || !is_int(b)) {
+        runtime_error_and_catch("arguments need to be int");
+    }
+    return int_value(as_int(a) + rand() % as_int(b)); // NOLINT(*-msc50-cpp)
+}
+
+static String *auto_length_string_copy(const char *name) {
+    int len = strlen(name); // NOLINT
+    return string_copy(name, len);
+}
+
+static void init_vm_static_strings() {
+    INIT = auto_length_string_copy("init");
+    LENGTH = auto_length_string_copy("length");
+    ARRAY_ITERATOR = auto_length_string_copy("$ArrayIterator");
+}
+
+
+void init_VM() {
+    reset_stack();
+    vm.objects = NULL;
+    vm.open_upvalues = NULL;
+    vm.gray_count = 0;
+    vm.gray_capacity = 0;
+    vm.gray_stack = NULL;
+    vm.allocated_size = 0;
+    vm.next_gc = INITIAL_GC_SIZE;
+    srand(time(NULL)); // NOLINT(*-msc51-cpp)
+    init_table(&vm.builtin);
+    init_table(&vm.string_table);
+    init_table(&vm.globals);
+    init_table(&vm.const_table);
+    init_vm_static_strings();
+
+    define_native("clock", native_clock, 0);
+    define_native("int", native_int, 1);
+    define_native("float", native_float, 1);
+    define_native("rand", native_rand, 2);
+    define_native("f", native_format, -1);
+    define_native("read", native_read, -1);
+}
+
+void additional_repl_init() {
+    define_native("help", native_help, 0);
+}
+
+/**
+ * 清除下列数据
+ * @par objects
+ * @par string_table
+ * @par globals
+ * @par const_table
+ */
+void free_VM() {
+    free_all_objects();
+    free_table(&vm.builtin);
+    free_table(&vm.string_table);
+    free_table(&vm.globals);
+    free_table(&vm.const_table);
+    free(vm.gray_stack);
+}
+
+/**
+ * 将value置于stack_top处，然后自增stack_top
+ * @param value 想要添加的value
+ */
+inline void stack_push(Value value) {
+    *vm.stack_top = value;
+    vm.stack_top++;
+}
+
+inline Value stack_pop() {
+    vm.stack_top--;
+    return *(vm.stack_top);
+}
+
+/**
+ * 先调用 compile 将源代码编译成字节码，然后运行字节码.
+ * 在repl中，每一次输入都将执行该函数.
+ * @return 执行结果（是否出错等）
+ */
+InterpretResult interpret(const char *src) {
+
+    LoxFunction *function = compile(src);
+    if (function == NULL) {
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    stack_push(ref_value((Object *) function));
+
+    vm.frame_count++;
+    curr_frame = vm.frames + vm.frame_count - 1;
+    CallFrame *frame = curr_frame;
+
+    Closure *closure = new_closure(function);
+    frame->closure = closure;
+    frame->FP = vm.stack;
+    frame->PC = function->chunk.code;
+
+    stack_pop();
+
+    stack_push(ref_value((Object *) closure));
+
+    return run();
+}
+
+static void import(const char *src) {
+
+    Table new_globals;
+    init_table(&new_globals);
+
+    Instance *new_module = new_instance(NULL);
+    stack_push(ref_value((Object *) new_module));
+
+    Instance *this_module = new_instance(NULL); // 该对象是用来储存原本的globals的。
+    this_module->fields = vm.globals;
+    stack_push(ref_value((Object *) this_module));
+
+    vm.globals = new_globals;
+
+    LoxFunction *function = compile(src);
+
+    if (function == NULL) {
+        runtime_error_and_catch("the module fails to compile");
+        return;
+    }
+    stack_push(ref_value((Object *) function));
+
+    // [new_module, old_module, new_main, top, ...]
+
+    vm.frame_count++;
+    curr_frame = vm.frames + vm.frame_count - 1;
+    CallFrame *frame = curr_frame;
+
+    Closure *closure = new_closure(function);
+    frame->closure = closure;
+    frame->FP = vm.stack_top - 1;
+    frame->PC = function->chunk.code;
+
+    stack_pop();
+
+    stack_push(ref_value((Object *) closure));
+
+}
+
+/**
+ * 目前还没写好。因为chunk内部是code指针
+ * @param src
+ * @param path
+ * @return
+ */
+InterpretResult produce(const char *src, const char *path) {
+    LoxFunction *function = compile(src);
+    if (function == NULL) {
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    FILE *file = fopen(path, "wb");
+    if (file == NULL) {
+        printf("Error when opening the file: %s\n", path);
+        return INTERPRET_PRODUCE_ERROR;
+    }
+    write_function(file, function);
+    fclose(file);
+    return INTERPRET_OK;
+}
+
+InterpretResult read_run_bytecode(const char *path) {
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        printf("Error when opening the file: %s\n", path);
+        return INTERPRET_READ_ERROR;
+    }
+    LoxFunction *function = read_function(file);
+    fclose(file);
+
+    stack_push(ref_value((Object *) function));
+    vm.frame_count++;
+    curr_frame = vm.frames + vm.frame_count - 1;
+    CallFrame *frame = curr_frame;
+
+    Closure *closure = new_closure(function);
+    frame->closure = closure;
+    frame->FP = vm.stack;
+    frame->PC = function->chunk.code;
+
+    stack_pop();
+    stack_push(ref_value((Object *) closure));
+
+    return run();
+}
+
+
+
+/**
  * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之
  * @return 执行的结果
  */
 static InterpretResult run() {
-
     if (setjmp(error_buf)) {
         //  运行时错误会跳转至这里
         return INTERPRET_RUNTIME_ERROR;
@@ -957,8 +1400,20 @@ static InterpretResult run() {
                 free(buffer);
                 break;
             }
+            case OP_COPY_N: {
+                int n = read_byte();
+                stack_push(stack_peek(n));
+                break;
+            }
+            case OP_SWAP: {
+                int n = read_byte();
+                Value temp = stack_peek(n);
+                vm.stack_top[-1-n] = stack_peek(0);
+                vm.stack_top[-1] = temp;
+                break;
+            }
             case OP_RESTORE_MODULE: {
-                // [new_module, old_module, nil, top]
+                // [new_module, old_module, nil, top] -> [new_module, top]
                 stack_pop();
                 Instance *old_module = as_instance(stack_pop());
                 Instance *new_module = as_instance(stack_peek(0));
@@ -972,446 +1427,4 @@ static InterpretResult run() {
             }
         }
     }
-}
-
-/**
- * 在指定的class中寻找对应method，然后调用之。
- * 在调用该函数时，请确保stack_peek(arg_count)为method的receiver。
- * 如果没有找到对应的method，该函数自己会发出runtime error
- */
-static void invoke_from_class(Class *class, String *name, int arg_count) {
-
-    // stack: obj, arg1, arg2, top
-    // code: op, name_index, arg_count
-    Value closure_value;
-    if (class == NULL || !table_get(&class->methods, name, &closure_value)) {
-        Value receiver = stack_peek(arg_count);
-        runtime_error_catch_2("%s does not have the property or method %s", receiver, ref_value((Object *) name));
-    }
-    call_closure(as_closure(closure_value), arg_count);
-}
-
-static void call_closure(Closure *closure, int arg_count) {
-    LoxFunction *function = closure->function;
-    if (function->arity != arg_count) {
-        runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity,
-                                arg_count);
-    }
-    if (vm.frame_count == FRAME_MAX) {
-        runtime_error_and_catch("Stack overflow.");
-    }
-    vm.frame_count++;
-    curr_frame = vm.frames + vm.frame_count - 1;
-    CallFrame *frame = curr_frame;
-    frame->FP = vm.stack_top - arg_count - 1;
-    frame->PC = function->chunk.code;
-    frame->closure = closure;
-}
-
-/**
- * 创建一个call frame。
- * 如果value不可调用，或者参数数量不匹配，则出现runtime错误
- * @param value 要调用的closure、method、native、class
- * @param arg_count 传入的参数的个数
- */
-static void call_value(Value value, int arg_count) {
-    if (!is_ref(value)) {
-        runtime_error_catch_1("%s is not callable", value);
-    }
-    switch (as_ref(value)->type) {
-        case OBJ_CLOSURE: {
-            call_closure(as_closure(value), arg_count);
-            break;
-        }
-        case OBJ_NATIVE: {
-            NativeFunction *native = as_native(value);
-            if (native->arity != arg_count && native->arity != -1) {
-                runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity,
-                                        arg_count);
-            }
-            Value result = native->impl(arg_count, vm.stack_top - arg_count);
-            vm.stack_top -= arg_count + 1;
-            stack_push(result);
-            break;
-        }
-        case OBJ_CLASS: {
-            Class *class = as_class(value);
-            Instance *instance = new_instance(class);
-            Value init_closure;
-            if (table_get(&class->methods, INIT, &init_closure)) {
-                Method *initializer = new_method(as_closure(init_closure), ref_value((Object *) instance));
-                call_value(ref_value((Object *) initializer), arg_count);
-            } else if (arg_count != 0) {
-                runtime_error_and_catch("%s does not define init() but got %d arguments", class->name->chars,
-                                        arg_count);
-            } else {
-                stack_pop();
-                stack_push(ref_value((Object *) instance));
-            }
-            break;
-        }
-        case OBJ_METHOD: {
-            Method *method = as_method(value);
-            vm.stack_top[-arg_count - 1] = method->receiver;
-            call_closure(method->closure, arg_count);
-            break;
-        }
-        default: {
-            runtime_error_catch_1("%s is not callable", value);
-        }
-    }
-}
-
-static void define_native(const char *name, NativeImplementation impl, int arity) {
-    int len = (int) strlen(name);
-
-    stack_push(ref_value((Object *) string_copy(name, len)));
-    stack_push(ref_value((Object *) new_native(impl, as_string(vm.stack[0]), arity)));
-    table_set(&vm.builtin, as_string(vm.stack[0]), vm.stack[1]);
-    stack_pop();
-    stack_pop();
-}
-
-/**
- * read a line. Return it as a String. the \n will not be included
- * */
-static Value native_read(int count, Value *values) {
-    if (count > 0) {
-        print_value(*values);
-    }
-    size_t len;
-    char *line;
-    getline(&line, &len, stdin);
-    String *str = string_copy(line, len - 1); // NOLINT
-    free(line);
-    return ref_value((Object *) str);
-}
-
-static inline int max(int a, int b) {
-    return a > b ? a : b;
-}
-
-static Value native_format(int count, Value *values) {
-    const char *format = as_string(*values)->chars;
-    static int capacity = 0;
-    static char *buf = NULL;
-//    char *buf = malloc(capacity);
-    int pre = 0;
-    int curr = 0;
-    int buf_len = 0;
-    int curr_v = 0;
-
-    while (true) {
-        while (format[curr] != '\0' && format[curr] != '#') {
-            curr++;
-        }
-
-        int new_len = curr - pre;
-        // buf overflow checking
-        if (buf_len + new_len > capacity) {
-            capacity = max(2 * capacity, buf_len + new_len);
-            buf = realloc(buf, capacity); // NOLINT
-        }
-
-        memcpy(buf + buf_len, format + pre, new_len);
-        buf_len += new_len;
-        pre = curr;
-
-        if (format[curr] == '\0') {
-            if (curr_v != count - 1) {
-                free(buf);
-                runtime_error_and_catch("format: more arguments than placeholders");
-            }
-            break;
-        }
-
-        if (format[curr] == '#') {
-            if (curr_v == count - 1) {
-                free(buf);
-                runtime_error_and_catch("format: more placeholders than arguments");
-            }
-
-            Value v = values[curr_v + 1];
-            int v_chars_len;
-            char *v_chars = value_to_chars(v, &v_chars_len);
-
-            if (v_chars_len + buf_len > capacity) {
-                capacity = max(2 * capacity, v_chars_len + buf_len);
-                buf = realloc(buf, capacity); // NOLINT
-            }
-            memcpy(buf + buf_len, v_chars, v_chars_len);
-            buf_len += v_chars_len;
-            curr++;
-            pre = curr;
-            curr_v++;
-            free(v_chars);
-        }
-    }
-
-    String *string = string_copy(buf, buf_len);
-//    free(buf);
-    return ref_value((Object *) string);
-}
-
-static Value native_clock(int count, Value *value) {
-    (void) count;
-    (void) value;
-    return float_value((double) clock() / CLOCKS_PER_SEC);
-}
-
-static Value native_int(int count, Value *value) {
-    (void) count;
-    switch (value->type) {
-        case VAL_INT:
-            return *value;
-        case VAL_FLOAT:
-            return int_value((int) as_float(*value));
-        case VAL_BOOL:
-            return int_value((int) as_bool(*value));
-        default:
-            if (is_ref_of(*value, OBJ_STRING)) {
-                String *str = as_string(*value);
-                char *end;
-                int result = strtol(str->chars, &end, 10); // NOLINT
-                if (end == str->chars) {
-                    runtime_error_and_catch("not a valid int: %s", str->chars);
-                }
-                return int_value(result);
-            }
-            runtime_error_and_catch("not a valid input");
-            return nil_value();
-    }
-}
-
-static Value native_float(int count, Value *value) {
-    (void) count;
-    Value v = *value;
-    switch (v.type) {
-        case VAL_INT:
-            return float_value((double) as_int(v));
-        case VAL_FLOAT:
-            return v;
-        case VAL_BOOL:
-            return float_value((double) as_bool(v));
-        default:
-            if (is_ref_of(v, OBJ_STRING)) {
-                String *str = as_string(v);
-                char *end;
-                double result = strtod(str->chars, &end);
-                if (end == str->chars) {
-                    runtime_error_and_catch("not a valid float: %s", str->chars);
-                }
-                return float_value(result);
-            }
-            runtime_error_and_catch("not a valid input");
-            return nil_value();
-    }
-}
-
-static Value native_help(int count, Value *value) {
-    (void) count;
-    (void) value;
-    printf("You are in the REPL mode because you run clox directly without providing any arguments.\n");
-    printf("You can also do `clox path/to/script` to run a lox script.\n");
-    printf("Or do `clox -h` to see more options\n");
-    printf("In this REPL mode, expression results will be printed out automatically in gray color. \n");
-    printf("You may also omit the last semicolon for a statement.\n");
-    printf("Use ctrl+C or ctrl+D to quit.\n");
-    return nil_value();
-}
-
-static Value native_rand(int count, Value *value) {
-    (void) count;
-    Value a = value[0];
-    Value b = value[1];
-    if (!is_int(a) || !is_int(b)) {
-        runtime_error_and_catch("arguments need to be int");
-    }
-    return int_value(as_int(a) + rand() % as_int(b)); // NOLINT(*-msc50-cpp)
-}
-
-static String *auto_length_string_copy(const char *name) {
-    int len = strlen(name); // NOLINT
-    return string_copy(name, len);
-}
-
-static void init_vm_static_strings() {
-    INIT = auto_length_string_copy("init");
-    LENGTH = auto_length_string_copy("length");
-    ARRAY_ITERATOR = auto_length_string_copy("$ArrayIterator");
-}
-
-
-void init_VM() {
-    reset_stack();
-    vm.objects = NULL;
-    vm.open_upvalues = NULL;
-    vm.gray_count = 0;
-    vm.gray_capacity = 0;
-    vm.gray_stack = NULL;
-    vm.allocated_size = 0;
-    vm.next_gc = INITIAL_GC_SIZE;
-    srand(time(NULL)); // NOLINT(*-msc51-cpp)
-    init_table(&vm.builtin);
-    init_table(&vm.string_table);
-    init_table(&vm.globals);
-    init_table(&vm.const_table);
-    init_vm_static_strings();
-
-    define_native("clock", native_clock, 0);
-    define_native("int", native_int, 1);
-    define_native("float", native_float, 1);
-    define_native("rand", native_rand, 2);
-    define_native("f", native_format, -1);
-    define_native("read", native_read, -1);
-}
-
-void additional_repl_init() {
-    define_native("help", native_help, 0);
-}
-
-/**
- * 清除下列数据
- * @par objects
- * @par string_table
- * @par globals
- * @par const_table
- */
-void free_VM() {
-    free_all_objects();
-    free_table(&vm.builtin);
-    free_table(&vm.string_table);
-    free_table(&vm.globals);
-    free_table(&vm.const_table);
-    free(vm.gray_stack);
-}
-
-/**
- * 将value置于stack_top处，然后自增stack_top
- * @param value 想要添加的value
- */
-inline void stack_push(Value value) {
-    *vm.stack_top = value;
-    vm.stack_top++;
-}
-
-inline Value stack_pop() {
-    vm.stack_top--;
-    return *(vm.stack_top);
-}
-
-/**
- * 先调用 compile 将源代码编译成字节码，然后运行字节码.
- * 在repl中，每一次输入都将执行该函数.
- * @return 执行结果（是否出错等）
- */
-InterpretResult interpret(const char *src) {
-
-    LoxFunction *function = compile(src);
-    if (function == NULL) {
-        return INTERPRET_COMPILE_ERROR;
-    }
-
-    stack_push(ref_value((Object *) function));
-
-    vm.frame_count++;
-    curr_frame = vm.frames + vm.frame_count - 1;
-    CallFrame *frame = curr_frame;
-
-    Closure *closure = new_closure(function);
-    frame->closure = closure;
-    frame->FP = vm.stack;
-    frame->PC = function->chunk.code;
-
-    stack_pop();
-
-    stack_push(ref_value((Object *) closure));
-
-    return run();
-}
-
-static void import(const char *src) {
-
-    Table new_globals;
-    init_table(&new_globals);
-
-    Instance *new_module = new_instance(NULL);
-    stack_push(ref_value((Object *) new_module));
-
-    Instance *this_module = new_instance(NULL); // 该对象是用来储存原本的globals的。
-    this_module->fields = vm.globals;
-    stack_push(ref_value((Object *) this_module));
-
-    vm.globals = new_globals;
-
-    LoxFunction *function = compile(src);
-
-    if (function == NULL) {
-        runtime_error_and_catch("the module fails to compile");
-        return;
-    }
-    stack_push(ref_value((Object *) function));
-
-    // [new_module, old_module, new_main, top, ...]
-
-    vm.frame_count++;
-    curr_frame = vm.frames + vm.frame_count - 1;
-    CallFrame *frame = curr_frame;
-
-    Closure *closure = new_closure(function);
-    frame->closure = closure;
-    frame->FP = vm.stack_top - 1;
-    frame->PC = function->chunk.code;
-
-    stack_pop();
-
-    stack_push(ref_value((Object *) closure));
-
-}
-
-/**
- * 目前还没写好。因为chunk内部是code指针
- * @param src
- * @param path
- * @return
- */
-InterpretResult produce(const char *src, const char *path) {
-    LoxFunction *function = compile(src);
-    if (function == NULL) {
-        return INTERPRET_COMPILE_ERROR;
-    }
-
-    FILE *file = fopen(path, "wb");
-    if (file == NULL) {
-        printf("Error when opening the file: %s\n", path);
-        return INTERPRET_PRODUCE_ERROR;
-    }
-    write_function(file, function);
-    fclose(file);
-    return INTERPRET_OK;
-}
-
-InterpretResult read_run_bytecode(const char *path) {
-    FILE *file = fopen(path, "rb");
-    if (file == NULL) {
-        printf("Error when opening the file: %s\n", path);
-        return INTERPRET_READ_ERROR;
-    }
-    LoxFunction *function = read_function(file);
-    fclose(file);
-
-    stack_push(ref_value((Object *) function));
-    vm.frame_count++;
-    curr_frame = vm.frames + vm.frame_count - 1;
-    CallFrame *frame = curr_frame;
-
-    Closure *closure = new_closure(function);
-    frame->closure = closure;
-    frame->FP = vm.stack;
-    frame->PC = function->chunk.code;
-
-    stack_pop();
-    stack_push(ref_value((Object *) closure));
-
-    return run();
 }

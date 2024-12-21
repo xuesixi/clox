@@ -1,7 +1,6 @@
 #ifndef CLOX_TABLE_H
 #define CLOX_TABLE_H
 
-//#include "object.h"
 #include "value.h"
 
 typedef struct String String;

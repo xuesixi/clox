@@ -223,6 +223,8 @@ static void const_declaration();
 
 static int parse_identifier_declaration(bool is_const);
 
+static int declare_identifier_token(Token *token);
+
 static int identifier_constant(Token *name);
 
 static void named_variable(Token *name, bool can_assign);
@@ -435,7 +437,9 @@ static void class_member() {
 }
 
 static void import_statement() {
+
     // import "path/to/module" as good;
+
     consume(TOKEN_STRING, "Expect module path");
     string(false);
     consume(TOKEN_AS, "Expect as");
@@ -452,6 +456,54 @@ static void import_statement() {
         mark_initialized();
     }
 
+}
+
+static void new_import_statement() {
+    // import "path": a, b;
+    // import "path": a as huhu, b;
+    consume(TOKEN_STRING, "Expect module path");
+    string(false);
+    emit_byte(OP_IMPORT);
+    // [new_module, old_module, nil, top]
+    emit_byte(OP_RESTORE_MODULE);
+    // [new_module, top]
+    if (match(TOKEN_COLON)) {
+        do {
+            consume(TOKEN_IDENTIFIER, "Expect identifier for this import statement");
+            int as_name;
+            int property_name = identifier_constant(&parser.previous);
+            if (match(TOKEN_AS)) {
+                as_name = parse_identifier_declaration(false);
+            } else {
+                as_name = declare_identifier_token(&parser.previous);
+            }
+            emit_byte(OP_COPY);
+            // [new_mod, new_mod, top]
+            emit_two_bytes(OP_GET_PROPERTY, property_name);
+            // [new_mod, property, top]
+            if (current_scope->depth == 0) {
+                emit_two_bytes(OP_DEFINE_GLOBAL, as_name);
+                // [new_mod, top]
+            } else {
+                emit_two_bytes(OP_SWAP, 1);
+                mark_initialized();
+                // [property, new_mod, top]
+            }
+        } while (!check(TOKEN_EOF) && match(TOKEN_COMMA));
+        consume(TOKEN_SEMICOLON, "Expect ; to end the import statement");
+        emit_byte(OP_POP);
+    } else {
+        consume(TOKEN_AS, "You need to use 'as' to specify the module name");
+        int name_index = parse_identifier_declaration(false);
+
+        consume(TOKEN_SEMICOLON, "Expect ;");
+
+        if (current_scope->depth == 0) {
+            emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
+        } else {
+            mark_initialized();
+        }
+    }
 }
 
 static void class_declaration() {
@@ -545,7 +597,8 @@ static void declaration() {
     } else if (match(TOKEN_CLASS)) {
         class_declaration();
     } else if (match(TOKEN_IMPORT)){
-        import_statement();
+        new_import_statement();
+//        import_statement();
     } else {
         statement();
     }
@@ -760,7 +813,8 @@ static int add_upvalue(Scope *scope, int index, bool is_local) {
 }
 
 /**
- * 解析一个标识符的申明，如果是全局变量，则将标识符添加为常量。如果是局部变量，申明之（尚未初始化）
+ * 解析一个标识符的申明，如果是全局变量，则将标识符添加为常量。如果是局部变量，申明之（尚未初始化）。
+ * 一般来说，这个函数后面会跟着mark_initialized() 或者 emit(OP_DEFINE_GLOBAL)
  * @return 如果是全局变量，返回索引。否则，返回-1
  */
 static inline int parse_identifier_declaration(bool is_const) {
@@ -773,6 +827,21 @@ static inline int parse_identifier_declaration(bool is_const) {
     } else {
         // 否则是global
         return identifier_constant(&parser.previous);
+    }
+}
+
+/**
+ * 和上面那个函数基本相同，但可以指定哪一个token。
+ * @param token
+ */
+static int declare_identifier_token(Token *token) {
+    if (current_scope->depth > 0) {
+        // 如果是local
+        declare_local(false, token);
+        return -1;
+    } else {
+        // 否则是global
+        return identifier_constant(token);
     }
 }
 
