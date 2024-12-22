@@ -1490,6 +1490,16 @@ static InterpretResult run() {
                 vm.current_module = old_module;
                 break;
             }
+            case OP_EXPORT: {
+                String *name = read_constant_string();
+                Entry *entry = table_find_entry(&vm.current_module->globals, name, false, false);
+                if (entry->key == NULL && is_bool(entry->value)) {
+                    runtime_error_and_catch("No such global variable: %s", name->chars);
+                } else {
+                    entry->is_public = true;
+                }
+                break;
+            }
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;

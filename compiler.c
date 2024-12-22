@@ -595,27 +595,38 @@ static void class_declaration(bool is_public) {
     current_class = current_class->enclosing;
 }
 
+static void export_statement() {
+    do {
+        consume(TOKEN_IDENTIFIER, "Expect identifiers");
+        int name = identifier_constant(&parser.previous);
+        emit_two_bytes(OP_EXPORT, name);
+    } while (!check(TOKEN_EOF) && match(TOKEN_COMMA));
+    consume(TOKEN_SEMICOLON, "Expect ; to terminate the export statement");
+}
+
 static void declaration() {
-    bool is_public = false;
-    if (match(TOKEN_PUBLIC)) {
+    bool is_export = false;
+    if (match(TOKEN_EXPORT)) {
         if (current_scope->depth == 0 && current_class == NULL) {
-            is_public = true;
+            is_export = true;
         } else {
-            error_at_previous("Can only use public in the global scope");
+            error_at_previous("export is only allowed in the global scope");
         }
     }
     if (match(TOKEN_VAR)) {
-        var_declaration(is_public);
+        var_declaration(is_export);
     } else if (match(TOKEN_CONST)) {
-        const_declaration(is_public);
+        const_declaration(is_export);
     } else if (match(TOKEN_LABEL)) {
         label_statement();
     } else if (match(TOKEN_FUN)) {
-        fun_declaration(is_public);
+        fun_declaration(is_export);
     } else if (match(TOKEN_CLASS)) {
-        class_declaration(is_public);
+        class_declaration(is_export);
     } else if (match(TOKEN_IMPORT)){
         import_statement();
+    } else if (is_export){
+        export_statement();
     } else {
         statement();
     }

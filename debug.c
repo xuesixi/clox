@@ -230,6 +230,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return constant_instruction("DEF_PUB_GLOBAL", chunk, offset);
         case OP_DEF_PUB_GLOBAL_CONST:
             return constant_instruction("DEF_PUB_GLOBAL_CONST", chunk, offset);
+        case OP_EXPORT:
+            return constant_instruction("EXPORT", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

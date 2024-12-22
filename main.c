@@ -69,13 +69,13 @@ static void run_file(const char *path) {
     char *src = read_file(path);
     InterpretResult result = interpret(src);
     free(src);
-    if (result == INTERPRET_COMPILE_ERROR) {
-        printf("== compile error ==\n");
-    } else if (result == INTERPRET_RUNTIME_ERROR) {
-        printf("== runtime error ==\n");
-    } else {
-        printf("== execution finished ==\n");
-    }
+//    if (result == INTERPRET_COMPILE_ERROR) {
+//        printf("== compile error ==\n");
+//    } else if (result == INTERPRET_RUNTIME_ERROR) {
+//        printf("== runtime error ==\n");
+//    } else {
+//        printf("== execution finished ==\n");
+//    }
 }
 
 static void produce_bytecode(const char *code_path, const char *result_path) {

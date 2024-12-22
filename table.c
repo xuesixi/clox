@@ -61,7 +61,7 @@ static void table_resize(Table *table) {
  * @return 如果key存在，返回对应的entry。如果不存在，返回第一个空位.
  * 如果存在，但不是满足条件，返回NULL
  */
-static Entry *find_entry(Table *table, String *key, bool public_only, bool mutable_only) {
+Entry *table_find_entry(Table *table, String *key, bool public_only, bool mutable_only) {
     int index = MODULO(key->hash, table->capacity);
     for (int i = 0; i < table->capacity; ++i) {
         int curr = MODULO(index + i, table->capacity);
@@ -79,7 +79,7 @@ static Entry *find_entry(Table *table, String *key, bool public_only, bool mutab
             return entry;
         }
     }
-    IMPLEMENTATION_ERROR("find_entry() does not find empty spot and returns NULL");
+    IMPLEMENTATION_ERROR("table_find_entry() does not find empty spot and returns NULL");
     return NULL;
 }
 
@@ -87,7 +87,7 @@ inline bool table_has(Table *table, String *key) {
     if (table->count == 0) {
         return false;
     }
-    return !empty_entry(find_entry(table, key, false, false));
+    return !empty_entry(table_find_entry(table, key, false, false));
 }
 
 /**
@@ -105,7 +105,7 @@ bool table_conditional_get(Table *table, String *key, Value *value, bool public_
     if (table->count == 0) {
         return false;
     }
-    Entry *entry = find_entry(table, key, public_only, mutable_only);
+    Entry *entry = table_find_entry(table, key, public_only, mutable_only);
     if (entry == NULL || empty_entry(entry)) {
         return false;
     } else {
@@ -232,7 +232,7 @@ Value table_delete(Table *table, String *key) {
     if (table->count == 0) {
         return nil_value();
     }
-    Entry *entry = find_entry(table, key, false, false);
+    Entry *entry = table_find_entry(table, key, false, false);
     entry->key = NULL;
     Value result = entry->value;
     entry->value = bool_value(true);

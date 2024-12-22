@@ -114,5 +114,8 @@ inline int add_constant(Chunk *c, Value constant) {
     stack_push(constant); // prevent gc
     append_ValueArray(&c->constants, constant);
     stack_pop();
+    if (c->constants.count > UINT8_MAX) {
+        IMPLEMENTATION_ERROR("TOO MANY CONSTANTS FOR A CHUNK");
+    }
     return c->constants.count - 1;
 }

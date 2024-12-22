@@ -96,7 +96,15 @@ static TokenType identifier_type() {
                 }
             }
             break;
-        case 'e': return check_keyword(1, 3, "lse", TOKEN_ELSE);
+        case 'e': {
+            if (is_keyword(1, 3, "lse")) {
+                return TOKEN_ELSE;
+            } else if (is_keyword(1, 5, "xport")) {
+                return TOKEN_EXPORT;
+            } else {
+                return TOKEN_IDENTIFIER;
+            }
+        }
         case 'd': return check_keyword(1, 6, "efault", TOKEN_DEFAULT);
         case 'i': {
             if (is_keyword(1, 1, "f")) {
@@ -109,15 +117,7 @@ static TokenType identifier_type() {
         }
         case 'n': return check_keyword(1, 2, "il", TOKEN_NIL);
         case 'o': return check_keyword(1, 1, "r", TOKEN_OR);
-        case 'p': {
-            if (is_keyword(1, 4, "rint")) {
-                return TOKEN_PRINT;
-            } else if (is_keyword(1, 5, "ublic")){
-                return TOKEN_PUBLIC;
-            } else {
-                return TOKEN_IDENTIFIER;
-            }
-        }
+        case 'p': return check_keyword(1, 4, "rint", TOKEN_PRINT);
         case 'r': return check_keyword(1, 5, "eturn", TOKEN_RETURN);
         case 's':
             if (scanner.current - scanner.start > 1) {

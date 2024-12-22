@@ -177,6 +177,7 @@ Method *new_method(Closure *closure, Value value) {
 
 Array *new_array(int length) {
     Value *values = ALLOCATE(Value, length);
+//    memset(values, 0, sizeof(Value) * length);
     Array *array = (Array *) allocate_object(sizeof(Array), OBJ_ARRAY);
     array->length = length;
     array->values = values;
