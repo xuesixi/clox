@@ -183,8 +183,9 @@ Array *new_array(int length) {
     return array;
 }
 
-Module *new_module() {
+Module *new_module(String *name) {
     Module *module = (Module *) allocate_object(sizeof(Module), OBJ_MODULE);
+    module->name = name;
     init_table(&module->globals);
     return module;
 }

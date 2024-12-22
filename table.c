@@ -449,8 +449,11 @@ void *map_delete(Map *map, void *key) {
 }
 
 int int_hash(void *p) {
-    int num = (int) p;
-    return num * 2654435761 % (INT32_MAX);
+    (void ) p;
+    IMPLEMENTATION_ERROR("undefined");
+    return 0;
+//    int num = (int) p;
+//    return num * 2654435761 % (INT32_MAX);
 }
 
 bool int_equal(void *a, void *b) {

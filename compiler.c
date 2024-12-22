@@ -458,16 +458,16 @@ static void class_member() {
 //
 //}
 
-static void new_import_statement() {
-    // import "path": a, b;
-    // import "path": a as huhu, b;
+static void import_statement() {
     consume(TOKEN_STRING, "Expect module path");
     string(false);
-    emit_byte(OP_IMPORT);
-    // [old_module, nil, top]
-    emit_byte(OP_RESTORE_MODULE);
-    // [new_module, top]
+    Token path = parser.previous;
     if (match(TOKEN_COLON)) {
+        // [old_module, nil, top]
+        // [new_module, top]
+        int name_index = identifier_constant(&path);
+        emit_two_bytes(OP_IMPORT, name_index);
+        emit_byte(OP_RESTORE_MODULE);
         do {
             consume(TOKEN_IDENTIFIER, "Expect identifier for this import statement");
             int as_name;
@@ -493,8 +493,14 @@ static void new_import_statement() {
         consume(TOKEN_SEMICOLON, "Expect ; to end the import statement");
         emit_byte(OP_POP);
     } else {
+        // [old_module, nil, top]
+        // [new_module, top]
         consume(TOKEN_AS, "You need to use 'as' to specify the module name");
-        int name_index = parse_identifier_declaration(false);
+
+        parse_identifier_declaration(false);
+        int name_index = identifier_constant(&parser.previous);
+        emit_two_bytes(OP_IMPORT, name_index);
+        emit_byte(OP_RESTORE_MODULE);
 
         consume(TOKEN_SEMICOLON, "Expect ;");
 
@@ -609,7 +615,7 @@ static void declaration() {
     } else if (match(TOKEN_CLASS)) {
         class_declaration(is_public);
     } else if (match(TOKEN_IMPORT)){
-        new_import_statement();
+        import_statement();
     } else {
         statement();
     }

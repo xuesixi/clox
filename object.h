@@ -28,6 +28,7 @@ typedef struct Object{
 typedef struct Module {
     Object object;
     Table globals;
+    String *name;
 } Module;
 
 typedef struct Array {
@@ -47,7 +48,7 @@ typedef enum FunctionType {
 typedef struct String{
     Object object;
     int length;
-    const char *chars;
+    char *chars;
     uint32_t hash;
 } String;
 
@@ -130,6 +131,6 @@ Class *new_class(String *name);
 Instance *new_instance(Class *class);
 Method *new_method(Closure *closure, Value value);
 Array *new_array(int length);
-Module *new_module();
+Module *new_module(String *name);
 
 #endif

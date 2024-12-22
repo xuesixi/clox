@@ -38,6 +38,8 @@ typedef struct VM{
 extern String *INIT;
 extern String *LENGTH;
 extern String *ARRAY_ITERATOR;
+extern String *SCRIPT;
+extern String *ANONYMOUS_MODULE;
 
 typedef enum {
     INTERPRET_OK,

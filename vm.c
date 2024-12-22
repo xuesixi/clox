@@ -21,6 +21,8 @@ VM vm;
 String *INIT = NULL;
 String *LENGTH = NULL;
 String *ARRAY_ITERATOR = NULL;
+String *SCRIPT = NULL;
+String *ANONYMOUS_MODULE = NULL;
 
 jmp_buf error_buf;
 
@@ -272,11 +274,14 @@ static void runtime_error(const char *format, ...) {
         size_t index = frame->PC - frame->closure->function->chunk.code - 1;
         int line = function->chunk.lines[index];
         fprintf(stderr, "at [line %d] in ", line);
-        if (i == 0) {
-            fprintf(stderr, "main()\n");
-        } else {
-            fprintf(stderr, "%s()\n", function->name->chars);
-        }
+        char *name = value_to_chars(ref_value((Object *) frame->closure), NULL);
+        fprintf(stderr, "%s()\n", name);
+        free(name);
+//        if (i == 0) {
+//            fprintf(stderr, "main()\n");
+//        } else {
+//            fprintf(stderr, "%s()\n", function->name->chars);
+//        }
     }
 
     reset_stack();
@@ -692,10 +697,12 @@ static String *auto_length_string_copy(const char *name) {
     return string_copy(name, len);
 }
 
-static void init_vm_static_strings() {
+static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
     ARRAY_ITERATOR = auto_length_string_copy("$ArrayIterator");
+    SCRIPT = auto_length_string_copy("$script");
+    ANONYMOUS_MODULE = auto_length_string_copy("$anonymous");
 }
 
 
@@ -713,7 +720,7 @@ void init_VM() {
     vm.current_module = NULL;
     init_table(&vm.builtin);
     init_table(&vm.string_table);
-    init_vm_static_strings();
+    init_static_strings();
 
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
@@ -783,7 +790,7 @@ InterpretResult interpret(const char *src) {
 
     stack_push(ref_value((Object *) closure));
 
-    Module *module = new_module();
+    Module *module = new_module(SCRIPT);
     closure->module = module;
     vm.current_module = module;
 
@@ -805,19 +812,27 @@ static void import(const char *src) {
 
     // [old_module, new_main, top, ...]
 
+    String *module_name = read_constant_string();
+    stack_push(ref_value((Object *) module_name));
+
+    // [old_module, new_main, new_name, top ]
+
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
     CallFrame *frame = curr_frame;
 
     Closure *closure = new_closure(function);
     frame->closure = closure;
-    frame->FP = vm.stack_top - 1;
+    frame->FP = vm.stack_top - 2;
     frame->PC = function->chunk.code;
 
+    Module *module = new_module(module_name);
+    stack_pop();
     stack_pop();
 
     stack_push(ref_value((Object *) closure));
-    Module *module = new_module();
+    // [old_module, fn: new_main, top]
+
     closure->module = module;
     vm.current_module = module;
 
@@ -1243,7 +1258,6 @@ static InterpretResult run() {
                 if (is_ref_of(target, OBJ_INSTANCE) == false) {
                     if (is_ref_of(target, OBJ_CLASS)) {
                         Class *class = as_class(target);
-                        Value static_field;
                         if (table_set_existent(&class->static_fields, property_name, value, false)) {
                             runtime_error_catch_2("%s does not have the static field: %s", ref_value((Object *) class), ref_value((Object *) property_name));
                         }
@@ -1261,7 +1275,7 @@ static InterpretResult run() {
                                 runtime_error_and_catch("cannot modify the const property: %s", property_name->chars);
                                 break;
                             case 3:
-                                runtime_error_and_catch("cannot modify the non-public property: %s", property_name->chars);
+                                runtime_error_and_catch("cannot access the non-public property: %s", property_name->chars);
                                 break;
                             default:
                                 IMPLEMENTATION_ERROR("bad");
@@ -1310,7 +1324,7 @@ static InterpretResult run() {
                             break;
                         }
                     }
-                    runtime_error_catch_2("%s does not have the property %s", receiver, ref_value((Object *) name));
+                    runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
                 }
                 Instance *instance = as_instance(receiver);
                 Value closure_value;
@@ -1422,7 +1436,8 @@ static InterpretResult run() {
                 break;
             }
             case OP_UNPACK_ARRAY: {
-                int length = read_byte();
+//                int length = read_byte();
+                read_byte();
                 break;
             }
             case OP_CLASS_STATIC_FIELD: {
@@ -1451,7 +1466,6 @@ static InterpretResult run() {
                 size_t read_size = fread(buffer, 1, size, file);
                 buffer[read_size] = '\0';
                 fclose(file);
-
                 import(buffer);
                 free(buffer);
                 break;

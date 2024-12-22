@@ -53,6 +53,7 @@ void print_value_with_color(Value value) {
                 case OBJ_UPVALUE:
                     break;
                 case OBJ_CLASS:
+                case OBJ_MODULE:
                     start_color(BOLD_BLUE);
                     break;
                 case OBJ_INSTANCE:
@@ -258,7 +259,7 @@ static char *ref_to_chars(Value value, int *len) {
             break;
         }
         case OBJ_MODULE: {
-            *len = asprintf(&buffer, "<module>");
+            *len = asprintf(&buffer, "<mod: %s>", as_module(value)->name->chars);
             break;
         }
         default:
