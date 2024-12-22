@@ -135,14 +135,14 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("GREATER", offset);
         case OP_PRINT:
             return simple_instruction("PRINT", offset);
-        case OP_EXPRESSION_PRINT:
-            return simple_instruction("EXPRESSION_PRINT", offset);
+        case OP_REPL_AUTO_PRINT:
+            return simple_instruction("REPL_AUTO_PRINT", offset);
         case OP_POP:
             return simple_instruction("POP", offset);
-        case OP_DEFINE_GLOBAL:
-            return constant_instruction("DEFINE_GLOBAL", chunk, offset);
-        case OP_DEFINE_GLOBAL_CONST:
-            return constant_instruction("DEFINE_GLOBAL_CONST", chunk, offset);
+        case OP_DEF_GLOBAL:
+            return constant_instruction("DEF_GLOBAL", chunk, offset);
+        case OP_DEF_GLOBAL_CONST:
+            return constant_instruction("DEF_GLOBAL_CONST", chunk, offset);
         case OP_GET_GLOBAL:
             return constant_instruction("GET_GLOBAL", chunk, offset);
         case OP_SET_GLOBAL:
@@ -226,8 +226,10 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("NOP", offset);
         case OP_SWAP:
             return constant_instruction("SWAP", chunk, offset);
-        case OP_GET_PUB_PROPERTY:
-            return constant_instruction("GET_PUB_PROPERTY", chunk, offset);
+        case OP_DEF_PUB_GLOBAL:
+            return constant_instruction("DEF_PUB_GLOBAL", chunk, offset);
+        case OP_DEF_PUB_GLOBAL_CONST:
+            return constant_instruction("DEF_PUB_GLOBAL_CONST", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

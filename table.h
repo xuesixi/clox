@@ -47,7 +47,7 @@ bool table_get(Table *table, String *key, Value *value);
 bool table_conditional_get(Table *table, String *key, Value *value, bool public_only, bool mutable_only);
 bool table_has(Table *table, String *key);
 bool table_set(Table *table, String *key, Value value);
-char table_set_existent(Table *table, String *key, Value value);
+char table_set_existent(Table *table, String *key, Value value, bool public_only);
 bool table_add_new(Table *table, String *key, Value value, bool is_public, bool is_const);
 Value table_delete(Table *table, String *key);
 void table_add_all(Table *from, Table *to);

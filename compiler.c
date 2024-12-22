@@ -195,7 +195,7 @@ static void lambda(bool can_assign);
 
 static void declaration();
 
-static void class_declaration();
+static void class_declaration(bool is_public);
 
 static void statement();
 
@@ -215,11 +215,11 @@ static int emit_jump(uint8_t jump_op);
 
 static void emit_goto(int dest);
 
-static void var_declaration();
+static void var_declaration(bool is_public);
 
-static void fun_declaration();
+static void fun_declaration(bool is_public);
 
-static void const_declaration();
+static void const_declaration(bool is_public);
 
 static int parse_identifier_declaration(bool is_const);
 
@@ -482,7 +482,7 @@ static void new_import_statement() {
             emit_two_bytes(OP_GET_PROPERTY, property_name);
             // [new_mod, property, top]
             if (current_scope->depth == 0) {
-                emit_two_bytes(OP_DEFINE_GLOBAL, as_name);
+                emit_two_bytes(OP_DEF_GLOBAL, as_name);
                 // [new_mod, top]
             } else {
                 emit_two_bytes(OP_SWAP, 1);
@@ -499,14 +499,14 @@ static void new_import_statement() {
         consume(TOKEN_SEMICOLON, "Expect ;");
 
         if (current_scope->depth == 0) {
-            emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
+            emit_two_bytes(OP_DEF_GLOBAL, name_index);
         } else {
             mark_initialized();
         }
     }
 }
 
-static void class_declaration() {
+static void class_declaration(bool is_public) {
 
     consume(TOKEN_IDENTIFIER, "An identifier is expected class");
 
@@ -525,7 +525,11 @@ static void class_declaration() {
         declare_local(false, &class_name);
         mark_initialized();
     } else {
-        emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
+        if (is_public) {
+            emit_two_bytes(OP_DEF_PUB_GLOBAL, name_index);
+        } else {
+            emit_two_bytes(OP_DEF_GLOBAL, name_index);
+        }
     }
 
     // top
@@ -586,16 +590,24 @@ static void class_declaration() {
 }
 
 static void declaration() {
+    bool is_public = false;
+    if (match(TOKEN_PUBLIC)) {
+        if (current_scope->depth == 0 && current_class == NULL) {
+            is_public = true;
+        } else {
+            error_at_previous("Can only use public in the global scope");
+        }
+    }
     if (match(TOKEN_VAR)) {
-        var_declaration();
+        var_declaration(is_public);
     } else if (match(TOKEN_CONST)) {
-        const_declaration();
+        const_declaration(is_public);
     } else if (match(TOKEN_LABEL)) {
         label_statement();
     } else if (match(TOKEN_FUN)) {
-        fun_declaration();
+        fun_declaration(is_public);
     } else if (match(TOKEN_CLASS)) {
-        class_declaration();
+        class_declaration(is_public);
     } else if (match(TOKEN_IMPORT)){
         new_import_statement();
     } else {
@@ -667,16 +679,20 @@ static void lambda(bool can_assign) {
     function_statement(TYPE_LAMBDA);
 }
 
-static void fun_declaration() {
+static void fun_declaration(bool is_public) {
     int name = parse_identifier_declaration(false);
     mark_initialized(); // 将函数名立刻标记为已初始化。
     function_statement(TYPE_FUNCTION);
     if (current_scope->depth == 0) {
-        emit_two_bytes(OP_DEFINE_GLOBAL, name);
+        if (is_public) {
+            emit_two_bytes(OP_DEF_PUB_GLOBAL, name);
+        } else {
+            emit_two_bytes(OP_DEF_GLOBAL, name);
+        }
     }
 }
 
-static void var_declaration() {
+static void var_declaration(bool is_public) {
 
     int index = parse_identifier_declaration(false);
 
@@ -688,7 +704,11 @@ static void var_declaration() {
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the var statement");
 
     if (current_scope->depth == 0) {
-        emit_two_bytes(OP_DEFINE_GLOBAL, index);
+        if (is_public) {
+            emit_two_bytes(OP_DEF_PUB_GLOBAL, index);
+        } else {
+            emit_two_bytes(OP_DEF_GLOBAL, index);
+        }
     } else {
         mark_initialized();
     }
@@ -696,7 +716,7 @@ static void var_declaration() {
     // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
 }
 
-static void const_declaration() {
+static void const_declaration(bool is_public) {
 
     int index = parse_identifier_declaration(true);
     consume(TOKEN_EQUAL, "A const variable must be initialized");
@@ -704,7 +724,11 @@ static void const_declaration() {
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the const statement");
 
     if (current_scope->depth == 0) {
-        emit_two_bytes(OP_DEFINE_GLOBAL_CONST, index);
+        if (is_public) {
+            emit_two_bytes(OP_DEF_PUB_GLOBAL_CONST, index);
+        } else {
+            emit_two_bytes(OP_DEF_GLOBAL_CONST, index);
+        }
     } else {
         current_scope->locals[current_scope->local_count - 1].depth = current_scope->depth;
     }
@@ -1136,7 +1160,7 @@ static void for_statement() {
     if (match(TOKEN_SEMICOLON)) {
 
     } else if (match(TOKEN_VAR)) {
-        var_declaration();
+        var_declaration(false);
     } else {
         expression_statement();
     }
@@ -1323,7 +1347,7 @@ static inline void expression_statement() {
     expression();
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminated the statement");
     if (REPL) {
-        emit_byte(OP_EXPRESSION_PRINT);
+        emit_byte(OP_REPL_AUTO_PRINT);
     } else {
         emit_byte(OP_POP);
     }

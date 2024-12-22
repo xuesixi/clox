@@ -26,10 +26,10 @@ typedef enum OpCode{
     OP_GREATER,
     OP_EQUAL,
     OP_PRINT,
-    OP_EXPRESSION_PRINT,
+    OP_REPL_AUTO_PRINT,
     OP_POP,
-    OP_DEFINE_GLOBAL, // OP, index: 定义一个全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
-    OP_DEFINE_GLOBAL_CONST, // OP, index: 定义一个const全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
+    OP_DEF_GLOBAL, // OP, index: 定义一个全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
+    OP_DEF_GLOBAL_CONST, // OP, index: 定义一个const全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
     OP_GET_GLOBAL, // OP, index: 向栈中添加一个全局变量的值，该变量名为const[index]之字符串
     OP_SET_GLOBAL, // OP, index: 为一个全局变量赋值为栈顶的值。变量名为const[index]。不消耗栈顶的值。
     OP_GET_LOCAL, // OP, index: 将stack[index]的值置入栈顶
@@ -67,7 +67,8 @@ typedef enum OpCode{
     OP_RESTORE_MODULE, // op:  [old_module, nil, top] -> [new_module, top]
     OP_SWAP, // op, index:
     NOP,
-    OP_GET_PUB_PROPERTY, // op, name_index
+    OP_DEF_PUB_GLOBAL, // op, name_index
+    OP_DEF_PUB_GLOBAL_CONST, // op, name_index
 } OpCode;
 
 typedef struct Chunk{

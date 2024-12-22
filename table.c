@@ -160,11 +160,12 @@ bool table_set(Table *table, String *key, Value value) {
 
 /**
  * 设置table的一个键值对。如果key原本就已存在（正常情况），返回0;
- * 如果原本不存在，不进行操作，返回1;
- * 如果该entry为const，不进行操作，返回2;
+ * 如果原本不存在，不进行修改，返回1;
+ * 如果该entry为const，不进行修改，返回2;
+ * 如果public_only为真，但找到的entry不为public，不进行修改，返回3
  * 该函数可能导致gc
  */
-char table_set_existent(Table *table, String *key, Value value) {
+char table_set_existent(Table *table, String *key, Value value, bool public_only) {
     if (need_resize(table)) {
         table_resize(table);
     }
@@ -177,13 +178,15 @@ char table_set_existent(Table *table, String *key, Value value) {
         } else if(entry->key == key) {
             if (entry->is_const) {
                 return 2;
+            } else if (public_only && !entry->is_public){
+                return 3;
             } else {
                 entry->value = value;
                 return 0;
             }
         }
     }
-    return false;
+    return 1;
 }
 
 /**

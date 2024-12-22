@@ -1015,7 +1015,7 @@ static InterpretResult run() {
                 }
                 break;
             }
-            case OP_EXPRESSION_PRINT: {
+            case OP_REPL_AUTO_PRINT: {
                 Value to_print = stack_pop();
                 start_color(GRAY);
                 print_value(to_print);
@@ -1026,7 +1026,7 @@ static InterpretResult run() {
             case OP_POP:
                 stack_pop();
                 break;
-            case OP_DEFINE_GLOBAL: {
+            case OP_DEF_GLOBAL: {
                 String *name = read_constant_string();
                 if (! table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), false, false)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
@@ -1034,9 +1034,25 @@ static InterpretResult run() {
                 stack_pop();
                 break;
             }
-            case OP_DEFINE_GLOBAL_CONST: {
+            case OP_DEF_GLOBAL_CONST: {
                 String *name = read_constant_string();
                 if (!table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), false, true)) {
+                    runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
+                }
+                stack_pop();
+                break;
+            }
+            case OP_DEF_PUB_GLOBAL: {
+                String *name = read_constant_string();
+                if (! table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), true, false)) {
+                    runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
+                }
+                stack_pop();
+                break;
+            }
+            case OP_DEF_PUB_GLOBAL_CONST: {
+                String *name = read_constant_string();
+                if (! table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), true, true)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1056,7 +1072,7 @@ static InterpretResult run() {
             }
             case OP_SET_GLOBAL: {
                 String *name = read_constant_string();
-                char result = table_set_existent(&curr_frame->closure->module->globals, name, stack_peek(0));
+                char result = table_set_existent(&curr_frame->closure->module->globals, name, stack_peek(0), false);
                 if (result != 0) {
                     if (result == 1) {
                         runtime_error_and_catch("Setting an undefined variable: %s", name->chars);
@@ -1170,55 +1186,6 @@ static InterpretResult run() {
                 stack_push(ref_value((Object *) new_class(name)));
                 break;
             }
-            case OP_GET_PUB_PROPERTY: {
-                Value value = stack_pop(); // instance
-                String *field_name = read_constant_string();
-                if (is_ref_of(value, OBJ_INSTANCE) == false) {
-                    switch (as_ref(value)->type) {
-                        case OBJ_ARRAY: {
-                            if (field_name == LENGTH) {
-                                Array *array = as_array(value);
-                                stack_push(int_value(array->length));
-                                break;
-                            } else {
-                                goto OP_GET_PUB_PROPERTY_not_found;
-                            }
-                            break;
-                        }
-                        case OBJ_CLASS: {
-                            Class *class = as_class(value);
-                            Value static_field;
-                            if (!table_conditional_get(&class->static_fields, field_name, &static_field, true, false)) {
-                                goto OP_GET_PUB_PROPERTY_not_found;
-                            }
-                            stack_push(static_field);
-                            break;
-                        }
-                        case OBJ_MODULE: {
-                            Module *module = as_module(value);
-                            Value property;
-                            if (!table_conditional_get(&module->globals, field_name, &property, true, false)) {
-                                goto OP_GET_PUB_PROPERTY_not_found;
-                            }
-                            stack_push(property);
-                            break;
-                        }
-                        OP_GET_PUB_PROPERTY_not_found:
-                        default:
-                            runtime_error_catch_2("%s does not have such a public property %s", value, ref_value((Object *) field_name));
-                    }
-                } else {
-                    Instance *instance = as_instance(value);
-                    Value result = nil_value();
-                    bool found = table_get(&instance->fields, field_name, &result);
-                    if (found == false) {
-                        Method *method = bind_method(instance->class, field_name, value);
-                        result = ref_value((Object *) method);
-                    }
-                    stack_push(result);
-                }
-                break;
-            }
             case OP_GET_PROPERTY: {
                 Value value = stack_pop(); // instance
                 String *field_name = read_constant_string();
@@ -1246,15 +1213,16 @@ static InterpretResult run() {
                         case OBJ_MODULE: {
                             Module *module = as_module(value);
                             Value property;
-                            if (!table_get(&module->globals, field_name, &property)) {
-                                goto OP_GET_PROPERTY_not_found;
+                            if (!table_conditional_get(&module->globals, field_name, &property, true, false)) {
+                                runtime_error_catch_2("%s does not the have public property: %s", value, ref_value((Object *) field_name));
+                            } else {
+                                stack_push(property);
                             }
-                            stack_push(property);
                             break;
                         }
                         OP_GET_PROPERTY_not_found:
                         default:
-                            runtime_error_catch_2("%s does not have property %s", value, ref_value((Object *) field_name));
+                            runtime_error_catch_2("%s does not have the property: %s", value, ref_value((Object *) field_name));
                     }
                 } else {
                     Instance *instance = as_instance(value);
@@ -1271,22 +1239,41 @@ static InterpretResult run() {
             case OP_SET_PROPERTY: {
                 Value target = stack_peek(1); // prevent being gc
                 Value value = stack_peek(0);
-                String *field = read_constant_string();
+                String *property_name = read_constant_string();
                 if (is_ref_of(target, OBJ_INSTANCE) == false) {
                     if (is_ref_of(target, OBJ_CLASS)) {
                         Class *class = as_class(target);
                         Value static_field;
-                        if (table_set_existent(&class->static_fields, field, value)) {
-                            runtime_error_catch_2("the class %s does not have the static field %s", ref_value((Object *) class), ref_value((Object *) field));
+                        if (table_set_existent(&class->static_fields, property_name, value, false)) {
+                            runtime_error_catch_2("%s does not have the static field: %s", ref_value((Object *) class), ref_value((Object *) property_name));
                         }
                         break;
+                    } else if (is_ref_of(target, OBJ_MODULE)) {
+                        Module *module = as_module(target);
+                        char result = table_set_existent(&module->globals, property_name, value, true);
+                        switch (result) {
+                            case 0:
+                                break;
+                            case 1:
+                                runtime_error_catch_2("%s does not have the property: %s", target, ref_value((Object *) property_name));
+                                break;
+                            case 2:
+                                runtime_error_and_catch("cannot modify the const property: %s", property_name->chars);
+                                break;
+                            case 3:
+                                runtime_error_and_catch("cannot modify the non-public property: %s", property_name->chars);
+                                break;
+                            default:
+                                IMPLEMENTATION_ERROR("bad");
+                                break;
+                        }
                     } else {
-                        runtime_error_catch_2("%s is not an object and does not have the property: %s", target,
-                                              ref_value((Object *) field));
+                        runtime_error_catch_2("%s does not have the property: %s", target,
+                                              ref_value((Object *) property_name));
                     }
                 } else {
                     Instance *instance = as_instance(target);
-                    table_set(&instance->fields, field, value); // potential gc
+                    table_set(&instance->fields, property_name, value); // potential gc
                     vm.stack_top -= 2;
                     stack_push(value);
                 }
@@ -1318,12 +1305,12 @@ static InterpretResult run() {
                     } else if (is_ref_of(receiver, OBJ_MODULE)) {
                         Module *module = as_module(receiver);
                         Value property;
-                        if (table_get(&module->globals, name, &property)) {
+                        if (table_conditional_get(&module->globals, name, &property, true, false)) {
                             call_value(property, arg_count);
                             break;
                         }
                     }
-                    runtime_error_catch_2("%s does not have property %s", receiver, ref_value((Object *) name));
+                    runtime_error_catch_2("%s does not have the property %s", receiver, ref_value((Object *) name));
                 }
                 Instance *instance = as_instance(receiver);
                 Value closure_value;
