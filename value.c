@@ -259,7 +259,8 @@ static char *ref_to_chars(Value value, int *len) {
             break;
         }
         case OBJ_MODULE: {
-            *len = asprintf(&buffer, "<mod: %s>", as_module(value)->name->chars);
+            char *filename = get_filename(as_module(value)->path->chars);
+            *len = asprintf(&buffer, "<mod: %s>", filename);
             break;
         }
         default:

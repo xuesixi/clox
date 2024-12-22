@@ -8,6 +8,8 @@
 #include "assert.h"
 #include "vm.h"
 
+bool gc_enabled = false;
+
 static void mark_roots();
 
 void mark_object(Object *object) {
@@ -129,7 +131,7 @@ static void blacken_object(Object *object) {
         }
         case OBJ_MODULE: {
             Module *module = (Module *) object;
-            mark_object((Object *) module->name);
+            mark_object((Object *) module->path);
             table_mark(&module->globals);
             break;
         }

@@ -28,6 +28,7 @@ extern bool REPL;
 
 char *read_file(const char *path);
 char *resolve_path(const char *path);
+char *get_filename(char *path);
 
 extern jmp_buf consume_buf;
 

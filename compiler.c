@@ -88,7 +88,6 @@ typedef struct Scope {
     int depth;
 } Scope;
 
-bool gc_enabled = false;
 Parser parser;
 Scope *current_scope;
 ClassScope *current_class = NULL;
@@ -436,37 +435,14 @@ static void class_member() {
     }
 }
 
-//static void import_statement() {
-//
-//    // import "path/to/module" as good;
-//
-//    consume(TOKEN_STRING, "Expect module path");
-//    string(false);
-//    consume(TOKEN_AS, "Expect as");
-//
-//    int name_index = parse_identifier_declaration(false);
-//
-//    consume(TOKEN_SEMICOLON, "Expect ;");
-//    emit_byte(OP_IMPORT);
-//    emit_byte(OP_RESTORE_MODULE);
-//
-//    if (current_scope->depth == 0) {
-//        emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
-//    } else {
-//        mark_initialized();
-//    }
-//
-//}
-
 static void import_statement() {
     consume(TOKEN_STRING, "Expect module path");
     string(false);
-    Token path = parser.previous;
+//    Token path = parser.previous;
     if (match(TOKEN_COLON)) {
         // [old_module, nil, top]
         // [new_module, top]
-        int name_index = identifier_constant(&path);
-        emit_two_bytes(OP_IMPORT, name_index);
+        emit_byte(OP_IMPORT);
         emit_byte(OP_RESTORE_MODULE);
         do {
             consume(TOKEN_IDENTIFIER, "Expect identifier for this import statement");
@@ -495,11 +471,10 @@ static void import_statement() {
     } else {
         // [old_module, nil, top]
         // [new_module, top]
-        consume(TOKEN_AS, "You need to use 'as' to specify the module name");
+        consume(TOKEN_AS, "You must use 'as' to specify the module name");
 
-        parse_identifier_declaration(false);
-        int name_index = identifier_constant(&parser.previous);
-        emit_two_bytes(OP_IMPORT, name_index);
+        int name_index = parse_identifier_declaration(false);
+        emit_byte(OP_IMPORT);
         emit_byte(OP_RESTORE_MODULE);
 
         consume(TOKEN_SEMICOLON, "Expect ;");

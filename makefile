@@ -1,4 +1,3 @@
-CC = gcc
 CFLAGS = -Wall -Wextra -Wformat -g 
 SRC = chunk.c compiler.c debug.c io.c main.c memory.c object.c scanner.c table.c value.c vm.c
 OBJ = $(SRC:.c=.o)

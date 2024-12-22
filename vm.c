@@ -23,6 +23,7 @@ String *LENGTH = NULL;
 String *ARRAY_ITERATOR = NULL;
 String *SCRIPT = NULL;
 String *ANONYMOUS_MODULE = NULL;
+Module *repl_module = NULL;
 
 jmp_buf error_buf;
 
@@ -308,7 +309,7 @@ static void runtime_error_catch_2(const char *format, Value v1, Value v2) {
  * 该函数只应该用在runtime_error()后面。
  */
 static inline void catch() {
-    longjmp(error_buf, 1);
+    longjmp(error_buf, INTERPRET_RUNTIME_ERROR);
 }
 
 /**
@@ -678,7 +679,14 @@ static Value native_help(int count, Value *value) {
     printf("Or do `clox -h` to see more options\n");
     printf("In this REPL mode, expression results will be printed out automatically in gray color. \n");
     printf("You may also omit the last semicolon for a statement.\n");
-    printf("Use ctrl+C or ctrl+D to quit.\n");
+    printf("Use exit(), ctrl+C or ctrl+D to quit.\n");
+    return nil_value();
+}
+
+static Value native_exit(int count, Value *value) {
+    (void ) count;
+    (void ) value;
+    longjmp(error_buf, INTERPRET_REPL_EXIT);
     return nil_value();
 }
 
@@ -732,6 +740,7 @@ void init_VM() {
 
 void additional_repl_init() {
     define_native("help", native_help, 0);
+    define_native("exit", native_exit, -1);
 }
 
 /**
@@ -764,8 +773,13 @@ inline Value stack_pop() {
 }
 
 /**
- * 先调用 compile 将源代码编译成字节码，然后运行字节码.
- * 在repl中，每一次输入都将执行该函数.
+ * 调用 compile() 将源代码编译成一个function，构造一个closure，设置栈帧，
+ * 将closure置入栈中，然后用run()运行代码，返回其结果。
+ * 在repl中，每一次输入都将执行该函数。
+ * 如果是repl，那么使用repl_module为初始module；否则，创建新的module
+ *
+ * @param src 要执行的代码
+ * @parem path 该脚本的路径。如果是REPL模式，不会用到该值。
  * @return 执行结果（是否出错等）
  */
 InterpretResult interpret(const char *src, const char *path) {
@@ -777,26 +791,27 @@ InterpretResult interpret(const char *src, const char *path) {
 
     DISABLE_GC;
 
-//    stack_push(ref_value((Object *) function));
-
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
     CallFrame *frame = curr_frame;
 
+    Module *module;
+    if (REPL) {
+        module = repl_module;
+    } else {
+        String *path_string = auto_length_string_copy(path);
+        module = new_module(path_string);
+    }
+    vm.current_module = module;
+
     Closure *closure = new_closure(function);
+    closure->module = module;
+
     frame->closure = closure;
     frame->FP = vm.stack;
     frame->PC = function->chunk.code;
 
-    String *path_string = auto_length_string_copy(path);
-
-//    stack_pop();
-
     stack_push(ref_value((Object *) closure));
-
-    Module *module = new_module(SCRIPT, path_string);
-    closure->module = module;
-    vm.current_module = module;
 
     ENABLE_GC;
 
@@ -816,9 +831,6 @@ static void import(const char *src, String *path) {
         runtime_error_and_catch("the module fails to compile");
         return;
     }
-//    stack_push(ref_value((Object *) function));
-
-    String *module_name = read_constant_string();
 
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
@@ -829,10 +841,7 @@ static void import(const char *src, String *path) {
     frame->FP = vm.stack_top;
     frame->PC = function->chunk.code;
 
-    Module *module = new_module(module_name, path);
-//    stack_pop();
-//    stack_pop();
-//    stack_pop();
+    Module *module = new_module(path);
 
     stack_push(ref_value((Object *) closure));
     // [old_module, fn: new_main, top]
@@ -895,12 +904,14 @@ InterpretResult read_run_bytecode(const char *path) {
 
 /**
  * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之
+ * 如果发生了runtime error，该函数将立刻返回。
  * @return 执行的结果
  */
 static InterpretResult run() {
-    if (setjmp(error_buf)) {
+    InterpretResult error_code;
+    if ( (error_code = setjmp(error_buf))) {
         //  运行时错误会跳转至这里
-        return INTERPRET_RUNTIME_ERROR;
+        return error_code;
     }
     while (true) {
         if (TRACE_EXECUTION && TRACE_SKIP == -1) {
@@ -1460,11 +1471,11 @@ static InterpretResult run() {
                 char *relative_path;
                 asprintf(&relative_path, "%s/../%s", vm.current_module->path->chars, relative->chars);
                 char *resolved_path = resolve_path(relative_path);
-                free(relative_path);
                 char *src = read_file(resolved_path);
                 if (src == NULL) {
-                    runtime_error_and_catch("error when reading the file %s\n", resolved_path);
+                    runtime_error_and_catch("error when reading the file %s (%s)\n", resolved_path, relative_path);
                 }
+                free(relative_path);
                 String *path_string = auto_length_string_copy(resolved_path);
                 import(src, path_string);
                 free(src);

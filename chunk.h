@@ -63,9 +63,9 @@ typedef enum OpCode{
     OP_BUILD_ARRAY, // op, length
     OP_UNPACK_ARRAY, // op, length
     OP_CLASS_STATIC_FIELD, // op, name_index: [class, field, top] -> [class, top]
-    OP_IMPORT, // op, name_index : [path_string, top]
+    OP_IMPORT, // op : [path_string, top]
     OP_RESTORE_MODULE, // op:  [old_module, nil, top] -> [new_module, top]
-    OP_SWAP, // op, index:
+    OP_SWAP, // op, index: swap(top, top - index)
     NOP,
     OP_DEF_PUB_GLOBAL, // op, name_index
     OP_DEF_PUB_GLOBAL_CONST, // op, name_index

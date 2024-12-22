@@ -20,6 +20,11 @@
 #define ALLOCATE(type, length) \
     (type*)(re_allocate(NULL, 0, sizeof(type) * (length)))
 
+extern bool gc_enabled;
+
+#define ENABLE_GC (gc_enabled = true)
+#define DISABLE_GC (gc_enabled = false)
+
 void *re_allocate(void *ptr, size_t old_size, size_t byte_size);
 void free_all_objects();
 void free_object(Object *object);

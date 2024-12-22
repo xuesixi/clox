@@ -22,17 +22,13 @@ typedef struct VM{
     UpValue *open_upvalues;
     Object *objects; // 所有object的值
     Table string_table; // 同名的String只会创建一次。
-//    Table globals; // 储存所有全局变量
     Module *current_module;
     Table builtin;
-//    Table const_table;  // 储存所有const的全局变量。(const的全局变量会同时存在与globals和const_table中）
     int gray_count;
     int gray_capacity;
     Object **gray_stack;
     size_t allocated_size;
     size_t next_gc;
-//    String *init_string;
-//    String *length_string;
 } VM ;
 
 extern String *INIT;
@@ -41,12 +37,15 @@ extern String *ARRAY_ITERATOR;
 extern String *SCRIPT;
 extern String *ANONYMOUS_MODULE;
 
+extern Module *repl_module;
+
 typedef enum {
     INTERPRET_OK,
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR,
     INTERPRET_PRODUCE_ERROR,
     INTERPRET_READ_ERROR,
+    INTERPRET_REPL_EXIT,
 } InterpretResult;
 
 extern VM vm;
