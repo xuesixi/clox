@@ -208,7 +208,7 @@ void *re_allocate(void *ptr, size_t old_size, size_t new_byte_size) {
     printf("Allocate %zu\n", new_byte_size - old_size);
 #endif
 
-    if (!compiling && vm.allocated_size > vm.next_gc) {
+    if (gc_enabled && vm.allocated_size > vm.next_gc) {
 #ifdef DEBUG_LOG_GC_SUMMARY
         printf("gc begin >>> size before gc: %zu\n", vm.allocated_size);
 #endif

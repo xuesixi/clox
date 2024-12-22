@@ -42,7 +42,7 @@ static Value read_constant2();
 
 static InterpretResult run();
 
-static void import(const char *src);
+static void import(const char *src, String *path);
 
 static void show_stack();
 
@@ -768,14 +768,16 @@ inline Value stack_pop() {
  * 在repl中，每一次输入都将执行该函数.
  * @return 执行结果（是否出错等）
  */
-InterpretResult interpret(const char *src) {
+InterpretResult interpret(const char *src, const char *path) {
 
     LoxFunction *function = compile(src);
     if (function == NULL) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    stack_push(ref_value((Object *) function));
+    DISABLE_GC;
+
+//    stack_push(ref_value((Object *) function));
 
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
@@ -786,36 +788,37 @@ InterpretResult interpret(const char *src) {
     frame->FP = vm.stack;
     frame->PC = function->chunk.code;
 
-    stack_pop();
+    String *path_string = auto_length_string_copy(path);
+
+//    stack_pop();
 
     stack_push(ref_value((Object *) closure));
 
-    Module *module = new_module(SCRIPT);
+    Module *module = new_module(SCRIPT, path_string);
     closure->module = module;
     vm.current_module = module;
+
+    ENABLE_GC;
 
     return run();
 }
 
-static void import(const char *src) {
+static void import(const char *src, String *path) {
 
     stack_push(ref_value((Object *) vm.current_module));
     // [old_module, top]
 
     LoxFunction *function = compile(src);
 
+    DISABLE_GC;
+
     if (function == NULL) {
         runtime_error_and_catch("the module fails to compile");
         return;
     }
-    stack_push(ref_value((Object *) function));
-
-    // [old_module, new_main, top, ...]
+//    stack_push(ref_value((Object *) function));
 
     String *module_name = read_constant_string();
-    stack_push(ref_value((Object *) module_name));
-
-    // [old_module, new_main, new_name, top ]
 
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
@@ -823,18 +826,21 @@ static void import(const char *src) {
 
     Closure *closure = new_closure(function);
     frame->closure = closure;
-    frame->FP = vm.stack_top - 2;
+    frame->FP = vm.stack_top;
     frame->PC = function->chunk.code;
 
-    Module *module = new_module(module_name);
-    stack_pop();
-    stack_pop();
+    Module *module = new_module(module_name, path);
+//    stack_pop();
+//    stack_pop();
+//    stack_pop();
 
     stack_push(ref_value((Object *) closure));
     // [old_module, fn: new_main, top]
 
     closure->module = module;
     vm.current_module = module;
+
+    ENABLE_GC;
 
 }
 
@@ -1450,24 +1456,18 @@ static InterpretResult run() {
                 break;
             }
             case OP_IMPORT: {
-                String *path_str = as_string(stack_pop());
-                const char *path = path_str->chars;
-                FILE *file = fopen(path, "r");
-                if (file == NULL) {
-                    runtime_error_and_catch("error when opening file %s", path);
+                String *relative = as_string(stack_pop());
+                char *relative_path;
+                asprintf(&relative_path, "%s/../%s", vm.current_module->path->chars, relative->chars);
+                char *resolved_path = resolve_path(relative_path);
+                free(relative_path);
+                char *src = read_file(resolved_path);
+                if (src == NULL) {
+                    runtime_error_and_catch("error when reading the file %s\n", resolved_path);
                 }
-
-                fseek(file, 0L, SEEK_END);
-                size_t size = ftell(file);
-                rewind(file);
-
-                char *buffer = malloc(size + 1);
-                assert(buffer != NULL);
-                size_t read_size = fread(buffer, 1, size, file);
-                buffer[read_size] = '\0';
-                fclose(file);
-                import(buffer);
-                free(buffer);
+                String *path_string = auto_length_string_copy(resolved_path);
+                import(src, path_string);
+                free(src);
                 break;
             }
             case OP_COPY_N: {

@@ -26,6 +26,9 @@ extern int TRACE_SKIP;
 extern bool SHOW_LABEL;
 extern bool REPL;
 
+char *read_file(const char *path);
+char *resolve_path(const char *path);
+
 extern jmp_buf consume_buf;
 
 #define IMPLEMENTATION_ERROR(msg) \

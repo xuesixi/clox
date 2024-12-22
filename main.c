@@ -2,6 +2,7 @@
 #include "stdlib.h"
 #include <unistd.h>
 #include "string.h"
+#include "limits.h"
 #include "vm.h"
 
 bool COMPILE_ONLY = false;
@@ -16,6 +17,15 @@ jmp_buf consume_buf;
 
 static void repl() {
     REPL = true;
+    char cwd[PATH_MAX];
+
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("Current working directory: %s\n", cwd);
+    } else {
+        perror("getcwd() error");
+        exit(1);
+    }
+
     additional_repl_init();
     printf("You are in the clox REPL mode. Type help() for more information\n\n");
     while (true) {
@@ -24,7 +34,7 @@ static void repl() {
             line = readline("> ");
             execute:
             if (line != NULL) {
-                interpret(line);
+                interpret(line, cwd);
                 add_history(line);
                 free(line);
             } else {
@@ -45,11 +55,15 @@ static void repl() {
     }
 }
 
-static char *read_file(const char *path) {
+char *resolve_path(const char *path) {
+    static char buffer[PATH_MAX];
+    return realpath(path, buffer);
+}
+
+char *read_file(const char *path) {
     FILE *file = fopen(path, "r");
     if (file == NULL) {
-        printf("error when opening file %s\n", path);
-        exit(1);
+        return NULL;
     }
     fseek(file, 0L, SEEK_END);
     size_t size = ftell(file);
@@ -67,7 +81,11 @@ static char *read_file(const char *path) {
 
 static void run_file(const char *path) {
     char *src = read_file(path);
-    InterpretResult result = interpret(src);
+    if (src == NULL) {
+        printf("error when opening file %s\n", path);
+        exit(1);
+    }
+    InterpretResult result = interpret(src, path);
     free(src);
 #ifdef COLOR_RUN_FILE_RESULT
     if (result == INTERPRET_COMPILE_ERROR) {
@@ -86,6 +104,10 @@ static void run_file(const char *path) {
 
 static void produce_bytecode(const char *code_path, const char *result_path) {
     char *src = read_file(code_path);
+    if (src == NULL) {
+        printf("error when opening file %s\n", code_path);
+        exit(1);
+    }
     InterpretResult result = produce(src, result_path);
     free(src);
     if (result == INTERPRET_COMPILE_ERROR) {

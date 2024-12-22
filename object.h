@@ -29,6 +29,7 @@ typedef struct Module {
     Object object;
     Table globals;
     String *name;
+    String *path;
 } Module;
 
 typedef struct Array {
@@ -131,6 +132,6 @@ Class *new_class(String *name);
 Instance *new_instance(Class *class);
 Method *new_method(Closure *closure, Value value);
 Array *new_array(int length);
-Module *new_module(String *name);
+Module *new_module(String *name, String *path);
 
 #endif

@@ -53,7 +53,7 @@ extern VM vm;
 
 void init_VM();
 void free_VM();
-InterpretResult interpret(const char *src);
+InterpretResult interpret(const char *src, const char *path);
 InterpretResult produce(const char *src, const char *path);
 InterpretResult read_run_bytecode(const char *path);
 void additional_repl_init();

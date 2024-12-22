@@ -88,7 +88,7 @@ typedef struct Scope {
     int depth;
 } Scope;
 
-bool compiling = true;
+bool gc_enabled = false;
 Parser parser;
 Scope *current_scope;
 ClassScope *current_class = NULL;
@@ -1984,7 +1984,7 @@ static void init_parser(Parser *the_parser) {
  * */
 LoxFunction *compile(const char *src) {
 
-    compiling = true;
+    gc_enabled = false;
 
     init_scanner(src);
     init_parser(&parser);
@@ -2000,7 +2000,7 @@ LoxFunction *compile(const char *src) {
 
     LoxFunction *function = end_compiler();
 
-    compiling = false;
+    gc_enabled = true;
 
     if (parser.has_error) {
         parser.has_error = false;
