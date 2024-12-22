@@ -69,13 +69,19 @@ static void run_file(const char *path) {
     char *src = read_file(path);
     InterpretResult result = interpret(src);
     free(src);
-//    if (result == INTERPRET_COMPILE_ERROR) {
-//        printf("== compile error ==\n");
-//    } else if (result == INTERPRET_RUNTIME_ERROR) {
-//        printf("== runtime error ==\n");
-//    } else {
-//        printf("== execution finished ==\n");
-//    }
+#ifdef COLOR_RUN_FILE_RESULT
+    if (result == INTERPRET_COMPILE_ERROR) {
+        start_color(BOLD_MAGENTA);
+        printf("== compile error ==\n");
+    } else if (result == INTERPRET_RUNTIME_ERROR) {
+        start_color(RED);
+        printf("== runtime error ==\n");
+    } else {
+        start_color(GREEN);
+        printf("== execution finished ==\n");
+    }
+    end_color();
+#endif
 }
 
 static void produce_bytecode(const char *code_path, const char *result_path) {
@@ -113,7 +119,7 @@ int main(int argc, char *const argv[]) {
     return 0;
 #endif
     char *options = "dlsc:bh";
-    char op;
+    int op;
     while ((op = getopt(argc, argv, options)) != -1) {
         switch (op) {
             case 'd':

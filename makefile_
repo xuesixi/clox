@@ -7,10 +7,10 @@ TARGET = clox
 all: $(TARGET)
 
 $(TARGET): $(OBJ) 
-	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm -l bsd
+	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm
 
 o: $(SRC)
-	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm -l bsd
+	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm 
 
 .PHONY: run
 run: $(TARGET)
@@ -30,11 +30,11 @@ file: $(TARGET)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 debug: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm -l bsd
+	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm 
 	# @lldb $(TARGET)
 
 clion_debug: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm -l bsd
+	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm
 
 .PHONY: clean
 clean:

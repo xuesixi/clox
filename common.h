@@ -15,6 +15,7 @@
 //#define DEBUG_LOG_GC_SUMMARY
 
 //#define JUST_SCRIPT
+#define COLOR_RUN_FILE_RESULT
 
 #define FRAME_MAX 64
 #define STACK_MAX (FRAME_MAX * UINT8_MAX)
