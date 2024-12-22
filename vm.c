@@ -441,7 +441,7 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
     // stack: obj, arg1, arg2, top
     // code: op, name_index, arg_count
     Value closure_value;
-    if (class == NULL || !table_get(&class->methods, name, &closure_value)) {
+    if (!table_get(&class->methods, name, &closure_value)) {
         Value receiver = stack_peek(arg_count);
         runtime_error_catch_2("%s does not have the property or method %s", receiver, ref_value((Object *) name));
     }
@@ -524,7 +524,7 @@ static void define_native(const char *name, NativeImplementation impl, int arity
 
     stack_push(ref_value((Object *) string_copy(name, len)));
     stack_push(ref_value((Object *) new_native(impl, as_string(vm.stack[0]), arity)));
-    table_set(&vm.builtin, as_string(vm.stack[0]), vm.stack[1]);
+    table_add_new(&vm.builtin, as_string(vm.stack[0]), vm.stack[1], true, false);
     stack_pop();
     stack_pop();
 }
@@ -709,10 +709,10 @@ void init_VM() {
     vm.allocated_size = 0;
     vm.next_gc = INITIAL_GC_SIZE;
     srand(time(NULL)); // NOLINT(*-msc51-cpp)
+
+    vm.current_module = NULL;
     init_table(&vm.builtin);
     init_table(&vm.string_table);
-    init_table(&vm.globals);
-    init_table(&vm.const_table);
     init_vm_static_strings();
 
     define_native("clock", native_clock, 0);
@@ -738,8 +738,7 @@ void free_VM() {
     free_all_objects();
     free_table(&vm.builtin);
     free_table(&vm.string_table);
-    free_table(&vm.globals);
-    free_table(&vm.const_table);
+//    free_table(&vm.globals);
     free(vm.gray_stack);
 }
 
@@ -784,22 +783,17 @@ InterpretResult interpret(const char *src) {
 
     stack_push(ref_value((Object *) closure));
 
+    Module *module = new_module();
+    closure->module = module;
+    vm.current_module = module;
+
     return run();
 }
 
 static void import(const char *src) {
 
-    Table new_globals;
-    init_table(&new_globals);
-
-    Instance *new_module = new_instance(NULL);
-    stack_push(ref_value((Object *) new_module));
-
-    Instance *this_module = new_instance(NULL); // 该对象是用来储存原本的globals的。
-    this_module->fields = vm.globals;
-    stack_push(ref_value((Object *) this_module));
-
-    vm.globals = new_globals;
+    stack_push(ref_value((Object *) vm.current_module));
+    // [old_module, top]
 
     LoxFunction *function = compile(src);
 
@@ -809,7 +803,7 @@ static void import(const char *src) {
     }
     stack_push(ref_value((Object *) function));
 
-    // [new_module, old_module, new_main, top, ...]
+    // [old_module, new_main, top, ...]
 
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
@@ -823,6 +817,9 @@ static void import(const char *src) {
     stack_pop();
 
     stack_push(ref_value((Object *) closure));
+    Module *module = new_module();
+    closure->module = module;
+    vm.current_module = module;
 
 }
 
@@ -1031,21 +1028,24 @@ static InterpretResult run() {
                 break;
             case OP_DEFINE_GLOBAL: {
                 String *name = read_constant_string();
-                table_set(&vm.globals, name, stack_peek(0));
+                if (! table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), false, false)) {
+                    runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
+                }
                 stack_pop();
                 break;
             }
             case OP_DEFINE_GLOBAL_CONST: {
                 String *name = read_constant_string();
-                table_set(&vm.globals, name, stack_peek(0));
-                table_set(&vm.const_table, name, bool_value(true));
+                if (!table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), false, true)) {
+                    runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
+                }
                 stack_pop();
                 break;
             }
             case OP_GET_GLOBAL: {
                 String *name = read_constant_string();
                 Value value;
-                if (table_get(&vm.globals, name, &value)) {
+                if (table_get(&curr_frame->closure->module->globals, name, &value)) {
                     stack_push(value);
                 } else if (table_get(&vm.builtin, name, &value)) {
                     stack_push(value);
@@ -1056,15 +1056,15 @@ static InterpretResult run() {
             }
             case OP_SET_GLOBAL: {
                 String *name = read_constant_string();
-                if (table_has(&vm.const_table, name)) {
-                    runtime_error_and_catch("The const variable %s cannot be re-assigned", name->chars);
+                char result = table_set_existent(&curr_frame->closure->module->globals, name, stack_peek(0));
+                if (result != 0) {
+                    if (result == 1) {
+                        runtime_error_and_catch("Setting an undefined variable: %s", name->chars);
+                    } else {
+                        runtime_error_and_catch("Setting a const variable: %s", name->chars);
+                    }
                 }
-                if (table_set(&vm.globals, name, stack_peek(0))) {
-                    break;
-                } else {
-                    table_delete(&vm.globals, name);
-                    runtime_error_and_catch("Setting an undefined variable: %s", name->chars);
-                }
+                break;
             }
             case OP_GET_LOCAL: {
                 int index = read_byte();
@@ -1137,6 +1137,7 @@ static InterpretResult run() {
                  */
                 Value f = read_constant();
                 Closure *closure = new_closure(as_function(f));
+                closure->module = vm.current_module;
                 stack_push(ref_value((Object *) closure));
                 for (int i = 0; i < closure->upvalue_count; ++i) {
                     bool is_local = read_byte();
@@ -1169,36 +1170,102 @@ static InterpretResult run() {
                 stack_push(ref_value((Object *) new_class(name)));
                 break;
             }
+            case OP_GET_PUB_PROPERTY: {
+                Value value = stack_pop(); // instance
+                String *field_name = read_constant_string();
+                if (is_ref_of(value, OBJ_INSTANCE) == false) {
+                    switch (as_ref(value)->type) {
+                        case OBJ_ARRAY: {
+                            if (field_name == LENGTH) {
+                                Array *array = as_array(value);
+                                stack_push(int_value(array->length));
+                                break;
+                            } else {
+                                goto OP_GET_PUB_PROPERTY_not_found;
+                            }
+                            break;
+                        }
+                        case OBJ_CLASS: {
+                            Class *class = as_class(value);
+                            Value static_field;
+                            if (!table_conditional_get(&class->static_fields, field_name, &static_field, true, false)) {
+                                goto OP_GET_PUB_PROPERTY_not_found;
+                            }
+                            stack_push(static_field);
+                            break;
+                        }
+                        case OBJ_MODULE: {
+                            Module *module = as_module(value);
+                            Value property;
+                            if (!table_conditional_get(&module->globals, field_name, &property, true, false)) {
+                                goto OP_GET_PUB_PROPERTY_not_found;
+                            }
+                            stack_push(property);
+                            break;
+                        }
+                        OP_GET_PUB_PROPERTY_not_found:
+                        default:
+                            runtime_error_catch_2("%s does not have such a public property %s", value, ref_value((Object *) field_name));
+                    }
+                } else {
+                    Instance *instance = as_instance(value);
+                    Value result = nil_value();
+                    bool found = table_get(&instance->fields, field_name, &result);
+                    if (found == false) {
+                        Method *method = bind_method(instance->class, field_name, value);
+                        result = ref_value((Object *) method);
+                    }
+                    stack_push(result);
+                }
+                break;
+            }
             case OP_GET_PROPERTY: {
                 Value value = stack_pop(); // instance
-                String *field = read_constant_string();
+                String *field_name = read_constant_string();
                 if (is_ref_of(value, OBJ_INSTANCE) == false) {
-                    if (is_ref_of(value, OBJ_ARRAY) && field == LENGTH) {
-                        Array *array = as_array(value);
-                        stack_push(int_value(array->length));
-                        break;
-                    } else if (is_ref_of(value, OBJ_CLASS)) {
-                        Class *class = as_class(value);
-                        Value static_field;
-                        if (!table_get(&class->static_fields, field, &static_field)) {
-                            runtime_error_catch_2("the class %s does not have the field %s",
-                                                  ref_value((Object *) class), ref_value((Object *) field));
+                    switch (as_ref(value)->type) {
+                        case OBJ_ARRAY: {
+                            if (field_name == LENGTH) {
+                                Array *array = as_array(value);
+                                stack_push(int_value(array->length));
+                                break;
+                            } else {
+                                goto OP_GET_PROPERTY_not_found;
+                            }
+                            break;
                         }
-                        stack_push(static_field);
-                        break;
-                    } else {
-                        runtime_error_catch_2("%s is not an object and does not have property %s", value,
-                                              ref_value((Object *) field));
+                        case OBJ_CLASS: {
+                            Class *class = as_class(value);
+                            Value static_field;
+                            if (!table_get(&class->static_fields, field_name, &static_field)) {
+                                goto OP_GET_PROPERTY_not_found;
+                            }
+                            stack_push(static_field);
+                            break;
+                        }
+                        case OBJ_MODULE: {
+                            Module *module = as_module(value);
+                            Value property;
+                            if (!table_get(&module->globals, field_name, &property)) {
+                                goto OP_GET_PROPERTY_not_found;
+                            }
+                            stack_push(property);
+                            break;
+                        }
+                        OP_GET_PROPERTY_not_found:
+                        default:
+                            runtime_error_catch_2("%s does not have property %s", value, ref_value((Object *) field_name));
                     }
+                } else {
+                    Instance *instance = as_instance(value);
+                    Value result = nil_value();
+                    bool found = table_get(&instance->fields, field_name, &result);
+                    if (found == false) {
+                        Method *method = bind_method(instance->class, field_name, value);
+                        result = ref_value((Object *) method);
+                    }
+                    stack_push(result);
                 }
-                Instance *instance = as_instance(value);
-                Value result = nil_value();
-                bool found = table_get(&instance->fields, field, &result);
-                if (found == false) {
-                    Method *method = bind_method(instance->class, field, value);
-                    result = ref_value((Object *) method);
-                }
-                stack_push(result);
                 break;
             }
             case OP_SET_PROPERTY: {
@@ -1209,21 +1276,20 @@ static InterpretResult run() {
                     if (is_ref_of(target, OBJ_CLASS)) {
                         Class *class = as_class(target);
                         Value static_field;
-                        if (!table_set(&class->static_fields, field, value)) {
-                            table_delete(&class->static_fields, field);
-                            runtime_error_catch_2("the class %s does not have the field %s",
-                                                  ref_value((Object *) class), ref_value((Object *) field));
+                        if (table_set_existent(&class->static_fields, field, value)) {
+                            runtime_error_catch_2("the class %s does not have the static field %s", ref_value((Object *) class), ref_value((Object *) field));
                         }
                         break;
                     } else {
                         runtime_error_catch_2("%s is not an object and does not have the property: %s", target,
                                               ref_value((Object *) field));
                     }
+                } else {
+                    Instance *instance = as_instance(target);
+                    table_set(&instance->fields, field, value); // potential gc
+                    vm.stack_top -= 2;
+                    stack_push(value);
                 }
-                Instance *instance = as_instance(target);
-                table_set(&instance->fields, field, value); // potential gc
-                vm.stack_top -= 2;
-                stack_push(value);
                 break;
             }
             case OP_METHOD: {
@@ -1245,16 +1311,19 @@ static InterpretResult run() {
                     if (is_ref_of(receiver, OBJ_CLASS)) {
                         Class *class = as_class(receiver);
                         Value static_field;
-                        if (!table_get(&class->static_fields, name, &static_field)) {
-                            runtime_error_catch_2("the class %s does not have the field %s",
-                                                  ref_value((Object *) class), ref_value((Object *) name));
+                        if (table_get(&class->static_fields, name, &static_field)) {
+                            call_value(static_field, arg_count);
+                            break;
                         }
-                        call_value(static_field, arg_count);
-                        break;
-                    } else {
-                        runtime_error_catch_2("%s is not an object and does not have property %s", receiver,
-                                              ref_value((Object *) name));
+                    } else if (is_ref_of(receiver, OBJ_MODULE)) {
+                        Module *module = as_module(receiver);
+                        Value property;
+                        if (table_get(&module->globals, name, &property)) {
+                            call_value(property, arg_count);
+                            break;
+                        }
                     }
+                    runtime_error_catch_2("%s does not have property %s", receiver, ref_value((Object *) name));
                 }
                 Instance *instance = as_instance(receiver);
                 Value closure_value;
@@ -1374,7 +1443,7 @@ static InterpretResult run() {
                 String *name = read_constant_string();
                 Value field = stack_peek(0);
                 Class *class = as_class(stack_peek(1));
-                table_set(&class->static_fields, name, field);
+                table_add_new(&class->static_fields, name, field, false, false);
                 stack_pop();
                 break;
             }
@@ -1413,12 +1482,11 @@ static InterpretResult run() {
                 break;
             }
             case OP_RESTORE_MODULE: {
-                // [new_module, old_module, nil, top] -> [new_module, top]
+                // [old_module, nil, top] -> [new_module, top]
                 stack_pop();
-                Instance *old_module = as_instance(stack_pop());
-                Instance *new_module = as_instance(stack_peek(0));
-                new_module->fields = vm.globals;
-                vm.globals = old_module->fields;
+                Module *old_module = as_module(stack_pop());
+                stack_push(ref_value((Object *) vm.current_module));
+                vm.current_module = old_module;
                 break;
             }
             default: {

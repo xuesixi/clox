@@ -109,7 +109,15 @@ static TokenType identifier_type() {
         }
         case 'n': return check_keyword(1, 2, "il", TOKEN_NIL);
         case 'o': return check_keyword(1, 1, "r", TOKEN_OR);
-        case 'p': return check_keyword(1, 4, "rint", TOKEN_PRINT);
+        case 'p': {
+            if (is_keyword(1, 4, "rint")) {
+                return TOKEN_PRINT;
+            } else if (is_keyword(1, 5, "ublic")){
+                return TOKEN_PUBLIC;
+            } else {
+                return TOKEN_IDENTIFIER;
+            }
+        }
         case 'r': return check_keyword(1, 5, "eturn", TOKEN_RETURN);
         case 's':
             if (scanner.current - scanner.start > 1) {

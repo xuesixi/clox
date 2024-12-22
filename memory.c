@@ -46,7 +46,7 @@ static void mark_roots() {
 
     // mark global
     table_mark(&vm.builtin);
-    table_mark(&vm.globals);
+//    table_mark(&vm.globals);
 
     // mark existing frames。否则调用中的函数可能会被回收
     for (int i = 0; i < vm.frame_count; ++i) {
@@ -94,6 +94,7 @@ static void blacken_object(Object *object) {
         case OBJ_CLOSURE: {
             Closure *closure = (Closure *) object;
             mark_object((Object *) closure->function);
+            mark_object((Object *) closure->module);
             for (int i = 0; i < closure->upvalue_count; ++i) {
                 mark_object((Object *) closure->upvalues[i]);
             }
@@ -123,6 +124,11 @@ static void blacken_object(Object *object) {
             for (int i = 0; i < array->length; ++i) {
                 mark_value(array->values[i]);
             }
+            break;
+        }
+        case OBJ_MODULE: {
+            Module *module = (Module *) object;
+            table_mark(&module->globals);
             break;
         }
     }
@@ -284,6 +290,12 @@ void free_object(Object *object) {
             Array *array = (Array *) object;
             FREE_ARRAY(Value, array->values, array->length);
             re_allocate(object, sizeof(Array), 0);
+            break;
+        }
+        case OBJ_MODULE: {
+            Module *module = (Module *) object;
+            free_table(&module->globals);
+            re_allocate(object, sizeof(Module), 0);
             break;
         }
         default:

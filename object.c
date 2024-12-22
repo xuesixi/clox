@@ -31,7 +31,7 @@ String *string_copy(const char *src, int length) {
     str->chars = chars;
     str->length = length;
     str->hash = hash;
-    table_set(&vm.string_table, str, nil_value());
+    table_add_new(&vm.string_table, str, nil_value(), true, false);
     stack_pop();
     return str;
 }
@@ -59,7 +59,7 @@ String *string_allocate(char *chars, int length) {
     str->chars = chars;
     str->length = length;
     str->hash = hash;
-    table_set(&vm.string_table, str, nil_value()); // this may cause gc
+    table_add_new(&vm.string_table, str, nil_value(), true, false); // this may cause gc
 
     stack_pop();
 
@@ -130,6 +130,7 @@ Closure *new_closure(LoxFunction *function) {
 
     closure->upvalue_count = function->upvalue_count;
     closure->upvalues = upvalues;
+    closure->module = NULL;
 
     stack_pop();
 
@@ -180,6 +181,12 @@ Array *new_array(int length) {
     array->length = length;
     array->values = values;
     return array;
+}
+
+Module *new_module() {
+    Module *module = (Module *) allocate_object(sizeof(Module), OBJ_MODULE);
+    init_table(&module->globals);
+    return module;
 }
 
 

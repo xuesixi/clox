@@ -244,8 +244,6 @@ static char *ref_to_chars(Value value, int *len) {
             Instance *instance = as_instance(value);
             if (instance->class != NULL) {
                 *len = asprintf(&buffer, "<obj: %s>", instance->class->name->chars);
-            } else {
-                *len = asprintf(&buffer, "<module>");
             }
             break;
         }
@@ -257,6 +255,10 @@ static char *ref_to_chars(Value value, int *len) {
         case OBJ_ARRAY: {
             Array *array = as_array(value);
             *len = asprintf(&buffer, "<array: %d>", array->length);
+            break;
+        }
+        case OBJ_MODULE: {
+            *len = asprintf(&buffer, "<module>");
             break;
         }
         default:

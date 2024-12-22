@@ -436,27 +436,27 @@ static void class_member() {
     }
 }
 
-static void import_statement() {
-
-    // import "path/to/module" as good;
-
-    consume(TOKEN_STRING, "Expect module path");
-    string(false);
-    consume(TOKEN_AS, "Expect as");
-
-    int name_index = parse_identifier_declaration(false);
-
-    consume(TOKEN_SEMICOLON, "Expect ;");
-    emit_byte(OP_IMPORT);
-    emit_byte(OP_RESTORE_MODULE);
-
-    if (current_scope->depth == 0) {
-        emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
-    } else {
-        mark_initialized();
-    }
-
-}
+//static void import_statement() {
+//
+//    // import "path/to/module" as good;
+//
+//    consume(TOKEN_STRING, "Expect module path");
+//    string(false);
+//    consume(TOKEN_AS, "Expect as");
+//
+//    int name_index = parse_identifier_declaration(false);
+//
+//    consume(TOKEN_SEMICOLON, "Expect ;");
+//    emit_byte(OP_IMPORT);
+//    emit_byte(OP_RESTORE_MODULE);
+//
+//    if (current_scope->depth == 0) {
+//        emit_two_bytes(OP_DEFINE_GLOBAL, name_index);
+//    } else {
+//        mark_initialized();
+//    }
+//
+//}
 
 static void new_import_statement() {
     // import "path": a, b;
@@ -464,7 +464,7 @@ static void new_import_statement() {
     consume(TOKEN_STRING, "Expect module path");
     string(false);
     emit_byte(OP_IMPORT);
-    // [new_module, old_module, nil, top]
+    // [old_module, nil, top]
     emit_byte(OP_RESTORE_MODULE);
     // [new_module, top]
     if (match(TOKEN_COLON)) {
@@ -598,7 +598,6 @@ static void declaration() {
         class_declaration();
     } else if (match(TOKEN_IMPORT)){
         new_import_statement();
-//        import_statement();
     } else {
         statement();
     }

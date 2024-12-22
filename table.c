@@ -39,6 +39,8 @@ static void table_resize(Table *table) {
     for (int i = 0; i < new_capacity; ++i) {
         new_backing[i].key = NULL;
         new_backing[i].value.type = VAL_NIL;
+        new_backing[i].is_public = false;
+        new_backing[i].is_const = false;
     }
 
     table->capacity = new_capacity;
@@ -48,7 +50,7 @@ static void table_resize(Table *table) {
     for (int i = 0; i < old_capacity; ++i) {
         Entry *entry = old_backing + i;
         if (entry->key != NULL) {
-            table_set(table, entry->key, entry->value);
+            table_add_new(table, entry->key, entry->value, entry->is_public, entry->is_const);
         }
     }
 
@@ -56,19 +58,24 @@ static void table_resize(Table *table) {
 }
 
 /**
- * @return 如果key存在，返回对应的entry。如果不存在，返回第一个空位
+ * @return 如果key存在，返回对应的entry。如果不存在，返回第一个空位.
+ * 如果存在，但不是满足条件，返回NULL
  */
-static Entry *find_entry(Table *table, String *key) {
-//    int index = key->hash % table->capacity;
+static Entry *find_entry(Table *table, String *key, bool public_only, bool mutable_only) {
     int index = MODULO(key->hash, table->capacity);
     for (int i = 0; i < table->capacity; ++i) {
-//        int curr = (index + i) % table->capacity;
         int curr = MODULO(index + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             return entry;
         }
         if (entry->key == key) {
+            if (public_only && !entry->is_public) {
+                return NULL;
+            }
+            if (mutable_only && entry->is_const) {
+                return NULL;
+            }
             return entry;
         }
     }
@@ -80,7 +87,7 @@ inline bool table_has(Table *table, String *key) {
     if (table->count == 0) {
         return false;
     }
-    return !empty_entry(find_entry(table, key));
+    return !empty_entry(find_entry(table, key, false, false));
 }
 
 /**
@@ -90,12 +97,16 @@ inline bool table_has(Table *table, String *key) {
  * @param value 如果存在该key，则将对应的值储存在这个参数值
  * @return 是否存在该key
  */
-bool table_get(Table *table, String *key, Value *value) {
+inline bool table_get(Table *table, String *key, Value *value) {
+    return table_conditional_get(table, key, value, false, false);
+}
+
+bool table_conditional_get(Table *table, String *key, Value *value, bool public_only, bool mutable_only) {
     if (table->count == 0) {
         return false;
     }
-    Entry *entry = find_entry(table, key);
-    if (empty_entry(entry)) {
+    Entry *entry = find_entry(table, key, public_only, mutable_only);
+    if (entry == NULL || empty_entry(entry)) {
         return false;
     } else {
         *value = entry->value;
@@ -104,7 +115,8 @@ bool table_get(Table *table, String *key, Value *value) {
 }
 
 /**
- * 设置table的一个键值对。如果key原本就已存在，返回true。如果原本不存在，返回false。
+ * 设置table的一个键值对。如果该entry为const，则不进行操作，返回false。
+ * 否则进行操作，并且返回true。
  * 该函数可能导致gc
  */
 bool table_set(Table *table, String *key, Value value) {
@@ -113,25 +125,31 @@ bool table_set(Table *table, String *key, Value value) {
         table_resize(table);
     }
     Entry *mark = NULL;
-//    int index = key->hash % table->capacity;
     int index = MODULO(key->hash, table->capacity);
     for (int i = 0; i < table->capacity; ++i) {
-//        int curr = (index + i) % table->capacity;
         int curr = MODULO(index + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             if (mark == NULL) {
                 entry->key = key;
                 entry->value = value;
+                entry->is_const = false;
+                entry->is_public = false;
                 table->count++;
             } else {
                 mark->key = key;
                 mark->value = value;
+                entry->is_const = false;
+                entry->is_public = false;
             }
-            return false;
-        } else if(entry->key == key) {
-            entry->value = value;
             return true;
+        } else if(entry->key == key) {
+            if (entry->is_const) {
+                return false;
+            } else {
+                entry->value = value;
+                return true;
+            }
         } else if (mark == NULL && del_mark(entry)) {
             mark = entry;
         }
@@ -140,11 +158,78 @@ bool table_set(Table *table, String *key, Value value) {
     return false;
 }
 
+/**
+ * 设置table的一个键值对。如果key原本就已存在（正常情况），返回0;
+ * 如果原本不存在，不进行操作，返回1;
+ * 如果该entry为const，不进行操作，返回2;
+ * 该函数可能导致gc
+ */
+char table_set_existent(Table *table, String *key, Value value) {
+    if (need_resize(table)) {
+        table_resize(table);
+    }
+    int index = MODULO(key->hash, table->capacity);
+    for (int i = 0; i < table->capacity; ++i) {
+        int curr = MODULO(index + i, table->capacity);
+        Entry *entry = table->backing + curr;
+        if (empty_entry(entry)) {
+            return 1;
+        } else if(entry->key == key) {
+            if (entry->is_const) {
+                return 2;
+            } else {
+                entry->value = value;
+                return 0;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * 如果该key不存在，则添加一个新的entry，并设定它的is_public, is_const属性，然后返回true.
+ * 如果该key已存在，什么都不做，返回false.
+ * 该函数可能导致gc
+ */
+bool table_add_new(Table *table, String *key, Value value, bool is_public, bool is_const) {
+
+    if (need_resize(table)) {
+        table_resize(table);
+    }
+    Entry *mark = NULL;
+    int index = MODULO(key->hash, table->capacity);
+    for (int i = 0; i < table->capacity; ++i) {
+        int curr = MODULO(index + i, table->capacity);
+        Entry *entry = table->backing + curr;
+        if (empty_entry(entry)) {
+            if (mark == NULL) {
+                entry->key = key;
+                entry->value = value;
+                entry->is_public = is_public;
+                entry->is_const = is_const;
+                table->count++;
+            } else {
+                mark->key = key;
+                mark->value = value;
+                mark->is_public = is_public;
+                mark->is_const = is_const;
+            }
+            return true;
+        } else if(entry->key == key) {
+            return false;
+        } else if (mark == NULL && del_mark(entry)) {
+            mark = entry;
+        }
+    }
+    IMPLEMENTATION_ERROR("table_add() does not find empty spot");
+    return false;
+}
+
 Value table_delete(Table *table, String *key) {
     if (table->count == 0) {
         return nil_value();
     }
-    Entry *entry = find_entry(table, key);
+    Entry *entry = find_entry(table, key, false, false);
     entry->key = NULL;
     Value result = entry->value;
     entry->value = bool_value(true);
@@ -156,7 +241,7 @@ void table_add_all(Table *from, Table *to) {
     for (int i = 0; i < capacity; ++i) {
         Entry *entry = from->backing + i;
         if (entry->key != NULL) {
-            table_set(to,entry->key, entry->value);
+            table_add_new(to,entry->key, entry->value, entry->is_public, entry->is_public);
         }
     }
 }
@@ -195,10 +280,8 @@ String *table_find_string(Table *table, const char *name, int length, uint32_t h
     if (table->count == 0) {
         return NULL;
     }
-//    int index = hash % table->capacity;
     int index = MODULO(hash, table->capacity);
     for (int i = 0; i < table->capacity; ++i) {
-//        int curr = (i + index) % table->capacity;
         int curr = MODULO(index + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {

@@ -64,9 +64,10 @@ typedef enum OpCode{
     OP_UNPACK_ARRAY, // op, length
     OP_CLASS_STATIC_FIELD, // op, name_index: [class, field, top] -> [class, top]
     OP_IMPORT, // op : [path, top]
-    OP_RESTORE_MODULE, // op:  [new_module, old_module, top] -> [new_module, top]
+    OP_RESTORE_MODULE, // op:  [old_module, nil, top] -> [new_module, top]
     OP_SWAP, // op, index:
     NOP,
+    OP_GET_PUB_PROPERTY, // op, name_index
 } OpCode;
 
 typedef struct Chunk{

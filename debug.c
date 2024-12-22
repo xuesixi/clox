@@ -226,6 +226,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("NOP", offset);
         case OP_SWAP:
             return constant_instruction("SWAP", chunk, offset);
+        case OP_GET_PUB_PROPERTY:
+            return constant_instruction("GET_PUB_PROPERTY", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

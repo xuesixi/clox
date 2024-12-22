@@ -16,6 +16,7 @@ typedef enum {
   OBJ_INSTANCE,
   OBJ_METHOD,
   OBJ_ARRAY,
+  OBJ_MODULE,
 } ObjectType;
 
 typedef struct Object{
@@ -23,6 +24,11 @@ typedef struct Object{
     Object *next;
     bool is_marked;
 } Object;
+
+typedef struct Module {
+    Object object;
+    Table globals;
+} Module;
 
 typedef struct Array {
     Object object;
@@ -65,6 +71,7 @@ typedef struct Closure {
     Object object;
     LoxFunction *function;
     UpValue **upvalues; // array of pointers to UpValueObject，之所以有额外一层pointer，是因为多个closure可以共享同一个UpValueObject本体。
+    Module *module;
     int upvalue_count;
 } Closure;
 
@@ -96,12 +103,6 @@ typedef struct NativeFunction {
     int arity; // -1 means variable amount of arguments
 } NativeFunction;
 
-//bool is_ref_of(Value value, ObjectType type);
-
-//inline bool is_ref_of(Value value, ObjectType type) {
-//    return is_ref(value) && as_ref(value)->type == type;
-//}
-
 #define is_ref_of(value, ref_type) (is_ref(value) && as_ref(value)->type == (ref_type))
 
 #define as_string(v) ((String *)(as_ref(v)))
@@ -112,6 +113,7 @@ typedef struct NativeFunction {
 #define as_instance(v) ((Instance *)(as_ref(v)))
 #define as_method(v) ((Method *)(as_ref(v)))
 #define as_array(v) ((Array *)(as_ref(v)))
+#define as_module(v) ((Module *)(as_ref(v)))
 
 
 String *string_copy(const char *src, int length);
@@ -121,25 +123,13 @@ String *string_concat(Value a, Value b);
 Object *allocate_object(size_t size, ObjectType type);
 
 LoxFunction *new_function(FunctionType type);
-//LoxFunction *as_function(Value value);
-
 NativeFunction *new_native(NativeImplementation impl, String *name, int arity);
-//NativeFunction *as_native(Value value);
-
-//Closure *as_closure(Value value);
 Closure *new_closure(LoxFunction *function);
-
 UpValue *new_upvalue(Value *position);
-
 Class *new_class(String *name);
-//Class *as_class(Value value);
-
 Instance *new_instance(Class *class);
-//Instance *as_instance(Value value);
-
 Method *new_method(Closure *closure, Value value);
-//Method *as_method(Value value);
-
 Array *new_array(int length);
-//Array *as_array(Value value);
+Module *new_module();
+
 #endif
