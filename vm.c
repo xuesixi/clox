@@ -29,10 +29,7 @@ jmp_buf error_buf;
 
 static CallFrame *curr_frame;
 static Table *curr_closure_global;
-
-//#define read_byte() (*curr_frame->PC ++)
-//#define read_uint16() (u8_to_u16(read_byte(), read_byte()))
-
+static Value *curr_const_pool;
 
 static uint8_t read_byte();
 static uint16_t read_uint16();
@@ -359,7 +356,8 @@ static inline uint16_t read_uint16() {
 }
 
 static inline Value read_constant16() {
-    return curr_frame->closure->function->chunk.constants.values[read_uint16()];
+    return curr_const_pool[read_uint16()];
+//    return curr_frame->closure->function->chunk.constants.values[read_uint16()];
 }
 
 /**
@@ -466,6 +464,7 @@ static void call_closure(Closure *closure, int arg_count) {
     frame->PC = function->chunk.code;
     frame->closure = closure;
     curr_closure_global = &closure->module->globals;
+    curr_const_pool = closure->function->chunk.constants.values;
 }
 
 /**
@@ -804,6 +803,7 @@ InterpretResult interpret(const char *src, const char *path) {
     Closure *closure = new_closure(function);
     closure->module = module;
     curr_closure_global = &closure->module->globals;
+    curr_const_pool = closure->function->chunk.constants.values;
 
     frame->closure = closure;
     frame->FP = vm.stack;
@@ -847,6 +847,7 @@ static void import(const char *src, String *path) {
     closure->module = module;
     vm.current_module = module;
     curr_closure_global = &closure->module->globals;
+    curr_const_pool = closure->function->chunk.constants.values;
 
     ENABLE_GC;
 
@@ -939,6 +940,7 @@ static InterpretResult run() {
                 if (vm.frame_count == 0) {
                     return INTERPRET_OK; // 程序运行结束
                 }
+                curr_const_pool = curr_frame->closure->function->chunk.constants.values;
                 stack_push(result);
                 break;
             }
@@ -1499,6 +1501,7 @@ static InterpretResult run() {
                 stack_push(ref_value((Object *) vm.current_module));
                 vm.current_module = old_module;
                 curr_closure_global = &curr_frame->closure->module->globals;
+                curr_const_pool = curr_frame->closure->function->chunk.constants.values; // 我认为本行是不需要的，但不知为何，注释掉它会导致性能有所下降。
                 break;
             }
             case OP_EXPORT: {
