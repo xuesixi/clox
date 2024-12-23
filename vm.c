@@ -30,8 +30,11 @@ jmp_buf error_buf;
 static CallFrame *curr_frame;
 static Table *curr_closure_global;
 
-static uint8_t read_byte();
+//#define read_byte() (*curr_frame->PC ++)
+//#define read_uint16() (u8_to_u16(read_byte(), read_byte()))
 
+
+static uint8_t read_byte();
 static uint16_t read_uint16();
 
 static bool is_falsy(Value value);
@@ -354,14 +357,6 @@ static inline uint16_t read_uint16() {
     uint8_t i1 = read_byte();
     return u8_to_u16(i0, i1);
 }
-
-///**
-// * 将下一个字节解释为常数索引，返回其对应的常数值
-// * @return 下一个字节代表的常数
-// */
-//static inline Value read_constant() {
-//    return curr_frame->closure->function->chunk.constants.values[read_byte()];
-//}
 
 static inline Value read_constant16() {
     return curr_frame->closure->function->chunk.constants.values[read_uint16()];

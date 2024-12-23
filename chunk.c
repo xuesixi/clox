@@ -23,16 +23,16 @@ static void init_constant(Chunk *chunk) {
     add_constant(chunk, float_value(0.0));
 }
 
-/**
- *
- * @param i0 [7,0]
- * @param i1 [15,8]
- * @return
- */
-inline uint16_t u8_to_u16(uint8_t i0, uint8_t i1) {
-    uint16_t value = (((uint16_t)i1) << 8) | i0;
-    return value;
-}
+///**
+// *
+// * @param i0 [7,0]
+// * @param i1 [15,8]
+// * @return
+// */
+//inline uint16_t u8_to_u16(uint8_t i0, uint8_t i1) {
+//    uint16_t value = (((uint16_t)i1) << 8) | i0;
+//    return value;
+//}
 
 /**
  * @param i0 [7,0]
