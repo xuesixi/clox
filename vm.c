@@ -38,9 +38,9 @@ static bool is_falsy(Value value);
 
 static void reset_stack();
 
-static Value read_constant();
+//static Value read_constant();
 
-static Value read_constant2();
+static Value read_constant16();
 
 static InterpretResult run();
 
@@ -355,24 +355,24 @@ static inline uint16_t read_uint16() {
     return u8_to_u16(i0, i1);
 }
 
-/**
- * 将下一个字节解释为常数索引，返回其对应的常数值
- * @return 下一个字节代表的常数
- */
-static inline Value read_constant() {
-    return curr_frame->closure->function->chunk.constants.values[read_byte()];
-}
+///**
+// * 将下一个字节解释为常数索引，返回其对应的常数值
+// * @return 下一个字节代表的常数
+// */
+//static inline Value read_constant() {
+//    return curr_frame->closure->function->chunk.constants.values[read_byte()];
+//}
 
-static inline Value read_constant2() {
+static inline Value read_constant16() {
     return curr_frame->closure->function->chunk.constants.values[read_uint16()];
 }
 
 /**
- * 将下一个字节解释为字符串常数索引，返回其对应的String
+ * 将下一个u16解释为字符串常数索引，返回其对应的String
  * @return 下一个字节代表的String
  */
 static inline String *read_constant_string() {
-    Value value = read_constant();
+    Value value = read_constant16();
     if (!is_ref_of(value, OBJ_STRING)) {
         IMPLEMENTATION_ERROR("trying to read a constant string, but the value is not a String");
         return NULL;
@@ -948,12 +948,12 @@ static InterpretResult run() {
                 break;
             }
             case OP_CONSTANT: {
-                Value value = read_constant();
+                Value value = read_constant16();
                 stack_push(value);
                 break;
             }
             case OP_CONSTANT2: {
-                Value value = read_constant2();
+                Value value = read_constant16();
                 stack_push(value);
                 break;
             }
@@ -1187,7 +1187,7 @@ static InterpretResult run() {
                  * 然后等到外层函数被调用、内层函数被定义后，内层函数的OP_closure
                  * 才会被执行
                  */
-                Value f = read_constant();
+                Value f = read_constant16();
                 Closure *closure = new_closure(as_function(f));
                 closure->module = vm.current_module;
                 stack_push(ref_value((Object *) closure));

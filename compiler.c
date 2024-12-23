@@ -140,11 +140,13 @@ static Chunk *current_chunk();
 
 static void emit_byte(uint8_t byte);
 
-static void emit_two_bytes(uint8_t byte1, uint8_t byte2);
+static inline void emit_u8_u16(uint8_t u8, uint16_t u16);
 
-static void emit_uint16(uint16_t value);
+static void emit_u8_u8(uint8_t byte1, uint8_t byte2);
 
-static void emit_constant(int index);
+static void emit_u16(uint16_t value);
+
+//static void emit_constant(int index);
 
 static void emit_return();
 
@@ -224,7 +226,7 @@ static int parse_identifier_declaration(bool is_const);
 
 static int declare_identifier_token(Token *token);
 
-static int identifier_constant(Token *name);
+static uint16_t identifier_constant(Token *name);
 
 static void named_variable(Token *name, bool can_assign);
 
@@ -238,7 +240,7 @@ static bool check(TokenType type);
 
 static void synchronize();
 
-static int make_constant(Value value);
+static uint16_t make_constant(Value value);
 
 static int resolve_upvalue(Scope *scope, Token *identifier, bool *is_const);
 
@@ -321,7 +323,7 @@ static void array_literal(bool can_assign) {
 //        expression();
 //        emit_two_bytes(OP_UNPACK_ARRAY, length);
 //    } else {
-        emit_two_bytes(OP_BUILD_ARRAY, length);
+    emit_u8_u8(OP_BUILD_ARRAY, length);
 //    }
 }
 
@@ -354,8 +356,9 @@ static void string(bool can_assign) {
     (void) can_assign;
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
     Value value = ref_value((Object *) str);
-    int index = make_constant(value);
-    emit_constant(index);
+    uint16_t index = make_constant(value);
+    emit_u8_u16(OP_CONSTANT, index);
+//    emit_constant(index);
 }
 
 static void this_expression(bool can_assign) {
@@ -407,11 +410,12 @@ static void label_statement() {
 static void class_member() {
     if (match(TOKEN_STATIC)) {
         consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
-        int name = identifier_constant(&parser.previous);
+        uint16_t name = identifier_constant(&parser.previous);
         if (check(TOKEN_LEFT_PAREN)) {
             // static function
             function_statement(TYPE_FUNCTION);
-            emit_two_bytes(OP_CLASS_STATIC_FIELD, name);
+
+            emit_u8_u16(OP_CLASS_STATIC_FIELD, name);
         } else {
             // static field
             // static num = 10;
@@ -422,7 +426,7 @@ static void class_member() {
                 consume(TOKEN_SEMICOLON, "Expect expression or semicolon");
                 emit_byte(OP_NIL);
             }
-            emit_two_bytes(OP_CLASS_STATIC_FIELD, name);
+            emit_u8_u16(OP_CLASS_STATIC_FIELD, name);
         }
     } else {
         consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
@@ -447,7 +451,7 @@ static void import_statement() {
         do {
             consume(TOKEN_IDENTIFIER, "Expect identifier for this import statement");
             int as_name;
-            int property_name = identifier_constant(&parser.previous);
+            uint16_t property_name = identifier_constant(&parser.previous);
             if (match(TOKEN_AS)) {
                 as_name = parse_identifier_declaration(false);
             } else {
@@ -455,13 +459,13 @@ static void import_statement() {
             }
             emit_byte(OP_COPY);
             // [new_mod, new_mod, top]
-            emit_two_bytes(OP_GET_PROPERTY, property_name);
+            emit_u8_u16(OP_GET_PROPERTY, property_name);
             // [new_mod, property, top]
             if (current_scope->depth == 0) {
-                emit_two_bytes(OP_DEF_GLOBAL, as_name);
+                emit_u8_u16(OP_DEF_GLOBAL, as_name);
                 // [new_mod, top]
             } else {
-                emit_two_bytes(OP_SWAP, 1);
+                emit_u8_u8(OP_SWAP, 1);
                 mark_initialized();
                 // [property, new_mod, top]
             }
@@ -480,7 +484,7 @@ static void import_statement() {
         consume(TOKEN_SEMICOLON, "Expect ;");
 
         if (current_scope->depth == 0) {
-            emit_two_bytes(OP_DEF_GLOBAL, name_index);
+            emit_u8_u16(OP_DEF_GLOBAL, name_index);
         } else {
             mark_initialized();
         }
@@ -493,23 +497,23 @@ static void class_declaration(bool is_public) {
 
     Token class_name = parser.previous;
     Token super_class_name;
-    int name_index = identifier_constant(&parser.previous);
+    uint16_t name_index = identifier_constant(&parser.previous);
 
     ClassScope new_class;
     new_class.enclosing = current_class;
     new_class.has_super = false;
     current_class = &new_class;
 
-    emit_two_bytes(OP_CLASS, name_index);
+    emit_u8_u16(OP_CLASS, name_index);
 
     if (current_scope->depth > 0) {
         declare_local(false, &class_name);
         mark_initialized();
     } else {
         if (is_public) {
-            emit_two_bytes(OP_DEF_PUB_GLOBAL, name_index);
+            emit_u8_u16(OP_DEF_PUB_GLOBAL, name_index);
         } else {
-            emit_two_bytes(OP_DEF_GLOBAL, name_index);
+            emit_u8_u16(OP_DEF_GLOBAL, name_index);
         }
     }
 
@@ -573,8 +577,8 @@ static void class_declaration(bool is_public) {
 static void export_statement() {
     do {
         consume(TOKEN_IDENTIFIER, "Expect identifiers");
-        int name = identifier_constant(&parser.previous);
-        emit_two_bytes(OP_EXPORT, name);
+        uint16_t name = identifier_constant(&parser.previous);
+        emit_u8_u16(OP_EXPORT, name);
     } while (!check(TOKEN_EOF) && match(TOKEN_COMMA));
     consume(TOKEN_SEMICOLON, "Expect ; to terminate the export statement");
 }
@@ -655,10 +659,10 @@ static void function_statement(FunctionType type) {
     LoxFunction *function = end_compiler(); // 完成了函数的解析，返回上级
 
     // 将这个函数作为一个常量储存起来
-    int index = make_constant(ref_value((Object *) function));
+    uint16_t index = make_constant(ref_value((Object *) function));
 
     // OP_closure 后面紧跟着的是一个function，而非closure对象。这个function对象会在运行时被包装成closure
-    emit_two_bytes(OP_CLOSURE, index);
+    emit_u8_u16(OP_CLOSURE, index);
 
     for (int i = 0; i < function->upvalue_count; ++i) {
         emit_byte(scope.upvalues[i].is_local);
@@ -677,9 +681,9 @@ static void fun_declaration(bool is_public) {
     function_statement(TYPE_FUNCTION);
     if (current_scope->depth == 0) {
         if (is_public) {
-            emit_two_bytes(OP_DEF_PUB_GLOBAL, name);
+            emit_u8_u16(OP_DEF_PUB_GLOBAL, name);
         } else {
-            emit_two_bytes(OP_DEF_GLOBAL, name);
+            emit_u8_u16(OP_DEF_GLOBAL, name);
         }
     }
 }
@@ -697,9 +701,9 @@ static void var_declaration(bool is_public) {
 
     if (current_scope->depth == 0) {
         if (is_public) {
-            emit_two_bytes(OP_DEF_PUB_GLOBAL, index);
+            emit_u8_u16(OP_DEF_PUB_GLOBAL, index);
         } else {
-            emit_two_bytes(OP_DEF_GLOBAL, index);
+            emit_u8_u16(OP_DEF_GLOBAL, index);
         }
     } else {
         mark_initialized();
@@ -717,9 +721,9 @@ static void const_declaration(bool is_public) {
 
     if (current_scope->depth == 0) {
         if (is_public) {
-            emit_two_bytes(OP_DEF_PUB_GLOBAL_CONST, index);
+            emit_u8_u16(OP_DEF_PUB_GLOBAL_CONST, index);
         } else {
-            emit_two_bytes(OP_DEF_GLOBAL_CONST, index);
+            emit_u8_u16(OP_DEF_GLOBAL_CONST, index);
         }
     } else {
         current_scope->locals[current_scope->local_count - 1].depth = current_scope->depth;
@@ -864,7 +868,7 @@ static int declare_identifier_token(Token *token) {
  * 根据标识符token产生一个String，将其添加入常数中，然后返回其索引
  * @return 常数中的索引
  */
-static inline int identifier_constant(Token *name) {
+static inline uint16_t identifier_constant(Token *name) {
     String *str = string_copy(name->start, name->length);
     return make_constant(ref_value((Object *) str));
 }
@@ -910,10 +914,10 @@ static void emit_goto(int dest) {
     int diff = dest - current_position;
     if (diff > 0) {
         emit_byte(OP_JUMP);
-        emit_uint16(diff);
+        emit_u16(diff);
     } else if (diff < 0) {
         emit_byte(OP_JUMP_BACK);
-        emit_uint16(-diff);
+        emit_u16(-diff);
     }
 }
 
@@ -972,9 +976,10 @@ static void if_statement() {
 static void loop_back(int start) {
     emit_byte(OP_JUMP_BACK);
     int diff = current_chunk()->count - start + 2;
-    uint8_t i0, i1;
-    u16_to_u8(diff, &i0, &i1);
-    emit_two_bytes(i0, i1);
+    emit_u16(diff);
+//    uint8_t i0, i1;
+//    u16_to_u8(diff, &i0, &i1);
+//    emit_two_bytes(i0, i1);
 }
 
 /**
@@ -1300,7 +1305,7 @@ static int argument_list() {
 static void call(bool can_assign) {
     (void) can_assign;
     int arg_count = argument_list();
-    emit_two_bytes(OP_CALL, arg_count);
+    emit_u8_u8(OP_CALL, arg_count);
 }
 
 /**
@@ -1351,16 +1356,15 @@ static inline void expression() {
 
 static void dot(bool can_assign) {
     consume(TOKEN_IDENTIFIER, "An identifier is expected here");
-    int name_index = identifier_constant(&parser.previous);
+    uint16_t name_index = identifier_constant(&parser.previous);
     if (can_assign && match_assign()) {
         arithmetic_equal(OP_SET_PROPERTY, OP_GET_PROPERTY, name_index, 1);
     } else if (match(TOKEN_LEFT_PAREN)) {
         int arg_count = argument_list();
-        emit_byte(OP_PROPERTY_INVOKE);
-        emit_byte(name_index);
+        emit_u8_u16(OP_PROPERTY_INVOKE, name_index);
         emit_byte(arg_count);
     } else {
-        emit_two_bytes(OP_GET_PROPERTY, name_index);
+        emit_u8_u16(OP_GET_PROPERTY, name_index);
     }
 }
 
@@ -1413,13 +1417,17 @@ static void arithmetic_equal(OpCode set_op, OpCode get_op, int index, int copy) 
     TokenType type = parser.previous.type;
     if (type == TOKEN_EQUAL) {
         expression();
-        emit_two_bytes(set_op, index);
+        if (get_op == OP_GET_GLOBAL || get_op == OP_GET_PROPERTY) {
+            emit_u8_u16(set_op, index);
+        } else {
+            emit_u8_u8(set_op, index);
+        }
         return;
     }
     if (copy == 1) {
         emit_byte(OP_COPY);
     }
-    emit_two_bytes(get_op, index);
+    emit_u8_u16(get_op, index);
     expression();
     switch (type) {
         case TOKEN_PLUS_EQUAL: {
@@ -1446,8 +1454,12 @@ static void arithmetic_equal(OpCode set_op, OpCode get_op, int index, int copy) 
             IMPLEMENTATION_ERROR("this should not happen");
             return;
     }
-    emit_two_bytes(set_op, index);
 
+    if (get_op == OP_GET_GLOBAL) {
+        emit_u8_u16(set_op, index);
+    } else {
+        emit_u8_u8(set_op, index);
+    }
 }
 
 static inline bool match_assign() {
@@ -1487,7 +1499,11 @@ static void named_variable(Token *name, bool can_assign) {
         }
         arithmetic_equal(set_op, get_op, index, 0);
     } else {
-        emit_two_bytes(get_op, index);
+        if (get_op == OP_GET_GLOBAL) {
+            emit_u8_u16(get_op, index);
+        } else {
+            emit_u8_u8(get_op, index);
+        }
     }
 }
 
@@ -1612,7 +1628,7 @@ static void super_expression(bool can_assign) {
     }
     consume(TOKEN_DOT, "super is always followed by a '.'");
     consume(TOKEN_IDENTIFIER, "expect an identifier");
-    int method = identifier_constant(&parser.previous);
+    uint16_t method = identifier_constant(&parser.previous);
     Token this = literal_token("this");
     Token super = literal_token("super");
     named_variable(&this, false);
@@ -1620,11 +1636,12 @@ static void super_expression(bool can_assign) {
         int arg_count = argument_list();
         named_variable(&super, false);
         emit_byte(OP_SUPER_INVOKE);
-        emit_byte(method);
+//        emit_byte(method);
+        emit_u16(method);
         emit_byte(arg_count);
     } else {
         named_variable(&super, false);
-        emit_two_bytes(OP_SUPER_ACCESS, method);
+        emit_u8_u16(OP_SUPER_ACCESS, method);
     }
 }
 
@@ -1638,21 +1655,21 @@ static void dimension_array(bool can_assign) {
         dimension ++;
         consume(TOKEN_RIGHT_BRACKET, "Expect a ]");
     }
-    emit_two_bytes(OP_DIMENSION_ARRAY, dimension);
+    emit_u8_u8(OP_DIMENSION_ARRAY, dimension);
 }
 
 static inline void float_num(bool can_assign) {
     (void) can_assign;
     double value = strtod(parser.previous.start, NULL);
-    int index = make_constant(float_value(value));
-    emit_constant(index);
+    uint16_t index = make_constant(float_value(value));
+    emit_u8_u16(OP_CONSTANT, index);
 }
 
 static inline void int_num(bool can_assign) {
     (void) can_assign;
     int value = (int) strtol(parser.previous.start, NULL, 10);
-    int index = make_constant(int_value(value));
-    emit_constant(index);
+    uint16_t index = make_constant(int_value(value));
+    emit_u8_u16(OP_CONSTANT, index);
 }
 
 static void literal(bool can_assign) {
@@ -1685,12 +1702,12 @@ static inline void grouping(bool can_assign) {
  * 该函数包装了 add_constant
  * @return 常数的索引
  * */
-static int make_constant(Value value) {
+static uint16_t make_constant(Value value) {
     int cache = constant_mapping(value);
     if (cache != -1) {
         return cache;
     }
-    int index = add_constant(current_chunk(), value);
+    uint16_t index = add_constant(current_chunk(), value);
     return index;
 }
 
@@ -1713,9 +1730,14 @@ static LoxFunction *end_compiler() {
     return function;
 }
 
-static inline void emit_two_bytes(uint8_t byte1, uint8_t byte2) {
+static inline void emit_u8_u8(uint8_t byte1, uint8_t byte2) {
     emit_byte(byte1);
     emit_byte(byte2);
+}
+
+static inline void emit_u8_u16(uint8_t u8, uint16_t u16) {
+    emit_byte(u8);
+    emit_u16(u16);
 }
 
 /**
@@ -1723,33 +1745,33 @@ static inline void emit_two_bytes(uint8_t byte1, uint8_t byte2) {
  * [7, 0]为i0，[15, 8]为i1
  * @param value
  */
-static inline void emit_uint16(uint16_t value) {
+static inline void emit_u16(uint16_t value) {
     uint8_t i0, i1;
     u16_to_u8(value, &i0, &i1);
-    emit_two_bytes(i0, i1);
+    emit_u8_u8(i0, i1);
 }
 
-/**
- * 根据给定的index产生OP_CONSTANT或者OP_CONSTANT2指令
- * @param index
- */
-static void emit_constant(int index) {
-    if (index < UINT8_MAX) {
-        emit_two_bytes(OP_CONSTANT, index);
-    } else if (index < UINT16_MAX) {
-        emit_byte(OP_CONSTANT2);
-        emit_uint16(index);
-    } else {
-        error_at_previous("Too many constants for a chunk");
-    }
-}
+///**
+// * 根据给定的index产生OP_CONSTANT或者OP_CONSTANT2指令
+// * @param index
+// */
+//static void emit_constant(int index) {
+//    if (index < UINT8_MAX) {
+//        emit_two_bytes(OP_CONSTANT, index);
+//    } else if (index < UINT16_MAX) {
+//        emit_byte(OP_CONSTANT2);
+//        emit_uint16(index);
+//    } else {
+//        error_at_previous("Too many constants for a chunk");
+//    }
+//}
 
 /**
  * 如果是构造函数，那么return this；否则return nil
  */
 static inline void emit_return() {
     if (current_scope->functionType == TYPE_INITIALIZER) {
-        emit_two_bytes(OP_GET_LOCAL, 0);
+        emit_u8_u8(OP_GET_LOCAL, 0);
     } else {
         emit_byte(OP_NIL);
     }

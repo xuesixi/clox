@@ -31,13 +31,24 @@ static int byte_instruction(const char *name, const Chunk *chunk, int offset) {
     return offset + 2;
 }
 
-static int constant_instruction(const char *name, const Chunk *chunk, int offset) {
+static int constant8_instruction(const char *name, const Chunk *chunk, int offset) {
     uint8_t index = chunk->code[offset + 1];
     printf("%-23s %4d : ", name, index);
     Value value = chunk->constants.values[index];
     print_value_with_color(value);
     NEW_LINE();
     return offset + 2;
+}
+
+static int constant16_instruction(const char *name, const Chunk *chunk, int offset) {
+    uint8_t i0 = chunk->code[offset + 1];
+    uint8_t i1 = chunk->code[offset + 2];
+    uint16_t index = u8_to_u16(i0, i1);
+    printf("%-23s %4d : ", name, index);
+    Value value = chunk->constants.values[index];
+    print_value_with_color(value);
+    NEW_LINE();
+    return offset + 3;
 }
 
 static int invoke_instruction(const char *name, const Chunk *chunk, int offset) {
@@ -51,16 +62,16 @@ static int invoke_instruction(const char *name, const Chunk *chunk, int offset) 
     return offset + 3;
 }
 
-static int constant2_instruction(const char *name, const Chunk *chunk, int offset) {
-    uint8_t i0 = chunk->code[offset + 1];
-    uint8_t i1 = chunk->code[offset + 2];
-    int index = u8_to_u16(i0, i1);
-    printf("%-23s %4d : ", name, index);
-    Value value = chunk->constants.values[index];
-    print_value_with_color(value);
-    NEW_LINE();
-    return offset + 3;
-}
+//static int constant2_instruction(const char *name, const Chunk *chunk, int offset) {
+//    uint8_t i0 = chunk->code[offset + 1];
+//    uint8_t i1 = chunk->code[offset + 2];
+//    int index = u8_to_u16(i0, i1);
+//    printf("%-23s %4d : ", name, index);
+//    Value value = chunk->constants.values[index];
+//    print_value_with_color(value);
+//    NEW_LINE();
+//    return offset + 3;
+//}
 
 static int jump_instruction(const char *name, const Chunk *chunk, int offset, bool forward) {
     uint8_t i0 = chunk->code[offset + 1];
@@ -102,9 +113,9 @@ int disassemble_instruction(Chunk *chunk, int offset) {
         case OP_RETURN:
             return simple_instruction("RETURN", offset);
         case OP_CONSTANT:
-            return constant_instruction("CONSTANT", chunk, offset);
+            return constant16_instruction("CONSTANT", chunk, offset);
         case OP_CONSTANT2:
-            return constant2_instruction("CONSTANT2", chunk, offset);
+            return constant16_instruction("CONSTANT2", chunk, offset);
         case OP_NEGATE:
             return simple_instruction("NEGATE", offset);
         case OP_ADD:
@@ -140,13 +151,13 @@ int disassemble_instruction(Chunk *chunk, int offset) {
         case OP_POP:
             return simple_instruction("POP", offset);
         case OP_DEF_GLOBAL:
-            return constant_instruction("DEF_GLOBAL", chunk, offset);
+            return constant16_instruction("DEF_GLOBAL", chunk, offset);
         case OP_DEF_GLOBAL_CONST:
-            return constant_instruction("DEF_GLOBAL_CONST", chunk, offset);
+            return constant16_instruction("DEF_GLOBAL_CONST", chunk, offset);
         case OP_GET_GLOBAL:
-            return constant_instruction("GET_GLOBAL", chunk, offset);
+            return constant16_instruction("GET_GLOBAL", chunk, offset);
         case OP_SET_GLOBAL:
-            return constant_instruction("SET_GLOBAL", chunk, offset);
+            return constant16_instruction("SET_GLOBAL", chunk, offset);
         case OP_GET_LOCAL:
             return byte_instruction("GET_LOCAL", chunk, offset);
         case OP_SET_LOCAL:
@@ -168,9 +179,9 @@ int disassemble_instruction(Chunk *chunk, int offset) {
         case OP_CALL:
             return byte_instruction("CALL", chunk, offset);
         case OP_GET_UPVALUE:
-            return constant_instruction("GET_UPVALUE", chunk, offset);
+            return constant8_instruction("GET_UPVALUE", chunk, offset);
         case OP_SET_UPVALUE:
-            return constant_instruction("SET_UPVALUE", chunk, offset);
+            return constant8_instruction("SET_UPVALUE", chunk, offset);
         case OP_CLOSURE: {
             offset++;
             int index = chunk->code[offset ++];
@@ -185,17 +196,17 @@ int disassemble_instruction(Chunk *chunk, int offset) {
         case OP_CLOSE_UPVALUE:
             return simple_instruction("CLOSE_UPVALUE", offset);
         case OP_CLASS:
-            return constant_instruction("CLASS", chunk, offset);
+            return constant16_instruction("CLASS", chunk, offset);
         case OP_GET_PROPERTY:
-            return constant_instruction("GET_PROPERTY", chunk, offset);
+            return constant16_instruction("GET_PROPERTY", chunk, offset);
         case OP_COPY:
             return simple_instruction("COPY", offset);
         case OP_COPY2:
             return simple_instruction("COPY2", offset);
         case OP_COPY_N:
-            return constant_instruction("COPY_N", chunk, offset);
+            return constant8_instruction("COPY_N", chunk, offset);
         case OP_SET_PROPERTY:
-            return constant_instruction("SET_PROPERTY", chunk, offset);
+            return constant16_instruction("SET_PROPERTY", chunk, offset);
         case OP_METHOD:
             return simple_instruction("METHOD", offset);
         case OP_PROPERTY_INVOKE:
@@ -203,15 +214,15 @@ int disassemble_instruction(Chunk *chunk, int offset) {
         case OP_INHERIT:
             return simple_instruction("INHERIT", offset);
         case OP_SUPER_ACCESS:
-            return constant_instruction("SUPER_ACCESS", chunk, offset);
+            return constant16_instruction("SUPER_ACCESS", chunk, offset);
         case OP_SUPER_INVOKE:
             return invoke_instruction("SUPER_INVOKE", chunk, offset);
         case OP_DIMENSION_ARRAY:
-            return constant_instruction("DIMENSION_ARRAY", chunk, offset);
+            return constant8_instruction("DIMENSION_ARRAY", chunk, offset);
         case OP_BUILD_ARRAY:
-            return constant_instruction("BUILD_ARRAY", chunk, offset);
+            return constant8_instruction("BUILD_ARRAY", chunk, offset);
         case OP_UNPACK_ARRAY:
-            return constant_instruction("UNPACK_ARRAY", chunk, offset);
+            return constant8_instruction("UNPACK_ARRAY", chunk, offset);
         case OP_INDEXING_GET:
             return simple_instruction("INDEXING_GET", offset);
         case OP_INDEXING_SET:
@@ -219,19 +230,19 @@ int disassemble_instruction(Chunk *chunk, int offset) {
         case OP_CLASS_STATIC_FIELD:
             return simple_instruction("CLASS_STATIC_FIELD", offset);
         case OP_IMPORT:
-            return constant_instruction("IMPORT", chunk, offset);
+            return simple_instruction("IMPORT", offset);
         case OP_RESTORE_MODULE:
             return simple_instruction("RESTORE_MODULE", offset);
         case NOP:
             return simple_instruction("NOP", offset);
         case OP_SWAP:
-            return constant_instruction("SWAP", chunk, offset);
+            return constant8_instruction("SWAP", chunk, offset);
         case OP_DEF_PUB_GLOBAL:
-            return constant_instruction("DEF_PUB_GLOBAL", chunk, offset);
+            return constant16_instruction("DEF_PUB_GLOBAL", chunk, offset);
         case OP_DEF_PUB_GLOBAL_CONST:
-            return constant_instruction("DEF_PUB_GLOBAL_CONST", chunk, offset);
+            return constant16_instruction("DEF_PUB_GLOBAL_CONST", chunk, offset);
         case OP_EXPORT:
-            return constant_instruction("EXPORT", chunk, offset);
+            return constant16_instruction("EXPORT", chunk, offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

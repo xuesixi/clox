@@ -30,7 +30,7 @@ static void init_constant(Chunk *chunk) {
  * @return
  */
 inline uint16_t u8_to_u16(uint8_t i0, uint8_t i1) {
-    uint16_t value = (((uint16_t)i1) << 8) + i0;
+    uint16_t value = (((uint16_t)i1) << 8) | i0;
     return value;
 }
 
@@ -110,11 +110,11 @@ int constant_mapping(Value value) {
  * @param constant 常量
  * @return 该常量在 chunk 中的 constants 中的索引。
  */
-inline int add_constant(Chunk *c, Value constant) {
+inline uint16_t add_constant(Chunk *c, Value constant) {
     stack_push(constant); // prevent gc
     append_ValueArray(&c->constants, constant);
     stack_pop();
-    if (c->constants.count > UINT8_MAX) {
+    if (c->constants.count > UINT16_MAX) {
         IMPLEMENTATION_ERROR("Too many constants for a chunk.");
     }
     return c->constants.count - 1;
