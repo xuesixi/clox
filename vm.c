@@ -28,6 +28,7 @@ Module *repl_module = NULL;
 jmp_buf error_buf;
 
 static CallFrame *curr_frame;
+static Table *curr_closure_global;
 
 static uint8_t read_byte();
 
@@ -469,6 +470,7 @@ static void call_closure(Closure *closure, int arg_count) {
     frame->FP = vm.stack_top - arg_count - 1;
     frame->PC = function->chunk.code;
     frame->closure = closure;
+    curr_closure_global = &closure->module->globals;
 }
 
 /**
@@ -806,6 +808,7 @@ InterpretResult interpret(const char *src, const char *path) {
 
     Closure *closure = new_closure(function);
     closure->module = module;
+    curr_closure_global = &closure->module->globals;
 
     frame->closure = closure;
     frame->FP = vm.stack;
@@ -834,12 +837,12 @@ static void import(const char *src, String *path) {
 
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
-    CallFrame *frame = curr_frame;
+//    CallFrame *frame = curr_frame;
 
     Closure *closure = new_closure(function);
-    frame->closure = closure;
-    frame->FP = vm.stack_top;
-    frame->PC = function->chunk.code;
+    curr_frame->closure = closure;
+    curr_frame->FP = vm.stack_top;
+    curr_frame->PC = function->chunk.code;
 
     Module *module = new_module(path);
 
@@ -848,6 +851,7 @@ static void import(const char *src, String *path) {
 
     closure->module = module;
     vm.current_module = module;
+    curr_closure_global = &closure->module->globals;
 
     ENABLE_GC;
 
@@ -1060,7 +1064,7 @@ static InterpretResult run() {
                 break;
             case OP_DEF_GLOBAL: {
                 String *name = read_constant_string();
-                if (! table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), false, false)) {
+                if (! table_add_new(curr_closure_global, name, stack_peek(0), false, false)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1068,7 +1072,7 @@ static InterpretResult run() {
             }
             case OP_DEF_GLOBAL_CONST: {
                 String *name = read_constant_string();
-                if (!table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), false, true)) {
+                if (!table_add_new(curr_closure_global, name, stack_peek(0), false, true)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1076,7 +1080,7 @@ static InterpretResult run() {
             }
             case OP_DEF_PUB_GLOBAL: {
                 String *name = read_constant_string();
-                if (! table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), true, false)) {
+                if (! table_add_new(curr_closure_global, name, stack_peek(0), true, false)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1084,7 +1088,7 @@ static InterpretResult run() {
             }
             case OP_DEF_PUB_GLOBAL_CONST: {
                 String *name = read_constant_string();
-                if (! table_add_new(&curr_frame->closure->module->globals, name, stack_peek(0), true, true)) {
+                if (! table_add_new(curr_closure_global, name, stack_peek(0), true, true)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1093,7 +1097,7 @@ static InterpretResult run() {
             case OP_GET_GLOBAL: {
                 String *name = read_constant_string();
                 Value value;
-                if (table_get(&curr_frame->closure->module->globals, name, &value)) {
+                if (table_get(curr_closure_global, name, &value)) {
                     stack_push(value);
                 } else if (table_get(&vm.builtin, name, &value)) {
                     stack_push(value);
@@ -1104,7 +1108,7 @@ static InterpretResult run() {
             }
             case OP_SET_GLOBAL: {
                 String *name = read_constant_string();
-                char result = table_set_existent(&curr_frame->closure->module->globals, name, stack_peek(0), false);
+                char result = table_set_existent(curr_closure_global, name, stack_peek(0), false);
                 if (result != 0) {
                     if (result == 1) {
                         runtime_error_and_catch("Setting an undefined variable: %s", name->chars);
@@ -1499,6 +1503,7 @@ static InterpretResult run() {
                 Module *old_module = as_module(stack_pop());
                 stack_push(ref_value((Object *) vm.current_module));
                 vm.current_module = old_module;
+                curr_closure_global = &curr_frame->closure->module->globals;
                 break;
             }
             case OP_EXPORT: {
