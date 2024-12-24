@@ -3,11 +3,15 @@
 //
 
 #include "native.h"
+#include "lib_iter.h"
 #include "vm.h"
 #include "stdlib.h"
 #include "string.h"
 #include "time.h"
-#include "math.h"
+
+Value array_iter_class;
+
+Instance *get_array_iterator(Array );
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
@@ -17,6 +21,11 @@ static void define_native(const char *name, NativeImplementation impl, int arity
     table_add_new(&vm.builtin, as_string(vm.stack[0]), vm.stack[1], true, false);
     stack_pop();
     stack_pop();
+}
+
+static void load_libraries() {
+    load_lib(lib_iter, lib_iter_len, "lib_iter");
+    table_get(&vm.builtin, ARRAY_ITERATOR, &array_iter_class);
 }
 
 /**
@@ -156,8 +165,8 @@ static Value native_float(int count, Value *value) {
 static Value native_help(int count, Value *value) {
     (void) count;
     (void) value;
-    printf("You are in the REPL mode because you run clox directly without providing any arguments.\n");
-    printf("You can also do `clox path/to/script` to run a lox script.\n");
+    printf("You are in the REPL mode because you run_vm clox directly without providing any arguments.\n");
+    printf("You can also do `clox path/to/script` to run_vm a lox script.\n");
     printf("Or do `clox -h` to see more options\n");
     printf("In this REPL mode, expression results will be printed out automatically in gray color. \n");
     printf("You may also omit the last semicolon for a statement.\n");
@@ -189,6 +198,8 @@ void init_vm_native() {
     define_native("rand", native_rand, 2);
     define_native("f", native_format, -1);
     define_native("read", native_read, -1);
+
+    load_libraries();
 }
 
 void additional_repl_init() {

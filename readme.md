@@ -2,19 +2,19 @@
 # clox
 clox is a interpreter of the lox programming language. 
 
-It has a compiler to compile scripts into bytecode, and a stack-based virtual machine to run the bytecode.
+It has a compiler to compile scripts into bytecode, and a stack-based virtual machine to run_vm the bytecode.
 
 ## build
 
 It currently requires GNU/readline.
 
 * `$ make clox`: produce the executable "clox". You can also do `$ cc *.c -o clox -l readline`
-* `$ make run`: build, run REPL, and then clean.
-* `$ make file`: build, run the file "test.lox", and then clean.
+* `$ make run_vm`: build, run_vm REPL, and then clean.
+* `$ make file`: build, run_vm the file "test.lox", and then clean.
 
 ## usage
-* `$ clox`: run REPL
-* `$ clox path/to/script`: run a lox script 
+* `$ clox`: run_vm REPL
+* `$ clox path/to/script`: run_vm a lox script 
 
 Other options
 * `-s`: show the compiled bytecode 
@@ -105,7 +105,7 @@ Clox has some built-in functions written in C.
 
 **REPL stands for "Read, Evaluate, Print, Loop".** It is an environment allowing you to write and test codes quickly.
 
-If you run `$ clox` without providing the path to a script, you will be in the REPL mode.
+If you run_vm `$ clox` without providing the path to a script, you will be in the REPL mode.
 
 * It has a basic support for multipl-line input. 
 

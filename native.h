@@ -7,6 +7,7 @@
 
 #include "object.h"
 
+extern Value array_iter_class;
 void additional_repl_init();
 
 void init_vm_native();

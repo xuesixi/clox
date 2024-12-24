@@ -43,7 +43,7 @@ static void reset_stack();
 
 static Value read_constant16();
 
-static InterpretResult run();
+static InterpretResult run_vm();
 
 static void import(const char *src, String *path);
 
@@ -60,6 +60,8 @@ static void invoke_from_class(Class *class, String *name, int arg_count);
 static void call_closure(Closure *closure, int arg_count);
 
 static Value multi_dimension_array(int dimension, Value *lens);
+
+static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl);
 
 
 
@@ -520,7 +522,7 @@ static String *auto_length_string_copy(const char *name) {
 static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
-    ARRAY_ITERATOR = auto_length_string_copy("$ArrayIterator");
+    ARRAY_ITERATOR = auto_length_string_copy("ArrayIter");
     SCRIPT = auto_length_string_copy("$script");
     ANONYMOUS_MODULE = auto_length_string_copy("$anonymous");
 }
@@ -593,33 +595,11 @@ InterpretResult interpret(const char *src, const char *path) {
 
     DISABLE_GC;
 
-    vm.frame_count++;
-    curr_frame = vm.frames + vm.frame_count - 1;
-    CallFrame *frame = curr_frame;
-
-    Module *module;
-    if (REPL) {
-        module = repl_module;
-    } else {
-        String *path_string = auto_length_string_copy(path);
-        module = new_module(path_string);
-    }
-    vm.current_module = module;
-
-    Closure *closure = new_closure(function);
-    closure->module = module;
-    curr_closure_global = &closure->module->globals;
-    curr_const_pool = closure->function->chunk.constants.values;
-
-    frame->closure = closure;
-    frame->FP = vm.stack;
-    frame->PC = function->chunk.code;
-
-    stack_push(ref_value((Object *) closure));
+    warmup(function, path, NULL, true);
 
     ENABLE_GC;
 
-    return run();
+    return run_vm();
 }
 
 static void import(const char *src, String *path) {
@@ -636,24 +616,7 @@ static void import(const char *src, String *path) {
         return;
     }
 
-    vm.frame_count++;
-    curr_frame = vm.frames + vm.frame_count - 1;
-//    CallFrame *frame = curr_frame;
-
-    Closure *closure = new_closure(function);
-    curr_frame->closure = closure;
-    curr_frame->FP = vm.stack_top;
-    curr_frame->PC = function->chunk.code;
-
-    Module *module = new_module(path);
-
-    stack_push(ref_value((Object *) closure));
-    // [old_module, fn: new_main, top]
-
-    closure->module = module;
-    vm.current_module = module;
-    curr_closure_global = &closure->module->globals;
-    curr_const_pool = closure->function->chunk.constants.values;
+    warmup(function, NULL, path, false);
 
     ENABLE_GC;
 
@@ -691,19 +654,54 @@ InterpretResult read_run_bytecode(const char *path) {
     DISABLE_GC;
 
     LoxFunction *function = read_function(file);
-
     fclose(file);
+    warmup(function, path, NULL, false);
 
+    ENABLE_GC;
+
+    return run_vm();
+}
+
+InterpretResult load_lib(unsigned char *bytes, size_t len, const char *path) {
+    FILE *file = fmemopen(bytes, len, "rb");
+    LoxFunction *function = read_function(file);
+    warmup(function, path, NULL, false);
+    InterpretResult result = run_vm();
+    if (result == INTERPRET_OK) {
+        table_add_all(curr_closure_global, &vm.builtin);
+    } else {
+        IMPLEMENTATION_ERROR("Error when loading lib");
+    }
+    return result;
+}
+
+
+/**
+ * 使用给定的函数，构造一个closure，设置栈帧，将closure置入栈中。
+ * 设置vm.current_module, curr_frame, curr_closure_global, curr_const_pool等值。
+ * @param function 要执行的main函数
+ * @param path_chars 该模块的路径。如果为NULL，则改为使用path_string
+ * @param path_string 如果path_chars为NULL，那么该模块的路径由该值决定
+ * @param care_repl 如果 care_repl && REPL，则不创建新的模块，而是使用先前保存的repl_module
+ */
+static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl) {
     vm.frame_count++;
+
     curr_frame = vm.frames + vm.frame_count - 1;
 
     Closure *closure = new_closure(function);
     curr_frame->closure = closure;
-    curr_frame->FP = vm.stack;
+    curr_frame->FP = vm.stack_top;
     curr_frame->PC = function->chunk.code;
 
-    String *path_string = auto_length_string_copy(path);
-    Module *module = new_module(path_string);
+    Module *module;
+    if (care_repl && REPL) {
+        module = repl_module;
+    } else if (path_chars != NULL) {
+        module = new_module(auto_length_string_copy(path_chars));
+    } else {
+        module = new_module(path_string);
+    }
 
     closure->module = module;
     vm.current_module = module;
@@ -711,20 +709,14 @@ InterpretResult read_run_bytecode(const char *path) {
     curr_const_pool = closure->function->chunk.constants.values;
 
     stack_push(ref_value((Object *) closure));
-
-    ENABLE_GC;
-
-    return run();
 }
-
-
 
 /**
  * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之
  * 如果发生了runtime error，该函数将立刻返回。
  * @return 执行的结果
  */
-static InterpretResult run() {
+static InterpretResult run_vm() {
     InterpretResult error_code;
     if ( (error_code = setjmp(error_buf))) {
         //  运行时错误会跳转至这里
@@ -738,8 +730,7 @@ static InterpretResult run() {
                 while (getchar() != '\n');
             } else {
                 CallFrame *frame = curr_frame;
-                disassemble_instruction(&frame->closure->function->chunk,
-                                        (int) (frame->PC - frame->closure->function->chunk.code));
+                disassemble_instruction(&frame->closure->function->chunk, (int) (frame->PC - frame->closure->function->chunk.code));
             }
         }
 
@@ -1158,6 +1149,10 @@ static InterpretResult run() {
                             call_value(property, arg_count);
                             break;
                         }
+                    } else if (is_ref_of(receiver, OBJ_ARRAY)) {
+                        stack_push(receiver);
+                        call_value(array_iter_class, 1);
+                        break;
                     }
                     runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
                 }
