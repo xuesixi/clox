@@ -111,6 +111,8 @@ static TokenType identifier_type() {
                 return TOKEN_IF;
             } else if (is_keyword(1, 5, "mport")) {
                 return TOKEN_IMPORT;
+            } else if (is_keyword(1, 1, "n")){
+                return TOKEN_IN;
             } else {
                 return TOKEN_IDENTIFIER;
             }

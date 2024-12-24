@@ -366,7 +366,7 @@ static inline Value read_constant16() {
  */
 static inline String *read_constant_string() {
     Value value = read_constant16();
-    if (!is_ref_of(value, OBJ_STRING)) {
+    if (!is_ref_of(value, OBJ_STRING)) { // 注释掉这一段也会导致某些情况下性能少许下降？
         IMPLEMENTATION_ERROR("trying to read a constant string, but the value is not a String");
         return NULL;
     }

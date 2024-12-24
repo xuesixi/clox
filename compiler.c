@@ -124,6 +124,8 @@ static inline void block_statement();
 
 static inline void return_statement();
 
+static void iteration_statement();
+
 static void set_new_scope(Scope *scope, FunctionType type);
 
 static void error_at(Token *token, const char *message);
@@ -885,7 +887,11 @@ static void statement() {
     } else if (match(TOKEN_WHILE)) {
         while_statement();
     } else if (match(TOKEN_FOR)) {
-        for_statement();
+        if (check(TOKEN_LEFT_PAREN)) {
+            for_statement();
+        } else {
+            iteration_statement();
+        }
     } else if (match(TOKEN_SWITCH)) {
         switch_statement();
     } else if (match(TOKEN_RETURN)) {
@@ -977,9 +983,115 @@ static void loop_back(int start) {
     emit_byte(OP_JUMP_BACK);
     int diff = current_chunk()->count - start + 2;
     emit_u16(diff);
-//    uint8_t i0, i1;
-//    u16_to_u8(diff, &i0, &i1);
-//    emit_two_bytes(i0, i1);
+}
+
+/**
+ * 将栈顶的值视为一个对象，调用其名为method_name的方法
+ */
+static void emit_invoke_no_arg(const char *method_name) {
+    Token token = literal_token(method_name);
+    uint16_t index = identifier_constant(&token);
+    emit_u8_u16(OP_PROPERTY_INVOKE, index);
+    emit_byte(0);
+}
+
+/**
+ * begin_scope 1
+ * get iterator: [iter]
+ *
+ * continue point:
+ * condition:
+ *      iter.has_next()  // [iter, bool]
+ * break point:
+ *      pop, if false, jump -> end
+ *
+ *      begin_scope 2
+ *
+ *      iter.next()     // [iter, item]
+ *
+ * body:
+ *      ... // [iter, item]
+ *      end_scope 2
+ *      jump -> condition
+ *
+ * end:
+ * end_scope 1
+ *
+ */
+static void iteration_statement() {
+
+    begin_scope();
+
+    consume(TOKEN_IDENTIFIER, "Expect an identifier");
+    Token item = parser.previous;
+    consume(TOKEN_IN, "Expect 'in'");
+
+    expression(); // [instance_to_iterate]
+
+//    emit_byte(OP_ITERATOR);
+    emit_invoke_no_arg("iterator");
+
+    Token iter = literal_token("$iter"); // [iter]
+    declare_identifier_token(&iter);
+    mark_initialized();
+
+    save_continue_point(); // continue point
+
+    // condition
+    int condition = current_chunk()->count;
+
+    emit_byte(OP_COPY); // [iter, iter]
+    emit_invoke_no_arg("has_next"); // [iter, bool]
+
+    save_break_point(); // break point
+
+    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
+
+    begin_scope(); // [iter]
+
+    emit_byte(OP_COPY);  // [iter, iter]
+    emit_invoke_no_arg("next"); // [iter, item]
+
+    declare_identifier_token(&item);
+    mark_initialized();
+
+    consume(TOKEN_LEFT_BRACE, "A { is required");
+    while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
+        declaration();
+    }
+    consume(TOKEN_RIGHT_BRACE, "A } is required");
+
+    end_scope();
+
+    loop_back(condition); // jump -> condition
+
+
+    // end
+    patch_jump(to_end);
+
+    end_scope();
+
+    restore_continue_point();
+    restore_break_point();
+
+
+    /*
+     * for i in arr {
+     *      body...
+     * }
+     *
+     * {
+     *
+     *
+     * }
+     *
+     *     var iterator = arr.iterator();
+     *     while (iterator.has_next()) {
+     *          var item = iterator.next;
+     *          body...
+     *     }
+     *
+     */
 }
 
 /**
@@ -992,7 +1104,6 @@ static void loop_back(int start) {
  *     pop, if false, jump -> end
  * 
  * body:
- *     pop condition
  *     statement
  *     jump -> condition
  * 
@@ -1455,7 +1566,7 @@ static void arithmetic_equal(OpCode set_op, OpCode get_op, int index, int copy) 
             return;
     }
 
-    if (get_op == OP_GET_GLOBAL) {
+    if (get_op == OP_GET_GLOBAL || get_op == OP_GET_PROPERTY) {
         emit_u8_u16(set_op, index);
     } else {
         emit_u8_u8(set_op, index);
@@ -1750,21 +1861,6 @@ static inline void emit_u16(uint16_t value) {
     u16_to_u8(value, &i0, &i1);
     emit_u8_u8(i0, i1);
 }
-
-///**
-// * 根据给定的index产生OP_CONSTANT或者OP_CONSTANT2指令
-// * @param index
-// */
-//static void emit_constant(int index) {
-//    if (index < UINT8_MAX) {
-//        emit_two_bytes(OP_CONSTANT, index);
-//    } else if (index < UINT16_MAX) {
-//        emit_byte(OP_CONSTANT2);
-//        emit_uint16(index);
-//    } else {
-//        error_at_previous("Too many constants for a chunk");
-//    }
-//}
 
 /**
  * 如果是构造函数，那么return this；否则return nil

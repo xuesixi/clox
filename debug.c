@@ -104,9 +104,9 @@ int disassemble_instruction(Chunk *chunk, int offset) {
 
     // print line number
     if (offset > 0 && chunk->lines[offset] == chunk->lines[offset-1]) {
-        printf("   | ");
+        printf("     | ");
     }else {
-        printf("%4d ", chunk->lines[offset]);
+        printf("  %4d ", chunk->lines[offset]);
     }
     int instruction = chunk->code[offset];
     switch (instruction) {
