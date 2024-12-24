@@ -21,12 +21,6 @@ o: $(SRC)
 %.o: %.c common.h %.h
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-.PHONY: run
-run: $(TARGET)
-	@./$(TARGET) -ds
-	@rm $(OBJ)
-	@rm $(TARGET)
-
 .PHONY: lldb
 lldb: $(OBJ)
 	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm 

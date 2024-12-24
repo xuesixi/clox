@@ -9,7 +9,7 @@
 #include "string.h"
 #include "time.h"
 
-Value array_iter_class;
+Value array_class;
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
@@ -22,19 +22,13 @@ static void define_native(const char *name, NativeImplementation impl, int arity
 }
 
 /**
- * 加载标准库（执行字节码）。有内建机制来避免重复加载，即使多次调用也只有第一次回生效。
- * 在仅编译模式(COMPILE_ONLY)下，该函数没有任何效果。
+ * 加载标准库（执行字节码）。
  */
 void load_libraries() {
-    static bool loaded = false;
-    if (loaded || COMPILE_ONLY) {
-        return;
-    }
-    loaded = true;
     if (load_bytes(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_OK) {
         exit(1);
     }
-    table_get(&vm.builtin, ARRAY_ITERATOR, &array_iter_class);
+    table_get(&vm.builtin, ARRAY_CLASS, &array_class);
 }
 
 /**

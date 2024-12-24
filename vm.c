@@ -21,7 +21,7 @@ VM vm;
 
 String *INIT = NULL;
 String *LENGTH = NULL;
-String *ARRAY_ITERATOR = NULL;
+String *ARRAY_CLASS = NULL;
 String *ITERATOR = NULL;
 Module *repl_module = NULL;
 //String *SCRIPT = NULL;
@@ -536,7 +536,7 @@ static String *auto_length_string_copy(const char *name) {
 static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
-    ARRAY_ITERATOR = auto_length_string_copy("ArrayIter");
+    ARRAY_CLASS = auto_length_string_copy("Array");
 //    SCRIPT = auto_length_string_copy("$script");
 //    ANONYMOUS_MODULE = auto_length_string_copy("$anonymous");
     ITERATOR = auto_length_string_copy("iterator");
@@ -701,7 +701,13 @@ InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
  */
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl) {
 
-    load_libraries();
+    if (preload_started || COMPILE_ONLY) {
+
+    } else {
+        preload_started = true;
+        load_libraries();
+        preload_finished = true;
+    }
 
     vm.frame_count++;
 
@@ -749,7 +755,7 @@ static InterpretResult run_vm() {
         return error_code;
     }
     while (true) {
-        if (TRACE_EXECUTION && TRACE_SKIP == -1) {
+        if (TRACE_EXECUTION && TRACE_SKIP == -1 && preload_finished) {
             show_stack();
             if (getchar() == 'o') {
                 TRACE_SKIP = vm.frame_count - 1; // skip until the frame_count is equal to TRACE_SKIP
@@ -775,6 +781,7 @@ static InterpretResult run_vm() {
                     return INTERPRET_OK; // 程序运行结束
                 }
                 curr_const_pool = curr_frame->closure->function->chunk.constants.values;
+                curr_closure_global = & curr_frame->closure->module->globals;
                 stack_push(result);
                 break;
             }
@@ -1175,9 +1182,8 @@ static InterpretResult run_vm() {
                             call_value(property, arg_count);
                             break;
                         }
-                    } else if (is_ref_of(receiver, OBJ_ARRAY) && name == ITERATOR) {
-                        stack_push(receiver);
-                        call_value(array_iter_class, 1);
+                    } else if (is_ref_of(receiver, OBJ_ARRAY)) {
+                        invoke_from_class(as_class(array_class), name, arg_count);
                         break;
                     }
                     runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));

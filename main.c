@@ -12,7 +12,9 @@
 bool COMPILE_ONLY = false;
 bool RUN_BYTECODE = false;
 char OUTPUT_PATH[100];
-bool REPL;
+bool REPL = false;
+bool preload_finished = false;
+bool preload_started = false;
 bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
 int TRACE_SKIP = -1;
