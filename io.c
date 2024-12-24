@@ -17,7 +17,7 @@ static Chunk read_chunk(FILE *file);
 
 static void write_value(FILE *file, Value *value) {
 
-    fwrite(& value->type, sizeof(int ), 1, file);
+    fwrite(& value->type, sizeof(ValueType), 1, file);
     fwrite(& value->as, sizeof(value->as), 1, file);
     if (value->type == VAL_REF) {
         Object *ref = as_ref(*value);
@@ -38,7 +38,7 @@ static void write_value(FILE *file, Value *value) {
 
 static Value read_value(FILE *file) {
     Value value;
-    fread(& value.type, sizeof(int ), 1, file);
+    fread(& value.type, sizeof(ValueType), 1, file);
     fread(&value.as, sizeof (value.as), 1, file);
     if (is_ref(value)) {
         int type;
@@ -107,6 +107,7 @@ static String *read_string(FILE *file) {
 }
 
 void write_function(FILE *file, LoxFunction *function) {
+    fwrite(&function->type, sizeof(FunctionType), 1, file);
     fwrite(&function->arity, sizeof(int ), 1, file);
     write_chunk(file, & function->chunk);
     write_string(file, function->name);
@@ -115,6 +116,7 @@ void write_function(FILE *file, LoxFunction *function) {
 
 LoxFunction *read_function(FILE *file) {
     LoxFunction *function = new_function(TYPE_FUNCTION);
+    fread(&function->type, sizeof(FunctionType), 1, file);
     fread(&function->arity, sizeof(int ), 1, file);
     function->chunk = read_chunk(file);
     function->name = read_string(file);

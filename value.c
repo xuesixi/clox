@@ -210,12 +210,13 @@ static char *ref_to_chars(Value value, int *len) {
         }
         case OBJ_CLOSURE: {
             LoxFunction *fun = as_closure(value)->function;
+            Closure *closure = as_closure(value);
             if (fun->type == TYPE_MAIN) {
-                *len = asprintf(&buffer, "<main>");
+                *len = asprintf(&buffer, "<main: %s>", get_filename(closure->module->path->chars));
             } else if (fun->type == TYPE_LAMBDA) {
                 *len = asprintf(&buffer, "<lambda>");
             } else {
-                *len = asprintf(&buffer, "<fn: %s>", as_closure(value)->function->name->chars);
+                *len = asprintf(&buffer, "<fn: %s>", fun->name->chars);
             }
             break;
         }

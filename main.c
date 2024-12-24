@@ -2,6 +2,7 @@
 #include "stdlib.h"
 #include <unistd.h>
 #include "memory.h"
+#include "native.h"
 #include "string.h"
 #include "limits.h"
 #include "vm.h"

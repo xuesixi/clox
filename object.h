@@ -28,7 +28,6 @@ typedef struct Object{
 typedef struct Module {
     Object object;
     Table globals;
-//    String *name;
     String *path;
 } Module;
 

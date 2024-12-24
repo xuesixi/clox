@@ -38,6 +38,7 @@ extern String *SCRIPT;
 extern String *ANONYMOUS_MODULE;
 
 extern Module *repl_module;
+extern jmp_buf error_buf;
 
 typedef enum {
     INTERPRET_OK,
@@ -55,9 +56,14 @@ void free_VM();
 InterpretResult interpret(const char *src, const char *path);
 InterpretResult produce(const char *src, const char *path);
 InterpretResult read_run_bytecode(const char *path);
-void additional_repl_init();
 
 void stack_push(Value value);
 Value stack_pop();
+
+void runtime_error(const char *format, ...);
+void runtime_error_catch_1(const char *format, Value value);
+void runtime_error_catch_2(const char *format, Value v1, Value v2);
+void catch();
+void runtime_error_and_catch(const char *format, ...);
 
 #endif //CLOX_VM_H

@@ -3,18 +3,19 @@
 //
 
 #include "vm.h"
+#include "native.h"
 
 #include "compiler.h"
 #include "io.h"
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
+#include "time.h"
+#include "math.h"
 
 #include "stdarg.h"
 #include "setjmp.h"
 #include "string.h"
-#include "time.h"
-#include "math.h"
 
 VM vm;
 
@@ -53,16 +54,6 @@ static Value stack_peek(int distance);
 static void binary_number_op(Value a, Value b, char operator);
 
 static void call_value(Value value, int arg_count);
-
-static void runtime_error(const char *format, ...);
-
-static void runtime_error_catch_1(const char *format, Value value);
-
-static void runtime_error_catch_2(const char *format, Value v1, Value v2);
-
-static void catch();
-
-static void runtime_error_and_catch(const char *format, ...);
 
 static void invoke_from_class(Class *class, String *name, int arg_count);
 
@@ -262,7 +253,7 @@ static inline Value stack_peek(int distance) {
  * 输出错误消息（会自动添加换行符）
  * 打印调用栈消息。清空栈。
  */
-static void runtime_error(const char *format, ...) {
+void runtime_error(const char *format, ...) {
     fputs("\nRuntime Error: ", stderr);
     va_list args;
     va_start(args, format);
@@ -277,7 +268,7 @@ static void runtime_error(const char *format, ...) {
         int line = function->chunk.lines[index];
         fprintf(stderr, "at [line %d] in ", line);
         char *name = value_to_chars(ref_value((Object *) frame->closure), NULL);
-        fprintf(stderr, "%s()\n", name);
+        fprintf(stderr, "%s\n", name);
         free(name);
 //        if (i == 0) {
 //            fprintf(stderr, "main()\n");
@@ -289,14 +280,14 @@ static void runtime_error(const char *format, ...) {
     reset_stack();
 }
 
-static void runtime_error_catch_1(const char *format, Value value) {
+void runtime_error_catch_1(const char *format, Value value) {
     char *str = value_to_chars(value, NULL);
     runtime_error(format, str);
     free(str);
     catch();
 }
 
-static void runtime_error_catch_2(const char *format, Value v1, Value v2) {
+void runtime_error_catch_2(const char *format, Value v1, Value v2) {
     char *str1 = value_to_chars(v1, NULL);
     char *str2 = value_to_chars(v2, NULL);
     runtime_error(format, str1, str2);
@@ -309,7 +300,7 @@ static void runtime_error_catch_2(const char *format, Value v1, Value v2) {
  * 跳转到错误处理处。
  * 该函数只应该用在runtime_error()后面。
  */
-static inline void catch() {
+inline void catch() {
     longjmp(error_buf, INTERPRET_RUNTIME_ERROR);
 }
 
@@ -317,7 +308,7 @@ static inline void catch() {
  * 输出错误消息（会自动添加换行符）
  * 打印调用栈消息。清空栈。然后跳转至错误处理处
  */
-static void runtime_error_and_catch(const char *format, ...) {
+void runtime_error_and_catch(const char *format, ...) {
     fputs("\nRuntime Error: ", stderr);
     va_list args;
     va_start(args, format);
@@ -521,181 +512,6 @@ static void call_value(Value value, int arg_count) {
     }
 }
 
-static void define_native(const char *name, NativeImplementation impl, int arity) {
-    int len = (int) strlen(name);
-
-    stack_push(ref_value((Object *) string_copy(name, len)));
-    stack_push(ref_value((Object *) new_native(impl, as_string(vm.stack[0]), arity)));
-    table_add_new(&vm.builtin, as_string(vm.stack[0]), vm.stack[1], true, false);
-    stack_pop();
-    stack_pop();
-}
-
-/**
- * read a line. Return it as a String. the \n will not be included
- * */
-static Value native_read(int count, Value *values) {
-    if (count > 0) {
-        print_value(*values);
-    }
-    size_t len;
-    char *line;
-    getline(&line, &len, stdin);
-    String *str = string_copy(line, len - 1); // NOLINT
-    free(line);
-    return ref_value((Object *) str);
-}
-
-static inline int max(int a, int b) {
-    return a > b ? a : b;
-}
-
-static Value native_format(int count, Value *values) {
-    const char *format = as_string(*values)->chars;
-    static int capacity = 0;
-    static char *buf = NULL;
-//    char *buf = malloc(capacity);
-    int pre = 0;
-    int curr = 0;
-    int buf_len = 0;
-    int curr_v = 0;
-
-    while (true) {
-        while (format[curr] != '\0' && format[curr] != '#') {
-            curr++;
-        }
-
-        int new_len = curr - pre;
-        // buf overflow checking
-        if (buf_len + new_len > capacity) {
-            capacity = max(2 * capacity, buf_len + new_len);
-            buf = realloc(buf, capacity); // NOLINT
-        }
-
-        memcpy(buf + buf_len, format + pre, new_len);
-        buf_len += new_len;
-        pre = curr;
-
-        if (format[curr] == '\0') {
-            if (curr_v != count - 1) {
-                free(buf);
-                runtime_error_and_catch("format: more arguments than placeholders");
-            }
-            break;
-        }
-
-        if (format[curr] == '#') {
-            if (curr_v == count - 1) {
-                free(buf);
-                runtime_error_and_catch("format: more placeholders than arguments");
-            }
-
-            Value v = values[curr_v + 1];
-            int v_chars_len;
-            char *v_chars = value_to_chars(v, &v_chars_len);
-
-            if (v_chars_len + buf_len > capacity) {
-                capacity = max(2 * capacity, v_chars_len + buf_len);
-                buf = realloc(buf, capacity); // NOLINT
-            }
-            memcpy(buf + buf_len, v_chars, v_chars_len);
-            buf_len += v_chars_len;
-            curr++;
-            pre = curr;
-            curr_v++;
-            free(v_chars);
-        }
-    }
-
-    String *string = string_copy(buf, buf_len);
-//    free(buf);
-    return ref_value((Object *) string);
-}
-
-static Value native_clock(int count, Value *value) {
-    (void) count;
-    (void) value;
-    return float_value((double) clock() / CLOCKS_PER_SEC);
-}
-
-static Value native_int(int count, Value *value) {
-    (void) count;
-    switch (value->type) {
-        case VAL_INT:
-            return *value;
-        case VAL_FLOAT:
-            return int_value((int) as_float(*value));
-        case VAL_BOOL:
-            return int_value((int) as_bool(*value));
-        default:
-            if (is_ref_of(*value, OBJ_STRING)) {
-                String *str = as_string(*value);
-                char *end;
-                int result = strtol(str->chars, &end, 10); // NOLINT
-                if (end == str->chars) {
-                    runtime_error_and_catch("not a valid int: %s", str->chars);
-                }
-                return int_value(result);
-            }
-            runtime_error_and_catch("not a valid input");
-            return nil_value();
-    }
-}
-
-static Value native_float(int count, Value *value) {
-    (void) count;
-    Value v = *value;
-    switch (v.type) {
-        case VAL_INT:
-            return float_value((double) as_int(v));
-        case VAL_FLOAT:
-            return v;
-        case VAL_BOOL:
-            return float_value((double) as_bool(v));
-        default:
-            if (is_ref_of(v, OBJ_STRING)) {
-                String *str = as_string(v);
-                char *end;
-                double result = strtod(str->chars, &end);
-                if (end == str->chars) {
-                    runtime_error_and_catch("not a valid float: %s", str->chars);
-                }
-                return float_value(result);
-            }
-            runtime_error_and_catch("not a valid input");
-            return nil_value();
-    }
-}
-
-static Value native_help(int count, Value *value) {
-    (void) count;
-    (void) value;
-    printf("You are in the REPL mode because you run clox directly without providing any arguments.\n");
-    printf("You can also do `clox path/to/script` to run a lox script.\n");
-    printf("Or do `clox -h` to see more options\n");
-    printf("In this REPL mode, expression results will be printed out automatically in gray color. \n");
-    printf("You may also omit the last semicolon for a statement.\n");
-    printf("Use exit(), ctrl+C or ctrl+D to quit.\n");
-    return nil_value();
-}
-
-static Value native_exit(int count, Value *value) {
-    (void ) count;
-    (void ) value;
-    longjmp(error_buf, INTERPRET_REPL_EXIT);
-    return nil_value();
-}
-
-static Value native_rand(int count, Value *value) {
-    (void) count;
-    Value a = value[0];
-    Value b = value[1];
-    if (!is_int(a) || !is_int(b)) {
-        runtime_error_and_catch("arguments need to be int");
-    }
-    return int_value(as_int(a) + rand() % as_int(b)); // NOLINT(*-msc50-cpp)
-}
-
 static String *auto_length_string_copy(const char *name) {
     int len = strlen(name); // NOLINT
     return string_copy(name, len);
@@ -726,17 +542,7 @@ void init_VM() {
     init_table(&vm.string_table);
     init_static_strings();
 
-    define_native("clock", native_clock, 0);
-    define_native("int", native_int, 1);
-    define_native("float", native_float, 1);
-    define_native("rand", native_rand, 2);
-    define_native("f", native_format, -1);
-    define_native("read", native_read, -1);
-}
-
-void additional_repl_init() {
-    define_native("help", native_help, 0);
-    define_native("exit", native_exit, -1);
+    init_vm_native();
 }
 
 /**
@@ -881,21 +687,32 @@ InterpretResult read_run_bytecode(const char *path) {
         printf("Error when opening the file: %s\n", path);
         return INTERPRET_READ_ERROR;
     }
+
+    DISABLE_GC;
+
     LoxFunction *function = read_function(file);
+
     fclose(file);
 
-    stack_push(ref_value((Object *) function));
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
-    CallFrame *frame = curr_frame;
 
     Closure *closure = new_closure(function);
-    frame->closure = closure;
-    frame->FP = vm.stack;
-    frame->PC = function->chunk.code;
+    curr_frame->closure = closure;
+    curr_frame->FP = vm.stack;
+    curr_frame->PC = function->chunk.code;
 
-    stack_pop();
+    String *path_string = auto_length_string_copy(path);
+    Module *module = new_module(path_string);
+
+    closure->module = module;
+    vm.current_module = module;
+    curr_closure_global = &closure->module->globals;
+    curr_const_pool = closure->function->chunk.constants.values;
+
     stack_push(ref_value((Object *) closure));
+
+    ENABLE_GC;
 
     return run();
 }
@@ -1321,7 +1138,7 @@ static InterpretResult run() {
                 break;
             }
             case OP_PROPERTY_INVOKE: {
-                // stack: obj, arg1, arg2, top
+                // stack: [obj, arg1, arg2, top]
                 // code: op, name_index, arg_count
                 String *name = read_constant_string();
                 int arg_count = read_byte();
