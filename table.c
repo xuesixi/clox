@@ -239,12 +239,14 @@ Value table_delete(Table *table, String *key) {
     return result;
 }
 
-void table_add_all(Table *from, Table *to) {
+void table_add_all(Table *from, Table *to, bool public_only) {
     int capacity = from->capacity;
     for (int i = 0; i < capacity; ++i) {
         Entry *entry = from->backing + i;
         if (entry->key != NULL) {
-            table_add_new(to,entry->key, entry->value, entry->is_public, entry->is_public);
+            if (!public_only || entry->is_public) {
+                table_add_new(to,entry->key, entry->value, entry->is_public, entry->is_public);
+            }
         }
     }
 }

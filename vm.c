@@ -683,7 +683,7 @@ InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
     warmup(function, path, NULL, false);
     InterpretResult result = run_vm();
     if (result == INTERPRET_OK) {
-        table_add_all(curr_closure_global, &vm.builtin);
+        table_add_all(curr_closure_global, &vm.builtin, true);
     } else {
         IMPLEMENTATION_ERROR("Error when loading lib");
     }
@@ -1200,7 +1200,7 @@ static InterpretResult run_vm() {
                 }
                 Class *sub = as_class(stack_peek(0));
                 Class *super_class = as_class(super);
-                table_add_all(&super_class->methods, &sub->methods);
+                table_add_all(&super_class->methods, &sub->methods, false);
                 stack_pop();
                 // super, top
                 break;

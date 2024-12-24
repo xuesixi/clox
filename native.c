@@ -21,6 +21,10 @@ static void define_native(const char *name, NativeImplementation impl, int arity
     stack_pop();
 }
 
+/**
+ * 加载标准库（执行字节码）。有内建机制来避免重复加载，即使多次调用也只有第一次回生效。
+ * 在仅编译模式(COMPILE_ONLY)下，该函数没有任何效果。
+ */
 void load_libraries() {
     static bool loaded = false;
     if (loaded || COMPILE_ONLY) {

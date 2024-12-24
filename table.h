@@ -51,7 +51,7 @@ bool table_set(Table *table, String *key, Value value);
 char table_set_existent(Table *table, String *key, Value value, bool public_only);
 bool table_add_new(Table *table, String *key, Value value, bool is_public, bool is_const);
 Value table_delete(Table *table, String *key);
-void table_add_all(Table *from, Table *to);
+void table_add_all(Table *from, Table *to, bool public_only);
 String *table_find_string(Table *table, const char *name, int length, uint32_t hash);
 void table_mark(Table *table);
 void table_delete_unreachable(Table *table);
