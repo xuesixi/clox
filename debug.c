@@ -184,7 +184,9 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return constant8_instruction("SET_UPVALUE", chunk, offset);
         case OP_CLOSURE: {
             offset++;
-            int index = chunk->code[offset ++];
+            uint8_t u0 = chunk->code[offset ++];
+            uint8_t u1 = chunk->code[offset ++];
+            int index = u8_to_u16(u0, u1);
             printf("%-23s %4d : ", "CLOSURE", index);
             Value value = chunk->constants.values[index];
             print_value_with_color(value);

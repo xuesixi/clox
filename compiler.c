@@ -1538,7 +1538,11 @@ static void arithmetic_equal(OpCode set_op, OpCode get_op, int index, int copy) 
     if (copy == 1) {
         emit_byte(OP_COPY);
     }
-    emit_u8_u16(get_op, index);
+    if (get_op == OP_GET_GLOBAL || get_op == OP_GET_PROPERTY) {
+        emit_u8_u16(get_op, index);
+    } else {
+        emit_u8_u8(get_op, index);
+    }
     expression();
     switch (type) {
         case TOKEN_PLUS_EQUAL: {
