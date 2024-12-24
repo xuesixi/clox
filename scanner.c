@@ -339,8 +339,17 @@ Token scan_token() {
             return make_token(TOKEN_COLON);
         case ',':
             return make_token(TOKEN_COMMA);
-        case '.':
-            return make_token(TOKEN_DOT);
+        case '.': {
+            if (match('.') ) {
+                if (match('.')) {
+                    return make_token(TOKEN_DOT_DOT_DOT);
+                } else {
+                    return error_token("Unrecognized character!");
+                }
+            } else {
+                return make_token(TOKEN_DOT);
+            }
+        }
         case '-':
             return make_token(match('=') ? TOKEN_MINUS_EQUAL : TOKEN_MINUS);
         case '+':

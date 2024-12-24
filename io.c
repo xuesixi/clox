@@ -109,6 +109,7 @@ static String *read_string(FILE *file) {
 void write_function(FILE *file, LoxFunction *function) {
     fwrite(&function->type, sizeof(FunctionType), 1, file);
     fwrite(&function->arity, sizeof(int ), 1, file);
+    fwrite(&function->var_arg, sizeof(bool), 1, file);
     write_chunk(file, & function->chunk);
     write_string(file, function->name);
     fwrite(&function->upvalue_count, sizeof(int ), 1, file);
@@ -118,6 +119,7 @@ LoxFunction *read_function(FILE *file) {
     LoxFunction *function = new_function(TYPE_FUNCTION);
     fread(&function->type, sizeof(FunctionType), 1, file);
     fread(&function->arity, sizeof(int ), 1, file);
+    fread(&function->var_arg, sizeof(bool), 1, file);
     function->chunk = read_chunk(file);
     function->name = read_string(file);
     fread(&function->upvalue_count, sizeof(int ), 1, file);

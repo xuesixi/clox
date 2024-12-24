@@ -22,9 +22,10 @@ VM vm;
 String *INIT = NULL;
 String *LENGTH = NULL;
 String *ARRAY_ITERATOR = NULL;
-String *SCRIPT = NULL;
-String *ANONYMOUS_MODULE = NULL;
+String *ITERATOR = NULL;
 Module *repl_module = NULL;
+//String *SCRIPT = NULL;
+//String *ANONYMOUS_MODULE = NULL;
 
 jmp_buf error_buf;
 
@@ -48,6 +49,8 @@ static InterpretResult run_vm();
 static void import(const char *src, String *path);
 
 static void show_stack();
+
+static void build_array(int length);
 
 static Value stack_peek(int distance);
 
@@ -359,10 +362,12 @@ static inline Value read_constant16() {
  */
 static inline String *read_constant_string() {
     Value value = read_constant16();
-    if (!is_ref_of(value, OBJ_STRING)) { // 注释掉这一段也会导致某些情况下性能少许下降？
+#ifdef IMPLEMENTATION_CHECK
+    if (!is_ref_of(value, OBJ_STRING)) {
         IMPLEMENTATION_ERROR("trying to read a constant string, but the value is not a String");
         return NULL;
     }
+#endif
     return (String *) (as_ref(value));
 }
 
@@ -443,9 +448,18 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
 
 static void call_closure(Closure *closure, int arg_count) {
     LoxFunction *function = closure->function;
-    if (function->arity != arg_count) {
-        runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity,
-                                arg_count);
+    if (function->var_arg) {
+        int array_len = arg_count - function->arity;
+        if (array_len < 0) {
+            runtime_error_and_catch("%s expects at least %d arguments, but got %d", function->name->chars, function->arity, arg_count);
+        } else {
+            arg_count = function->arity + 1;
+            build_array(array_len);
+        }
+    } else {
+        if (function->arity != arg_count) {
+            runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
+        }
     }
     if (vm.frame_count == FRAME_MAX) {
         runtime_error_and_catch("Stack overflow.");
@@ -523,8 +537,9 @@ static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
     ARRAY_ITERATOR = auto_length_string_copy("ArrayIter");
-    SCRIPT = auto_length_string_copy("$script");
-    ANONYMOUS_MODULE = auto_length_string_copy("$anonymous");
+//    SCRIPT = auto_length_string_copy("$script");
+//    ANONYMOUS_MODULE = auto_length_string_copy("$anonymous");
+    ITERATOR = auto_length_string_copy("iterator");
 }
 
 
@@ -662,7 +677,7 @@ InterpretResult read_run_bytecode(const char *path) {
     return run_vm();
 }
 
-InterpretResult load_lib(unsigned char *bytes, size_t len, const char *path) {
+InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
     FILE *file = fmemopen(bytes, len, "rb");
     LoxFunction *function = read_function(file);
     warmup(function, path, NULL, false);
@@ -685,6 +700,9 @@ InterpretResult load_lib(unsigned char *bytes, size_t len, const char *path) {
  * @param care_repl 如果 care_repl && REPL，则不创建新的模块，而是使用先前保存的repl_module
  */
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl) {
+
+    load_libraries();
+
     vm.frame_count++;
 
     curr_frame = vm.frames + vm.frame_count - 1;
@@ -709,6 +727,14 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
     curr_const_pool = closure->function->chunk.constants.values;
 
     stack_push(ref_value((Object *) closure));
+}
+
+static void build_array(int length) {
+    Array *array = new_array(length);
+    for (int i = length - 1; i >= 0; i--) {
+        array->values[i] = stack_pop();
+    }
+    stack_push(ref_value((Object *) array));
 }
 
 /**
@@ -1149,7 +1175,7 @@ static InterpretResult run_vm() {
                             call_value(property, arg_count);
                             break;
                         }
-                    } else if (is_ref_of(receiver, OBJ_ARRAY)) {
+                    } else if (is_ref_of(receiver, OBJ_ARRAY) && name == ITERATOR) {
                         stack_push(receiver);
                         call_value(array_iter_class, 1);
                         break;
@@ -1258,11 +1284,12 @@ static InterpretResult run_vm() {
             }
             case OP_BUILD_ARRAY: {
                 int length = read_byte();
-                Array *array = new_array(length);
-                for (int i = length - 1; i >= 0; i--) {
-                    array->values[i] = stack_pop();
-                }
-                stack_push(ref_value((Object *) array));
+                build_array(length);
+//                Array *array = new_array(length);
+//                for (int i = length - 1; i >= 0; i--) {
+//                    array->values[i] = stack_pop();
+//                }
+//                stack_push(ref_value((Object *) array));
                 break;
             }
             case OP_UNPACK_ARRAY: {
@@ -1313,7 +1340,7 @@ static InterpretResult run_vm() {
                 stack_push(ref_value((Object *) vm.current_module));
                 vm.current_module = old_module;
                 curr_closure_global = &curr_frame->closure->module->globals;
-                curr_const_pool = curr_frame->closure->function->chunk.constants.values; // 我认为本行是不需要的，但不知为何，注释掉它会导致性能有所下降。
+//                curr_const_pool = curr_frame->closure->function->chunk.constants.values;
                 break;
             }
             case OP_EXPORT: {

@@ -11,8 +11,6 @@
 
 Value array_iter_class;
 
-Instance *get_array_iterator(Array );
-
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
 
@@ -23,8 +21,15 @@ static void define_native(const char *name, NativeImplementation impl, int arity
     stack_pop();
 }
 
-static void load_libraries() {
-    load_lib(lib_iter, lib_iter_len, "lib_iter");
+void load_libraries() {
+    static bool loaded = false;
+    if (loaded || COMPILE_ONLY) {
+        return;
+    }
+    loaded = true;
+    if (load_bytes(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_OK) {
+        exit(1);
+    }
     table_get(&vm.builtin, ARRAY_ITERATOR, &array_iter_class);
 }
 
@@ -199,7 +204,7 @@ void init_vm_native() {
     define_native("f", native_format, -1);
     define_native("read", native_read, -1);
 
-    load_libraries();
+//    load_libraries();
 }
 
 void additional_repl_init() {

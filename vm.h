@@ -34,8 +34,9 @@ typedef struct VM{
 extern String *INIT;
 extern String *LENGTH;
 extern String *ARRAY_ITERATOR;
-extern String *SCRIPT;
-extern String *ANONYMOUS_MODULE;
+extern String *ITERATOR;
+//extern String *SCRIPT;
+//extern String *ANONYMOUS_MODULE;
 
 extern Module *repl_module;
 extern jmp_buf error_buf;
@@ -56,7 +57,7 @@ void free_VM();
 InterpretResult interpret(const char *src, const char *path);
 InterpretResult produce(const char *src, const char *path);
 InterpretResult read_run_bytecode(const char *path);
-InterpretResult load_lib(unsigned char *bytes, size_t len, const char *path);
+InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path);
 
 void stack_push(Value value);
 Value stack_pop();

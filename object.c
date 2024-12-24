@@ -110,6 +110,7 @@ LoxFunction *new_function(FunctionType type) {
     LoxFunction *function = (LoxFunction *) allocate_object(sizeof(LoxFunction), OBJ_FUNCTION);
     function->name = NULL;
     function->arity = 0;
+    function->var_arg = false;
     function->type = type;
     function->upvalue_count = 0;
     init_chunk(&function->chunk);
@@ -190,6 +191,8 @@ Module *new_module(String *path) {
     init_table(&module->globals);
     return module;
 }
+
+
 
 
 

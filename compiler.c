@@ -644,6 +644,10 @@ static void function_statement(FunctionType type) {
         do {
             parse_identifier_declaration(false);
             mark_initialized();
+            if (match(TOKEN_DOT_DOT_DOT)) {
+                current_scope->function->var_arg = true;
+                break;
+            }
             current_scope->function->arity++;
             if (current_scope->function->arity > 255) {
                 error_at_previous("cannot have more than 255 parameters");
@@ -995,7 +999,18 @@ static void emit_invoke_no_arg(const char *method_name) {
     emit_byte(0);
 }
 
+
+
 /**
+ *
+ * {
+ *     var iterator = arr.iterator();
+ *     while (iterator.has_next()) {
+ *          var item = iterator.next;
+ *          body...
+ *     }
+ * }
+ *
  * begin_scope 1
  * get iterator: [iter]
  *
@@ -1073,25 +1088,6 @@ static void iteration_statement() {
 
     restore_continue_point();
     restore_break_point();
-
-
-    /*
-     * for i in arr {
-     *      body...
-     * }
-     *
-     * {
-     *
-     *
-     * }
-     *
-     *     var iterator = arr.iterator();
-     *     while (iterator.has_next()) {
-     *          var item = iterator.next;
-     *          body...
-     *     }
-     *
-     */
 }
 
 /**

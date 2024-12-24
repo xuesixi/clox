@@ -9,6 +9,7 @@
 
 extern Value array_iter_class;
 void additional_repl_init();
+void load_libraries();
 
 void init_vm_native();
 #endif //CLOX_NATIVE_H

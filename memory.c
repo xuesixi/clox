@@ -48,7 +48,6 @@ static void mark_roots() {
 
     // mark global
     table_mark(&vm.builtin);
-//    table_mark(&vm.globals);
 
     // mark existing frames。否则调用中的函数可能会被回收
     for (int i = 0; i < vm.frame_count; ++i) {
@@ -58,7 +57,8 @@ static void mark_roots() {
     mark_object((Object *) INIT);
     mark_object((Object *) LENGTH);
     mark_object((Object *) ARRAY_ITERATOR);
-    mark_object((Object *) SCRIPT);
+//    mark_object((Object *) SCRIPT);
+    mark_object((Object *) ITERATOR);
 
 //    // mark open upvalues ? 暂时无法理解。这些值是open的，意味着它们仍然在作用域内，要么是在stack上，要么是在globals中。我认为没必要额外标记
 //    UpValueObject *curr = vm.open_upvalues;
