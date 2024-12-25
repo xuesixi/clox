@@ -9,7 +9,7 @@
 #include "string.h"
 #include "time.h"
 
-Value array_class;
+Class *array_class;
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
@@ -28,7 +28,9 @@ void load_libraries() {
     if (load_bytes(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_OK) {
         exit(1);
     }
-    table_get(&vm.builtin, ARRAY_CLASS, &array_class);
+    Value array_class_value;
+    table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
+    array_class = as_class(array_class_value);
 }
 
 /**

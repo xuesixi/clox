@@ -521,7 +521,7 @@ static void class_declaration(bool is_public) {
 
     // top
 
-    if (match(TOKEN_COLON)) {
+    if (match(TOKEN_COLON) || match(TOKEN_LESS)) {
         consume(TOKEN_IDENTIFIER, "Expect super class name");
         super_class_name = parser.previous;
         if (lexeme_equal(&class_name, &parser.previous)) {

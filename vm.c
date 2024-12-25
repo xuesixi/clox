@@ -417,7 +417,8 @@ static void close_upvalue(Value *position) {
 
 
 /**
- * 在指定的class的methods中寻找某个closure，然后将其包装成一个Method
+ * 在指定的class的methods中寻找某个closure，然后将其包装成一个Method.
+ * 如果没找到，该函数自身会调用runtime error
  */
 static Method *bind_method(Class *class, String *name, Value receiver) {
     Value value;
@@ -1071,7 +1072,8 @@ static InterpretResult run_vm() {
                                 stack_push(int_value(array->length));
                                 break;
                             } else {
-                                goto OP_GET_PROPERTY_not_found;
+                                Method *method = bind_method(array_class, field_name, value);
+                                stack_push(ref_value((Object *)method));
                             }
                             break;
                         }
@@ -1183,7 +1185,7 @@ static InterpretResult run_vm() {
                             break;
                         }
                     } else if (is_ref_of(receiver, OBJ_ARRAY)) {
-                        invoke_from_class(as_class(array_class), name, arg_count);
+                        invoke_from_class(array_class, name, arg_count);
                         break;
                     }
                     runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
@@ -1194,7 +1196,13 @@ static InterpretResult run_vm() {
                     Class *class = instance->class;
                     invoke_from_class(class, name, arg_count);
                 } else {
-                    call_closure(as_closure(closure_value), arg_count);
+                    if (is_ref_of(closure_value, OBJ_METHOD)) {
+                        call_value(closure_value, arg_count);
+                    } else if (is_ref_of(closure_value, OBJ_CLOSURE)) {
+                        call_closure(as_closure(closure_value), arg_count);
+                    } else {
+                        runtime_error_catch_1("%s is not callable", closure_value);
+                    }
                 }
                 break;
             }

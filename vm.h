@@ -41,7 +41,7 @@ extern String *ITERATOR;
 extern Module *repl_module;
 extern jmp_buf error_buf;
 
-typedef enum {
+typedef enum InterpretResult{
     INTERPRET_OK,
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR,

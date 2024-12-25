@@ -7,7 +7,7 @@
 
 #include "object.h"
 
-extern Value array_class;
+extern Class *array_class;
 void additional_repl_init();
 void load_libraries();
 
