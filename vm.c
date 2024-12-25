@@ -449,18 +449,29 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
 
 static void call_closure(Closure *closure, int arg_count) {
     LoxFunction *function = closure->function;
-    if (function->var_arg) {
-        int array_len = arg_count - function->arity;
-        if (array_len < 0) {
-            runtime_error_and_catch("%s expects at least %d arguments, but got %d", function->name->chars, function->arity, arg_count);
+    int fixed_arg_count = function->fixed_arg_count;
+    int optional_arg_count = function->optional_arg_count;
+    if (arg_count >= fixed_arg_count) {
+        // fixed: 2, option: 1, got: 5 -> num_absence = -2, array_len = 2
+        // fixed: 1, option: 1, va, got: 1 -> num_absence = 1
+        int num_absence = fixed_arg_count + optional_arg_count - arg_count;
+        if (num_absence >= 0) { // some optional args are missing
+            for (int i = 0; i < num_absence; ++i) {
+                stack_push(absence_value());
+            }
+            arg_count = fixed_arg_count + optional_arg_count;
+            if (function->var_arg) {
+                stack_push(ref_value((Object *) new_array(0)));
+                arg_count ++;
+            }
+        } else if (function->var_arg) { // more than expect
+            arg_count = fixed_arg_count + optional_arg_count + 1;
+            build_array(-num_absence);
         } else {
-            arg_count = function->arity + 1;
-            build_array(array_len);
+            runtime_error_and_catch("%s expects at most %d arguments, but got %d", function->name->chars, fixed_arg_count + optional_arg_count, arg_count);
         }
     } else {
-        if (function->arity != arg_count) {
-            runtime_error_and_catch("%s expects %d arguments, but got %d", function->name->chars, function->arity, arg_count);
-        }
+        runtime_error_and_catch("%s expects at least %d arguments, but got %d", function->name->chars, fixed_arg_count, arg_count);
     }
     if (vm.frame_count == FRAME_MAX) {
         runtime_error_and_catch("Stack overflow.");
@@ -736,6 +747,10 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
     stack_push(ref_value((Object *) closure));
 }
 
+/**
+ * 消耗栈顶的length个数组，将它们组成一个数组，然后置于栈顶
+ * @param length
+ */
 static void build_array(int length) {
     Array *array = new_array(length);
     for (int i = length - 1; i >= 0; i--) {
@@ -1367,6 +1382,9 @@ static InterpretResult run_vm() {
                 }
                 break;
             }
+            case OP_ABSENCE:
+                stack_push(absence_value());
+                break;
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;

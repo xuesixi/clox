@@ -639,18 +639,46 @@ static void function_statement(FunctionType type) {
 
     consume(TOKEN_LEFT_PAREN, "A ( is expected after function name");
 
+    bool optional_begin = false;
+
     // 参数列表
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
             parse_identifier_declaration(false);
             mark_initialized();
+
+            // var arg
             if (match(TOKEN_DOT_DOT_DOT)) {
                 current_scope->function->var_arg = true;
                 break;
             }
-            current_scope->function->arity++;
-            if (current_scope->function->arity > 255) {
-                error_at_previous("cannot have more than 255 parameters");
+            // 解析可选参数
+            if (optional_begin) {
+                consume(TOKEN_EQUAL, "Expect '='. No fixed parameters are allowed after any optional parameters");
+                goto default_value;
+            } else if (match(TOKEN_EQUAL)) {
+
+                optional_begin = true;
+
+                default_value:
+
+                emit_u8_u8(OP_GET_LOCAL, current_scope->local_count - 1);
+                emit_byte(OP_ABSENCE);
+                emit_byte(OP_EQUAL);
+                int default_value_end = emit_jump(OP_JUMP_IF_FALSE_POP);
+                parse_precedence(PREC_ASSIGNMENT); // right value
+                emit_u8_u8(OP_SET_LOCAL, current_scope->local_count - 1);
+                emit_byte(OP_POP);
+                patch_jump(default_value_end);
+                current_scope->function->optional_arg_count ++;
+
+            }else {
+                // 普通参数
+                current_scope->function->fixed_arg_count++;
+            }
+
+            if (current_scope->function->fixed_arg_count + current_scope->function->optional_arg_count >= 255) {
+                error_at_previous("cannot have more than 254 parameters");
                 return;
             }
         } while (match(TOKEN_COMMA));

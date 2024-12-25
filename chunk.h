@@ -70,6 +70,7 @@ typedef enum OpCode{
     OP_DEF_PUB_GLOBAL, // op, name_index16
     OP_DEF_PUB_GLOBAL_CONST, // op, name_index16
     OP_EXPORT, // op, name_index16
+    OP_ABSENCE,
 } OpCode;
 
 typedef struct Chunk{

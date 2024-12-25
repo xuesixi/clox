@@ -109,7 +109,8 @@ static inline uint32_t chars_hash(const char *key, int length) {
 LoxFunction *new_function(FunctionType type) {
     LoxFunction *function = (LoxFunction *) allocate_object(sizeof(LoxFunction), OBJ_FUNCTION);
     function->name = NULL;
-    function->arity = 0;
+    function->fixed_arg_count = 0;
+    function->optional_arg_count = 0;
     function->var_arg = false;
     function->type = type;
     function->upvalue_count = 0;

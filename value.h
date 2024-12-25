@@ -16,6 +16,7 @@ typedef enum {
     VAL_FLOAT,
     VAL_BOOL,
     VAL_INT,
+    VAL_ABSENCE,
     VAL_REF,
 } ValueType;
 
@@ -50,18 +51,8 @@ char *value_to_chars(Value value, int *len);
 #define is_int(value) ((value).type == VAL_INT)
 #define is_nil(value) ((value).type == VAL_NIL)
 #define is_ref(value) ((value).type == VAL_REF)
+#define is_absence(value) ((value).type == VAL_ABSENCE)
 
-//bool is_bool(Value value);
-//bool is_float(Value value);
-//bool is_number(Value value);
-//bool is_int(Value value);
-//bool is_nil(Value value);
-//bool is_ref(Value value);
-
-//double as_float(Value value);
-//int as_int(Value value);
-//bool as_bool(Value value);
-//Object *as_ref(Value value);
 #define as_float(v) ((v).as.decimal)
 #define as_int(v) ((v).as.integer)
 #define as_bool(v) ((v).as.boolean)
@@ -69,17 +60,12 @@ char *value_to_chars(Value value, int *len);
 #define AS_NUMBER(value) \
     (is_int(value) ? as_int(value) : as_float(value))
 
-//Value bool_value(bool value);
-//Value float_value(double value);
-//Value int_value(int value);
-//Value nil_value();
-//Value ref_value(Object *value);
-
 #define bool_value(v) ((Value) {.type = VAL_BOOL, .as = {.boolean = (v)}})
 #define int_value(v) ((Value) {.type = VAL_INT, .as = {.integer = (v)}})
 #define float_value(v) ((Value) {.type = VAL_FLOAT, .as = {.decimal = (v)}})
 #define nil_value(v) ((Value) {.type = VAL_NIL, .as = {}})
 #define ref_value(v) ((Value) {.type = VAL_REF, .as = {.reference = (v)}})
+#define absence_value() ((Value) {.type = VAL_ABSENCE, .as = {}})
 
 bool value_equal(Value a, Value b);
 bool object_equal(Object *a, Object *b);

@@ -58,7 +58,8 @@ typedef struct LoxFunction {
     String *name;
     int upvalue_count;
     FunctionType type;
-    int arity; // 固定参数的数量。
+    int fixed_arg_count; // 固定参数的数量。
+    short optional_arg_count; // 可选参数的数量
     bool var_arg; // 是否接受可变数量的参数。arity=3, var_arg=true意味着至少三个参数，实际调用时会将所有额外参数作为一个数组传入
 } LoxFunction;
 
