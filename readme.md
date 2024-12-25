@@ -2,19 +2,17 @@
 # clox
 clox is a interpreter of the lox programming language. 
 
-It has a compiler to compile scripts into bytecode, and a stack-based virtual machine to run_vm the bytecode.
+It has a compiler to compile scripts into bytecode, and a stack-based virtual machine to run the bytecode.
 
 ## build
 
 It currently requires GNU/readline.
 
 * `$ make clox`: produce the executable "clox". You can also do `$ cc *.c -o clox -l readline`
-* `$ make run_vm`: build, run_vm REPL, and then clean.
-* `$ make file`: build, run_vm the file "test.lox", and then clean.
 
 ## usage
-* `$ clox`: run_vm REPL
-* `$ clox path/to/script`: run_vm a lox script 
+* `$ clox`: run REPL
+* `$ clox path/to/script`: run a lox script 
 
 Other options
 * `-s`: show the compiled bytecode 
@@ -82,14 +80,57 @@ Lox provides a built-in keyword `print` to output to stdout. A new line will be 
 Lox support `if/else/while/for` as in c/java/javascript
 
 ## function
-Use the keyword `fun` to declare a function. Functions are first-class values in lox.
+Use the keyword `fun` to declare a function. Functions are first-class values in lox. Closure is supported. 
 If a function does not explicitly return anything, it returns `nil`
 
 ```lox
-fun greet(name) {
-    print "good day: " + name;
+fun adder(num1) {
+	fun add_num1(num2) {
+		return num1 + num;
+	}
+	return add_num1;
 }
-greet("huhu");
+```
+
+### anonymous function
+
+The `fun` keyword can also be used to define anonymous functions by simply omitting the function name. `$` does the same thing.
+
+Anonymous functions are expressions rather than statements.
+
+```lox
+var hey = fun (name) {
+	print name;
+};
+
+var hello = $(name) {
+	print name;
+};
+```
+
+### optional parameter
+
+When defining a function, we can give parameters default values. At runtime, if the coressponding argument is absent, the value will be computed by evaluating the expression.
+
+```lox
+fun add(a, b = 2 * a + 1) {
+	// if b is absent, b = 2 * a + 1;
+	return a + b;
+}
+```
+
+All optionals parameters must go after any definite parameters. 
+
+### var arg
+
+Adding `...` to the **last** parameter allows passing variable arguments. It is treated as an array at runtime.
+
+```lox
+fun hey(greeting = "good day", names...) {
+	for name in names {
+		print f("#, #", greeting, name);
+	}
+}
 ```
 
 ## native functions
@@ -100,12 +141,16 @@ Clox has some built-in functions written in C.
 * `int(input)`: convert string or float to int
 * `float(input)`: convert int or string to float
 * `rand(low, high)`: return a random int in [low, high]. Both arguments need to be int. 
+* `f(format, values...)`: return a formated string according to the specify format. `#` is used as the placeholder. 
+    * For example, ` str = f("the name is #, age is #", "anda", 22)`
+
+* `read(prompt)`: read a line of string from the keyboard (excluding the newline). If `prompt` is provided, it will be printed out first.
 
 # REPL
 
 **REPL stands for "Read, Evaluate, Print, Loop".** It is an environment allowing you to write and test codes quickly.
 
-If you run_vm `$ clox` without providing the path to a script, you will be in the REPL mode.
+If you run `$ clox` without providing the path to a script, you will be in the REPL mode.
 
 * It has a basic support for multipl-line input. 
 

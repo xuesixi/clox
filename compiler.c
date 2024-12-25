@@ -94,7 +94,7 @@ ClassScope *current_class = NULL;
 
 static Token literal_token(const char *text);
 
-static int argument_list();
+static int argument_list(bool *arr_as_var_arg);
 
 static inline bool match_assign();
 
@@ -262,7 +262,7 @@ ParseRule rules[] = {
         [TOKEN_PLUS]          = {NULL, binary, PREC_TERM},
         [TOKEN_SEMICOLON]     = {NULL, NULL, PREC_NONE},
         [TOKEN_SLASH]         = {NULL, binary, PREC_FACTOR},
-        [TOKEN_STAR]          = {lambda, binary, PREC_FACTOR},
+        [TOKEN_STAR]          = {NULL, binary, PREC_FACTOR},
         [TOKEN_STAR_STAR]     = {NULL, binary, PREC_POWER},
         [TOKEN_PERCENT]       = {NULL, binary, PREC_FACTOR},
         [TOKEN_BANG]          = {unary, NULL, PREC_NONE},
@@ -300,6 +300,7 @@ ParseRule rules[] = {
         [TOKEN_EOF]           = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACKET]  = {dimension_array, indexing, PREC_CALL},
         [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
+        [TOKEN_DOLLAR]        = {lambda, NULL, PREC_NONE},
 };
 
 void mark_compiler_roots() {
@@ -495,7 +496,7 @@ static void import_statement() {
 
 static void class_declaration(bool is_public) {
 
-    consume(TOKEN_IDENTIFIER, "An identifier is expected class");
+    consume(TOKEN_IDENTIFIER, "Expect an identifier as the class name");
 
     Token class_name = parser.previous;
     Token super_class_name;
@@ -637,7 +638,7 @@ static void function_statement(FunctionType type) {
 
     begin_scope();
 
-    consume(TOKEN_LEFT_PAREN, "A ( is expected after function name");
+    consume(TOKEN_LEFT_PAREN, "Expected ( after the function name");
 
     bool optional_begin = false;
 
@@ -682,8 +683,8 @@ static void function_statement(FunctionType type) {
         } while (match(TOKEN_COMMA));
     }
 
-    consume(TOKEN_RIGHT_PAREN, "A ) is expected after parameters");
-    consume(TOKEN_LEFT_BRACE, "A { is expected to start the function body");
+    consume(TOKEN_RIGHT_PAREN, "Expect ) after parameters");
+    consume(TOKEN_LEFT_BRACE, "Expect { to start the function body");
 
     // 函数体
     block_statement();
@@ -869,7 +870,7 @@ static int add_upvalue(Scope *scope, int index, bool is_local) {
  * @return 如果是全局变量，返回索引。否则，返回-1
  */
 static inline int parse_identifier_declaration(bool is_const) {
-    consume(TOKEN_IDENTIFIER, "An identifier is expected here");
+    consume(TOKEN_IDENTIFIER, "Expect an identifier here");
 
     if (current_scope->depth > 0) {
         // 如果是local
@@ -986,10 +987,10 @@ static void patch_jump(int from) {
  * after:
  */
 static void if_statement() {
-    consume(TOKEN_LEFT_PAREN, "A ( is expected after if");
+    consume(TOKEN_LEFT_PAREN, "Expect ( to start the condition after if");
     // condition
     expression();
-    consume(TOKEN_RIGHT_PAREN, "A ) is expected after if");
+    consume(TOKEN_RIGHT_PAREN, "Expect ) to end the condition");
 
     // jump to else if false
     int to_else = emit_jump(OP_JUMP_IF_FALSE_POP);
@@ -1024,8 +1025,6 @@ static void emit_invoke_no_arg(const char *method_name) {
     emit_u8_u16(OP_PROPERTY_INVOKE, index);
     emit_byte(0);
 }
-
-
 
 /**
  *
@@ -1116,6 +1115,15 @@ static void iteration_statement() {
     restore_break_point();
 }
 
+//static void unpack_iterable() {
+//    // [iterable]
+//
+//    // iter, 1
+//    // copy, getnext, swap,
+//
+//    // [items...]
+//}
+
 /**
  * start:
  * 
@@ -1132,14 +1140,14 @@ static void iteration_statement() {
  * end:
  * */
 static void while_statement() {
-    consume(TOKEN_LEFT_PAREN, "A ( is expected after while");
+    consume(TOKEN_LEFT_PAREN, "Expect ( to start the condition");
 
     save_continue_point();
     int condition = current_chunk()->count;
 
     // condition:
     expression();
-    consume(TOKEN_RIGHT_PAREN, "A ) is expected after while");
+    consume(TOKEN_RIGHT_PAREN, "Expect ) to end the condition");
     save_break_point();
     int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
 
@@ -1190,7 +1198,7 @@ static void while_statement() {
  * 
  * */
 static void switch_statement() {
-    consume(TOKEN_LEFT_PAREN, "A ( is expected after switch");
+    consume(TOKEN_LEFT_PAREN, "Expect ( to start the expression for switch");
 
     int start = emit_jump(OP_JUMP);
 
@@ -1201,8 +1209,8 @@ static void switch_statement() {
 
     expression();
 
-    consume(TOKEN_RIGHT_PAREN, "A ) is expected after switch");
-    consume(TOKEN_LEFT_BRACE, "A { is expected after switch");
+    consume(TOKEN_RIGHT_PAREN, "Expect ) to end the expression for switch");
+    consume(TOKEN_LEFT_BRACE, "Expect { to start switch cases");
     int bridge = -1;
     while (!check(TOKEN_EOF) && match(TOKEN_CASE)) {
         if (bridge != -1) {
@@ -1221,7 +1229,7 @@ static void switch_statement() {
             error_at_current("only constant values can be used as switch cases");
             return;
         }
-        consume(TOKEN_COLON, "A : is needed after each case");
+        consume(TOKEN_COLON, "Expect ':' after each case");
         bridge = emit_jump(OP_JUMP_IF_NOT_EQUAL);
         emit_byte(OP_POP);
         emit_byte(OP_POP);
@@ -1242,14 +1250,14 @@ static void switch_statement() {
     }
 
     if (match(TOKEN_DEFAULT)) {
-        consume(TOKEN_COLON, "A : is needed after each case");
+        consume(TOKEN_COLON, "Expect ':' after each case");
         while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
             statement();
         }
     }
 
     patch_jump(to_end);
-    consume(TOKEN_RIGHT_BRACE, "A } is expected after switch");
+    consume(TOKEN_RIGHT_BRACE, "Expect } to end the switch statement");
 }
 
 /*
@@ -1283,7 +1291,7 @@ static void switch_statement() {
  */
 static void for_statement() {
 
-    consume(TOKEN_LEFT_PAREN, "A ( is expected after for");
+    consume(TOKEN_LEFT_PAREN, "Expect ( after for");
     begin_scope();
 
     // initialize
@@ -1317,7 +1325,7 @@ static void for_statement() {
     if (!match(TOKEN_RIGHT_PAREN)) {
         expression();
         emit_byte(OP_POP);
-        consume(TOKEN_RIGHT_PAREN, "A ) is expected after for");
+        consume(TOKEN_RIGHT_PAREN, "Expect )");
     }
 
     loop_back(condition);
@@ -1420,25 +1428,36 @@ static Token literal_token(const char *text) {
     return token;
 }
 
-static int argument_list() {
+static int argument_list(bool *arr_as_var_arg) {
+    *arr_as_var_arg = false;
     int count = 0;
     if (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_PAREN)) {
         do {
+            if (match(TOKEN_STAR)) {
+                *arr_as_var_arg = true;
+            }
             if (count == 255) {
                 error_at_previous("Cannot have more than 255 arguments");
             }
             parse_precedence(PREC_ASSIGNMENT);
             count++;
+            if (*arr_as_var_arg) {
+                break;
+            }
         } while (match(TOKEN_COMMA));
     }
-    consume(TOKEN_RIGHT_PAREN, "A ) is expected to terminate the argument list");
+    consume(TOKEN_RIGHT_PAREN, "Expect ) to end the argument list");
     return count;
 }
 
 static void call(bool can_assign) {
     (void) can_assign;
-    int arg_count = argument_list();
+    bool arr_as_var_arg;
+    int arg_count = argument_list(&arr_as_var_arg);
     emit_u8_u8(OP_CALL, arg_count);
+    if (arr_as_var_arg) {
+        emit_byte(OP_ARR_AS_VAR_ARG);
+    }
 }
 
 /**
@@ -1493,9 +1512,13 @@ static void dot(bool can_assign) {
     if (can_assign && match_assign()) {
         arithmetic_equal(OP_SET_PROPERTY, OP_GET_PROPERTY, name_index, 1);
     } else if (match(TOKEN_LEFT_PAREN)) {
-        int arg_count = argument_list();
+        bool arr_as_var_arg;
+        int arg_count = argument_list(&arr_as_var_arg);
         emit_u8_u16(OP_PROPERTY_INVOKE, name_index);
         emit_byte(arg_count);
+        if (arr_as_var_arg) {
+            emit_byte(OP_ARR_AS_VAR_ARG);
+        }
     } else {
         emit_u8_u16(OP_GET_PROPERTY, name_index);
     }
@@ -1770,12 +1793,16 @@ static void super_expression(bool can_assign) {
     Token super = literal_token("super");
     named_variable(&this, false);
     if (match(TOKEN_LEFT_PAREN)) {
-        int arg_count = argument_list();
+        bool arr_as_var_arg;
+        int arg_count = argument_list(&arr_as_var_arg);
         named_variable(&super, false);
         emit_byte(OP_SUPER_INVOKE);
 //        emit_byte(method);
         emit_u16(method);
         emit_byte(arg_count);
+        if (arr_as_var_arg) {
+            emit_byte(OP_ARR_AS_VAR_ARG);
+        }
     } else {
         named_variable(&super, false);
         emit_u8_u16(OP_SUPER_ACCESS, method);

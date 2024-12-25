@@ -72,6 +72,7 @@ typedef enum OpCode{
     OP_EXPORT, // op, name_index16
     OP_ABSENCE,
     OP_JUMP_IF_NOT_ABSENCE, // op, offset16
+    OP_ARR_AS_VAR_ARG, // op
 } OpCode;
 
 typedef struct Chunk{

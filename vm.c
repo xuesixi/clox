@@ -42,6 +42,8 @@ static void reset_stack();
 
 //static Value read_constant();
 
+static inline bool if_read_byte(OpCode op);
+
 static Value read_constant16();
 
 static InterpretResult run_vm();
@@ -66,10 +68,101 @@ static Value multi_dimension_array(int dimension, Value *lens);
 
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl);
 
+static Method *bind_method(Class *class, String *name, Value receiver);
 
+//static Value get_property(Value target, String *property_name) {
+//    if (is_ref_of(target, OBJ_INSTANCE) == false) {
+//        switch (as_ref(target)->type) {
+//            case OBJ_ARRAY: {
+//                if (property_name == LENGTH) {
+//                    Array *array = as_array(target);
+//                    stack_push(int_value(array->length));
+//                    break;
+//                } else {
+//                    Method *method = bind_method(array_class, property_name, target);
+//                    stack_push(ref_value((Object *)method));
+//                }
+//                break;
+//            }
+//            case OBJ_CLASS: {
+//                Class *class = as_class(target);
+//                Value static_field;
+//                if (!table_get(&class->static_fields, property_name, &static_field)) {
+//                    goto OP_GET_PROPERTY_not_found;
+//                }
+//                stack_push(static_field);
+//                break;
+//            }
+//            case OBJ_MODULE: {
+//                Module *module = as_module(target);
+//                Value property;
+//                if (!table_conditional_get(&module->globals, property_name, &property, true, false)) {
+//                    runtime_error_catch_2("%s does not the have public property: %s", target, ref_value((Object *) property_name));
+//                } else {
+//                    stack_push(property);
+//                }
+//                break;
+//            }
+//            OP_GET_PROPERTY_not_found:
+//            default:
+//                runtime_error_catch_2("%s does not have the property: %s", target, ref_value((Object *) property_name));
+//        }
+//    } else {
+//        Instance *instance = as_instance(target);
+//        Value result = nil_value();
+//        bool found = table_get(&instance->fields, property_name, &result);
+//        if (found == false) {
+//            Method *method = bind_method(instance->class, property_name, target);
+//            result = ref_value((Object *) method);
+//        }
+//        stack_push(result);
+//    }
+//}
 
-// ------------------上面是静态函数申明-----------------------
-// ------------------下面是静态函数定义-----------------------
+/**
+ * 调用一个property。receiver是stack_peek(arg_count)
+ * @param name 名字
+ * @param arg_count 参数个数
+ */
+static void invoke_property(String *name, int arg_count) {
+//    int arg_count = read_byte();
+    Value receiver = stack_peek(arg_count);
+    if (is_ref_of(receiver, OBJ_INSTANCE)) {
+        Instance *instance = as_instance(receiver);
+        Value closure_value;
+        if (!table_get(&instance->fields, name, &closure_value)) {
+            Class *class = instance->class;
+            invoke_from_class(class, name, arg_count);
+        } else {
+            if (is_ref_of(closure_value, OBJ_METHOD)) {
+                call_value(closure_value, arg_count);
+            } else if (is_ref_of(closure_value, OBJ_CLOSURE)) {
+                call_closure(as_closure(closure_value), arg_count);
+            } else {
+                runtime_error_catch_1("%s is not callable", closure_value);
+            }
+        }
+    } else {
+        if (is_ref_of(receiver, OBJ_CLASS)) {
+            Class *class = as_class(receiver);
+            Value static_field;
+            if (table_get(&class->static_fields, name, &static_field)) {
+                call_value(static_field, arg_count);
+            }
+        } else if (is_ref_of(receiver, OBJ_MODULE)) {
+            Module *module = as_module(receiver);
+            Value property;
+            if (table_conditional_get(&module->globals, name, &property, true, false)) {
+                call_value(property, arg_count);
+            }
+        } else if (is_ref_of(receiver, OBJ_ARRAY)) {
+            invoke_from_class(array_class, name, arg_count);
+        } else {
+            runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
+        }
+    }
+}
+
 
 static Value multi_dimension_array(int dimension, Value *lens) {
     Value len_value = *lens;
@@ -345,6 +438,15 @@ static inline uint8_t read_byte() {
     return *curr_frame->PC++;
 }
 
+static inline bool if_read_byte(OpCode op) {
+    if (*curr_frame->PC == op) {
+        curr_frame->PC++;
+        return true;
+    } else {
+        return false;
+    }
+}
+
 static inline uint16_t read_uint16() {
     uint8_t i0 = read_byte();
     uint8_t i1 = read_byte();
@@ -466,7 +568,18 @@ static void call_closure(Closure *closure, int arg_count) {
             }
         } else if (function->var_arg) { // more than expect
             arg_count = fixed_arg_count + optional_arg_count + 1;
-            build_array(-num_absence);
+            if (if_read_byte(OP_ARR_AS_VAR_ARG)) {
+                if (num_absence == -1) {
+                    Value top = stack_peek(0);
+                    if (!is_ref_of(top, OBJ_ARRAY)) {
+                        runtime_error_catch_1("cannot use a non-array value: %s as var arg", top);
+                    }
+                } else {
+                    runtime_error_and_catch("too many arguments when using an array as the var arg");
+                }
+            } else {
+                build_array(-num_absence);
+            }
         } else {
             runtime_error_and_catch("%s expects at most %d arguments, but got %d", function->name->chars, fixed_arg_count + optional_arg_count, arg_count);
         }
@@ -1186,42 +1299,43 @@ static InterpretResult run_vm() {
                 // code: op, name_index, arg_count
                 String *name = read_constant_string();
                 int arg_count = read_byte();
-                Value receiver = stack_peek(arg_count);
-                if (!is_ref_of(receiver, OBJ_INSTANCE)) {
-                    if (is_ref_of(receiver, OBJ_CLASS)) {
-                        Class *class = as_class(receiver);
-                        Value static_field;
-                        if (table_get(&class->static_fields, name, &static_field)) {
-                            call_value(static_field, arg_count);
-                            break;
-                        }
-                    } else if (is_ref_of(receiver, OBJ_MODULE)) {
-                        Module *module = as_module(receiver);
-                        Value property;
-                        if (table_conditional_get(&module->globals, name, &property, true, false)) {
-                            call_value(property, arg_count);
-                            break;
-                        }
-                    } else if (is_ref_of(receiver, OBJ_ARRAY)) {
-                        invoke_from_class(array_class, name, arg_count);
-                        break;
-                    }
-                    runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
-                }
-                Instance *instance = as_instance(receiver);
-                Value closure_value;
-                if (!table_get(&instance->fields, name, &closure_value)) {
-                    Class *class = instance->class;
-                    invoke_from_class(class, name, arg_count);
-                } else {
-                    if (is_ref_of(closure_value, OBJ_METHOD)) {
-                        call_value(closure_value, arg_count);
-                    } else if (is_ref_of(closure_value, OBJ_CLOSURE)) {
-                        call_closure(as_closure(closure_value), arg_count);
-                    } else {
-                        runtime_error_catch_1("%s is not callable", closure_value);
-                    }
-                }
+                invoke_property(name, arg_count);
+//                Value receiver = stack_peek(arg_count);
+//                if (!is_ref_of(receiver, OBJ_INSTANCE)) {
+//                    if (is_ref_of(receiver, OBJ_CLASS)) {
+//                        Class *class = as_class(receiver);
+//                        Value static_field;
+//                        if (table_get(&class->static_fields, name, &static_field)) {
+//                            call_value(static_field, arg_count);
+//                            break;
+//                        }
+//                    } else if (is_ref_of(receiver, OBJ_MODULE)) {
+//                        Module *module = as_module(receiver);
+//                        Value property;
+//                        if (table_conditional_get(&module->globals, name, &property, true, false)) {
+//                            call_value(property, arg_count);
+//                            break;
+//                        }
+//                    } else if (is_ref_of(receiver, OBJ_ARRAY)) {
+//                        invoke_from_class(array_class, name, arg_count);
+//                        break;
+//                    }
+//                    runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
+//                }
+//                Instance *instance = as_instance(receiver);
+//                Value closure_value;
+//                if (!table_get(&instance->fields, name, &closure_value)) {
+//                    Class *class = instance->class;
+//                    invoke_from_class(class, name, arg_count);
+//                } else {
+//                    if (is_ref_of(closure_value, OBJ_METHOD)) {
+//                        call_value(closure_value, arg_count);
+//                    } else if (is_ref_of(closure_value, OBJ_CLOSURE)) {
+//                        call_closure(as_closure(closure_value), arg_count);
+//                    } else {
+//                        runtime_error_catch_1("%s is not callable", closure_value);
+//                    }
+//                }
                 break;
             }
             case OP_INHERIT: {

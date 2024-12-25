@@ -248,6 +248,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("ABSENCE", offset);
         case OP_JUMP_IF_NOT_ABSENCE:
             return jump_instruction("JUMP_IF_NOT_ABSENCE", chunk, offset, true);
+        case OP_ARR_AS_VAR_ARG:
+            return simple_instruction("ARR_AS_VAR_ARG", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

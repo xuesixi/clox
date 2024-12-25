@@ -58,7 +58,7 @@ static bool is_keyword(int start, int length, const char *rest) {
     }
 }
 
-static TokenType check_keyword(int start, int length, const char *rest, TokenType type){
+static TokenType check_keyword(int start, int length, const char *rest, TokenType type) {
     if (is_keyword(start, length, rest)) {
         return type;
     } else {
@@ -78,11 +78,13 @@ static TokenType identifier_type() {
                 return TOKEN_IDENTIFIER;
             }
         }
-        case 'b': return check_keyword(1, 4, "reak", TOKEN_BREAK);
+        case 'b':
+            return check_keyword(1, 4, "reak", TOKEN_BREAK);
         case 'c':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
-                    case 'l': return check_keyword(2, 3, "ass", TOKEN_CLASS);
+                    case 'l':
+                        return check_keyword(2, 3, "ass", TOKEN_CLASS);
                     case 'o': {
                         if (is_keyword(2, 3, "nst")) {
                             return TOKEN_CONST;
@@ -92,7 +94,8 @@ static TokenType identifier_type() {
                             return TOKEN_IDENTIFIER;
                         }
                     }
-                    case 'a': return check_keyword(2, 2, "se", TOKEN_CASE);
+                    case 'a':
+                        return check_keyword(2, 2, "se", TOKEN_CASE);
                 }
             }
             break;
@@ -105,47 +108,62 @@ static TokenType identifier_type() {
                 return TOKEN_IDENTIFIER;
             }
         }
-        case 'd': return check_keyword(1, 6, "efault", TOKEN_DEFAULT);
+        case 'd':
+            return check_keyword(1, 6, "efault", TOKEN_DEFAULT);
         case 'i': {
             if (is_keyword(1, 1, "f")) {
                 return TOKEN_IF;
             } else if (is_keyword(1, 5, "mport")) {
                 return TOKEN_IMPORT;
-            } else if (is_keyword(1, 1, "n")){
+            } else if (is_keyword(1, 1, "n")) {
                 return TOKEN_IN;
             } else {
                 return TOKEN_IDENTIFIER;
             }
         }
-        case 'n': return check_keyword(1, 2, "il", TOKEN_NIL);
-        case 'o': return check_keyword(1, 1, "r", TOKEN_OR);
-        case 'p': return check_keyword(1, 4, "rint", TOKEN_PRINT);
-        case 'r': return check_keyword(1, 5, "eturn", TOKEN_RETURN);
+        case 'n':
+            return check_keyword(1, 2, "il", TOKEN_NIL);
+        case 'o':
+            return check_keyword(1, 1, "r", TOKEN_OR);
+        case 'p':
+            return check_keyword(1, 4, "rint", TOKEN_PRINT);
+        case 'r':
+            return check_keyword(1, 5, "eturn", TOKEN_RETURN);
         case 's':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
-                    case 'u': return check_keyword(2, 3, "per", TOKEN_SUPER);
-                    case 'w': return check_keyword(2, 4, "itch", TOKEN_SWITCH);
-                    case 't': return check_keyword(2, 4, "atic", TOKEN_STATIC);
+                    case 'u':
+                        return check_keyword(2, 3, "per", TOKEN_SUPER);
+                    case 'w':
+                        return check_keyword(2, 4, "itch", TOKEN_SWITCH);
+                    case 't':
+                        return check_keyword(2, 4, "atic", TOKEN_STATIC);
                 }
             }
-	    break;
-        case 'v': return check_keyword(1, 2, "ar", TOKEN_VAR);
-        case 'w': return check_keyword(1, 4, "hile", TOKEN_WHILE);
+            break;
+        case 'v':
+            return check_keyword(1, 2, "ar", TOKEN_VAR);
+        case 'w':
+            return check_keyword(1, 4, "hile", TOKEN_WHILE);
         case 'f':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
-                    case 'a': return check_keyword(2, 3, "lse", TOKEN_FALSE);
-                    case 'o': return check_keyword(2, 1, "r", TOKEN_FOR);
-                    case 'u': return check_keyword(2, 1, "n", TOKEN_FUN);
+                    case 'a':
+                        return check_keyword(2, 3, "lse", TOKEN_FALSE);
+                    case 'o':
+                        return check_keyword(2, 1, "r", TOKEN_FOR);
+                    case 'u':
+                        return check_keyword(2, 1, "n", TOKEN_FUN);
                 }
             }
             break;
         case 't':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
-                    case 'h': return check_keyword(2, 2, "is", TOKEN_THIS);
-                    case 'r': return check_keyword(2, 2, "ue", TOKEN_TRUE);
+                    case 'h':
+                        return check_keyword(2, 2, "is", TOKEN_THIS);
+                    case 'r':
+                        return check_keyword(2, 2, "ue", TOKEN_TRUE);
                 }
             }
             break;
@@ -161,7 +179,7 @@ static Token identifier_token() {
 }
 
 static inline bool is_alpha(char ch) {
-    return (ch >= 'a' && ch <= 'z')|| (ch >= 'A' && ch <= 'Z') || (ch == '_');
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch == '_');
 }
 
 static inline bool is_digit(char ch) {
@@ -230,9 +248,9 @@ static void skip_whitespace() {
                 } else if (peek_next() == '*') {
                     advance();
                     advance();
-                    while ( (peek() != '*' || peek_next() != '/') && !is_end()) {
+                    while ((peek() != '*' || peek_next() != '/') && !is_end()) {
                         if (peek() == '\n') {
-                            scanner.line ++;
+                            scanner.line++;
                         }
                         advance();
                     }
@@ -243,8 +261,7 @@ static void skip_whitespace() {
                         advance();
                         continue;
                     }
-                }
-                else {
+                } else {
                     return;
                 }
             default:
@@ -340,7 +357,7 @@ Token scan_token() {
         case ',':
             return make_token(TOKEN_COMMA);
         case '.': {
-            if (match('.') ) {
+            if (match('.')) {
                 if (match('.')) {
                     return make_token(TOKEN_DOT_DOT_DOT);
                 } else {
@@ -374,6 +391,8 @@ Token scan_token() {
             return string_token();
         case '#':
             return label_token();
+        case '$':
+            return make_token(TOKEN_DOLLAR);
         default:
             return error_token("Unrecognized character!");
     }
