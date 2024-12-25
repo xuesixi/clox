@@ -660,17 +660,15 @@ static void function_statement(FunctionType type) {
 
                 optional_begin = true;
 
-                default_value:
-
-                emit_u8_u8(OP_GET_LOCAL, current_scope->local_count - 1);
-                emit_byte(OP_ABSENCE);
-                emit_byte(OP_EQUAL);
-                int default_value_end = emit_jump(OP_JUMP_IF_FALSE_POP);
-                parse_precedence(PREC_ASSIGNMENT); // right value
-                emit_u8_u8(OP_SET_LOCAL, current_scope->local_count - 1);
-                emit_byte(OP_POP);
-                patch_jump(default_value_end);
-                current_scope->function->optional_arg_count ++;
+                default_value: {
+                    int default_value_end = emit_jump(OP_JUMP_IF_NOT_ABSENCE);
+                    emit_byte(current_scope->local_count - 1);
+                    parse_precedence(PREC_ASSIGNMENT); // right value
+                    emit_u8_u8(OP_SET_LOCAL, current_scope->local_count - 1);
+                    emit_byte(OP_POP);
+                    patch_jump(default_value_end);
+                    current_scope->function->optional_arg_count ++;
+                };
 
             }else {
                 // 普通参数

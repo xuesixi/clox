@@ -78,13 +78,18 @@ static int jump_instruction(const char *name, const Chunk *chunk, int offset, bo
     uint8_t i1 = chunk->code[offset + 2];
     int index = u8_to_u16(i0, i1);
     int target = forward ? offset + 3 + index : offset + 3 - index;
-//    char *label = map_get(&label_map, (void*)(target + 1));
-//    if (label != NULL) {
-//        printf("%-23s   -> %04d: %s\n", name, target, label);
-//    } else {
-        printf("%-23s   -> %04d\n", name, target);
-//    }
+    printf("%-23s   -> %04d\n", name, target);
     return offset + 3;
+}
+
+static int jump_u16_u8_instruction(const char *name, const Chunk *chunk, int offset, bool forward){
+    uint8_t i0 = chunk->code[offset + 1];
+    uint8_t i1 = chunk->code[offset + 2];
+    int index = u8_to_u16(i0, i1);
+    int local_index = chunk->code[offset + 3];
+    int target = forward ? offset + 3 + index : offset + 3 - index;
+    printf("%-23s   -> %04d; %d\n", name, target, local_index);
+    return offset + 4;
 }
 
 /**
@@ -92,12 +97,6 @@ static int jump_instruction(const char *name, const Chunk *chunk, int offset, bo
  * @return 下一个 instruction 的 offset
  */
 int disassemble_instruction(Chunk *chunk, int offset) {
-
-//    char *label = map_get(&label_map, (void*)(offset + 1)); // +1 是为了防止索引0被当成NULL。见label_statement()
-//    if (label != NULL) {
-//        NEW_LINE();
-//        printf("%s: \n", label);
-//    }
 
     // code index
     printf("%04d ", offset);
@@ -247,6 +246,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return constant16_instruction("EXPORT", chunk, offset);
         case OP_ABSENCE:
             return simple_instruction("ABSENCE", offset);
+        case OP_JUMP_IF_NOT_ABSENCE:
+            return jump_u16_u8_instruction("JUMP_IF_NOT_ABSENCE", chunk, offset, true);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

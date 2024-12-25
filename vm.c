@@ -1314,11 +1314,6 @@ static InterpretResult run_vm() {
             case OP_BUILD_ARRAY: {
                 int length = read_byte();
                 build_array(length);
-//                Array *array = new_array(length);
-//                for (int i = length - 1; i >= 0; i--) {
-//                    array->values[i] = stack_pop();
-//                }
-//                stack_push(ref_value((Object *) array));
                 break;
             }
             case OP_UNPACK_ARRAY: {
@@ -1385,6 +1380,14 @@ static InterpretResult run_vm() {
             case OP_ABSENCE:
                 stack_push(absence_value());
                 break;
+            case OP_JUMP_IF_NOT_ABSENCE: {
+                int offset = read_uint16();
+                int index = read_byte();
+                if (!is_absence(curr_frame->FP[index])) {
+                    curr_frame->PC += offset;
+                }
+                break;
+            }
             default: {
                 runtime_error_and_catch("unrecognized instruction");
                 break;
