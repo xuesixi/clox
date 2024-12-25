@@ -3,14 +3,13 @@ SRC = chunk.c compiler.c debug.c io.c main.c memory.c object.c scanner.c table.c
 OBJ = $(SRC:.c=.o)
 TARGET = clox
 
-lib_lox: $(TARGET)
+all: $(TARGET)
+	@make $(TARGET)
 	@./clox -c liblox_iter liblox/Iter.lox
 	@xxd -i liblox_iter lib_iter.h
 	@make clean
 	@make $(TARGET)
 	@rm liblox_iter
-
-all: $(TARGET)
 
 $(TARGET): $(OBJ) 
 	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm
@@ -18,7 +17,7 @@ $(TARGET): $(OBJ)
 o: $(SRC)
 	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm
 
-%.o: %.c common.h %.h
+%.o: %.c *.h
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: lldb

@@ -21,6 +21,32 @@ int TRACE_SKIP = -1;
 bool SHOW_LABEL = false;
 jmp_buf consume_buf;
 
+static void print_result_with_color(InterpretResult result) {
+    switch (result) {
+        case INTERPRET_COMPILE_ERROR:
+            start_color(BOLD_MAGENTA);
+            printf("== compile error ==\n");
+            break;
+        case INTERPRET_RUNTIME_ERROR:
+            start_color(RED);
+            printf("== runtime error ==\n");
+            break;
+        case INTERPRET_PRODUCE_ERROR:
+            start_color(RED);
+            printf("== produce error ==\n");
+            break;
+        case INTERPRET_READ_ERROR:
+            start_color(RED);
+            printf("== file reading error");
+            break;
+        case INTERPRET_OK:
+        case INTERPRET_REPL_EXIT:
+            start_color(GREEN);
+            printf("== execution finished ==\n");
+    }
+    end_color();
+}
+
 static void repl() {
 
     DISABLE_GC;
@@ -128,17 +154,7 @@ static void run_file(const char *path) {
     InterpretResult result = interpret(src, path);
     free(src);
 #ifdef COLOR_RUN_FILE_RESULT
-    if (result == INTERPRET_COMPILE_ERROR) {
-        start_color(BOLD_MAGENTA);
-        printf("== compile error ==\n");
-    } else if (result == INTERPRET_RUNTIME_ERROR) {
-        start_color(RED);
-        printf("== runtime error ==\n");
-    } else {
-        start_color(GREEN);
-        printf("== execution finished ==\n");
-    }
-    end_color();
+    print_result_with_color(result);
 #endif
 }
 
@@ -150,27 +166,17 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
     }
     InterpretResult result = produce(src, result_path);
     free(src);
-    if (result == INTERPRET_COMPILE_ERROR) {
-        printf("== compile error ==\n");
-    } else if (result == INTERPRET_RUNTIME_ERROR) {
-        printf("== runtime error ==\n");
-    } else {
-        printf("== produce finished ==\n");
-    }
+#ifdef COLOR_RUN_FILE_RESULT
+    print_result_with_color(result);
+#endif
 }
 
 static void main_run_bytecode(const char *code_path) {
 
     InterpretResult result = read_run_bytecode(code_path);
-    if (result == INTERPRET_COMPILE_ERROR) {
-        printf("== compile error ==\n");
-    } else if (result == INTERPRET_RUNTIME_ERROR) {
-        printf("== runtime error ==\n");
-    } else if (result == INTERPRET_READ_ERROR){
-        printf("== io error ==\n");
-    } else {
-        printf("== execution finished ==\n");
-    }
+#ifdef COLOR_RUN_FILE_RESULT
+    print_result_with_color(result);
+#endif
 }
 
 int main(int argc, char *const argv[]) {

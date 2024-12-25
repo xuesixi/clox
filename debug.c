@@ -82,15 +82,15 @@ static int jump_instruction(const char *name, const Chunk *chunk, int offset, bo
     return offset + 3;
 }
 
-static int jump_u16_u8_instruction(const char *name, const Chunk *chunk, int offset, bool forward){
-    uint8_t i0 = chunk->code[offset + 1];
-    uint8_t i1 = chunk->code[offset + 2];
-    int index = u8_to_u16(i0, i1);
-    int local_index = chunk->code[offset + 3];
-    int target = forward ? offset + 3 + index : offset + 3 - index;
-    printf("%-23s   -> %04d; %d\n", name, target, local_index);
-    return offset + 4;
-}
+//static int jump_u16_u8_instruction(const char *name, const Chunk *chunk, int offset){
+//    uint8_t i0 = chunk->code[offset + 1];
+//    uint8_t i1 = chunk->code[offset + 2];
+//    int index = u8_to_u16(i0, i1);
+//    int local_index = chunk->code[offset + 3];
+//    int target = forward ? offset + 4 + index : offset + 4 - index;
+//    printf("%-23s   -> %04d; %d\n", name, target, local_index);
+//    return offset + 4;
+//}
 
 /**
  * 给定一个 offset，将对应的 instruction 的信息打印
@@ -247,7 +247,7 @@ int disassemble_instruction(Chunk *chunk, int offset) {
         case OP_ABSENCE:
             return simple_instruction("ABSENCE", offset);
         case OP_JUMP_IF_NOT_ABSENCE:
-            return jump_u16_u8_instruction("JUMP_IF_NOT_ABSENCE", chunk, offset, true);
+            return jump_instruction("JUMP_IF_NOT_ABSENCE", chunk, offset, true);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

@@ -210,7 +210,7 @@ static void binary_number_op(Value a, Value b, char operator) {
         runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
         free(a_text);
         free(b_text);
-        catch();
+        catch(INTERPRET_RUNTIME_ERROR);
         return;
     }
 }
@@ -289,7 +289,7 @@ void runtime_error_catch_1(const char *format, Value value) {
     char *str = value_to_chars(value, NULL);
     runtime_error(format, str);
     free(str);
-    catch();
+    catch(INTERPRET_RUNTIME_ERROR);
 }
 
 void runtime_error_catch_2(const char *format, Value v1, Value v2) {
@@ -298,15 +298,15 @@ void runtime_error_catch_2(const char *format, Value v1, Value v2) {
     runtime_error(format, str1, str2);
     free(str1);
     free(str2);
-    catch();
+    catch(INTERPRET_RUNTIME_ERROR);
 }
 
 /**
  * 跳转到错误处理处。
  * 该函数只应该用在runtime_error()后面。
  */
-inline void catch() {
-    longjmp(error_buf, INTERPRET_RUNTIME_ERROR);
+inline void catch(InterpretResult result) {
+    longjmp(error_buf, result);
 }
 
 /**
@@ -334,7 +334,7 @@ void runtime_error_and_catch(const char *format, ...) {
         }
     }
     reset_stack();
-    catch();
+    catch(INTERPRET_RUNTIME_ERROR);
 }
 
 /**
@@ -689,6 +689,9 @@ InterpretResult read_run_bytecode(const char *path) {
     return run_vm();
 }
 
+/**
+ * 用fmemopen()从目标字节数组处打开一个流，然后读取并执行起字节码。运行后，将全局命名空间中的public元素添加到builtin命名空间中
+ */
 InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
     FILE *file = fmemopen(bytes, len, "rb");
     LoxFunction *function = read_function(file);
@@ -1382,8 +1385,7 @@ static InterpretResult run_vm() {
                 break;
             case OP_JUMP_IF_NOT_ABSENCE: {
                 int offset = read_uint16();
-                int index = read_byte();
-                if (!is_absence(curr_frame->FP[index])) {
+                if (!is_absence(stack_pop())) {
                     curr_frame->PC += offset;
                 }
                 break;

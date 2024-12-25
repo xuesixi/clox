@@ -65,7 +65,7 @@ Value stack_pop();
 void runtime_error(const char *format, ...);
 void runtime_error_catch_1(const char *format, Value value);
 void runtime_error_catch_2(const char *format, Value v1, Value v2);
-void catch();
+void catch(InterpretResult result);
 void runtime_error_and_catch(const char *format, ...);
 
 #endif //CLOX_VM_H
