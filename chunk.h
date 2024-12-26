@@ -71,7 +71,7 @@ typedef enum OpCode{
     OP_DEF_PUB_GLOBAL_CONST, // op, name_index16
     OP_EXPORT, // op, name_index16
     OP_ABSENCE,
-    OP_JUMP_IF_NOT_ABSENCE, // op, offset16
+    OP_JUMP_IF_NOT_ABSENCE_POP, // op, offset16
     OP_ARR_AS_VAR_ARG, // op
 } OpCode;
 

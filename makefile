@@ -21,7 +21,7 @@ liblox_%.h: liblox_%
 liblox_%: liblox/%.lox $(TARGET)
 	@./clox -c $@ $<
 
-o: $(SRC)
+o: $(SRC) $(LIB_HEADERS)
 	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm # for optimized clox
 
 .PHONY: lldb

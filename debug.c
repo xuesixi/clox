@@ -246,7 +246,7 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return constant16_instruction("EXPORT", chunk, offset);
         case OP_ABSENCE:
             return simple_instruction("ABSENCE", offset);
-        case OP_JUMP_IF_NOT_ABSENCE:
+        case OP_JUMP_IF_NOT_ABSENCE_POP:
             return jump_instruction("JUMP_IF_NOT_ABSENCE", chunk, offset, true);
         case OP_ARR_AS_VAR_ARG:
             return simple_instruction("ARR_AS_VAR_ARG", offset);

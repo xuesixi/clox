@@ -22,6 +22,8 @@ VM vm;
 String *INIT = NULL;
 String *LENGTH = NULL;
 String *ITERATOR = NULL;
+String *EQUAL = NULL;
+
 Module *repl_module = NULL;
 
 String *ARRAY_CLASS = NULL;
@@ -81,6 +83,17 @@ static Value multi_dimension_array(int dimension, Value *lens);
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl);
 
 static Method *bind_method(Class *class, String *name, Value receiver);
+
+
+static inline void stack_set(int n, Value value) {
+    vm.stack_top[-1 - n] = value;
+}
+
+static inline void stack_swap(int n) {
+    Value temp = stack_peek(n);
+    stack_set(n, stack_peek(0));
+    stack_set(0, temp);
+}
 
 /**
  * 获取target的指定属性，并将之置于栈顶。
@@ -641,6 +654,7 @@ static void call_closure(Closure *closure, int arg_count) {
     curr_frame = vm.frames + vm.frame_count - 1;
     CallFrame *frame = curr_frame;
     frame->FP = vm.stack_top - arg_count - 1;
+    frame->mark = 0;
     frame->PC = function->chunk.code;
     frame->closure = closure;
     curr_closure_global = &closure->module->globals;
@@ -710,6 +724,7 @@ static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
     ITERATOR = auto_length_string_copy("iterator");
+    EQUAL = auto_length_string_copy("equal");
 
     ARRAY_CLASS = auto_length_string_copy("Array");
     STRING_CLASS = auto_length_string_copy("String");
@@ -984,6 +999,15 @@ static InterpretResult run_vm() {
                 curr_const_pool = curr_frame->closure->function->chunk.constants.values;
                 curr_closure_global = & curr_frame->closure->module->globals;
                 stack_push(result);
+                if (curr_frame->mark != 0) {
+                    int mark = curr_frame->mark;
+                    curr_frame->mark = 0;
+                    switch (mark) {
+                        case 1:
+                            goto label_equal;
+                            break;
+                    }
+                }
                 break;
             }
             case OP_CONSTANT: {
@@ -1062,9 +1086,48 @@ static InterpretResult run_vm() {
                 break;
             }
             case OP_EQUAL: {
-                Value b = stack_pop();
-                Value a = stack_pop();
-                stack_push(bool_value(value_equal(a, b)));
+                Value b = stack_peek(0);
+                Value a = stack_peek(1);
+                if (is_ref_of(a, OBJ_INSTANCE) && is_ref_of(b, OBJ_INSTANCE)) {
+                    Instance *ia = as_instance(a);
+                    Instance *ib = as_instance(b);
+                    Value value;
+                    Closure *closure;
+                    if (table_get(&ia->class->methods, EQUAL, &value)) {
+                        // [a, b]
+                        closure = as_closure(value);
+                        stack_push(stack_peek(1));
+                        stack_push(stack_peek(1));
+                        // [a, b, a, b]
+                        curr_frame->mark = 1;
+                        call_closure(closure, 1);
+                        continue;
+                        label_equal:
+                        printf("try second equal\n");
+                        // [a, b, bool]
+                        if (is_falsy(stack_peek(0)) && table_get(&ib->class->methods, EQUAL, &value)) {
+                            closure = as_closure(value); // [a, b, false]
+                            stack_pop();
+                            stack_swap(1); // [b, a];
+                            call_closure(closure, 1);
+                        } else {
+                            Value result = stack_pop();
+                            stack_pop();
+                            stack_set(0, result);
+                        }
+                    } else if (table_get(&ib->class->methods, EQUAL, &value)){
+
+                    } else {
+                        stack_pop();
+                        stack_pop();
+                        stack_push(bool_value(value_equal(a, b)));
+                    }
+                } else {
+                    stack_pop();
+                    stack_pop();
+                    stack_push(bool_value(value_equal(a, b)));
+                }
+
                 break;
             }
             case OP_NIL:
@@ -1578,7 +1641,7 @@ static InterpretResult run_vm() {
             case OP_ABSENCE:
                 stack_push(absence_value());
                 break;
-            case OP_JUMP_IF_NOT_ABSENCE: {
+            case OP_JUMP_IF_NOT_ABSENCE_POP: {
                 int offset = read_uint16();
                 if (!is_absence(stack_pop())) {
                     curr_frame->PC += offset;

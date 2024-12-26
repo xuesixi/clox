@@ -5,6 +5,10 @@
 #include "memory.h"
 #include "vm.h"
 
+#define FNV_PRIME 16777619
+#define FNV_OFFSET_BASIS 2166136261
+
+
 static uint32_t chars_hash(const char *key, int length);
 
 /**
@@ -103,6 +107,50 @@ static inline uint32_t chars_hash(const char *key, int length) {
         hash ^= (uint8_t) key[i];
         hash *= 16777619;
     }
+    return hash;
+}
+
+uint32_t general_hash(Value given) {
+    uint32_t hash = FNV_OFFSET_BASIS;
+
+    switch(given.type) {
+        case VAL_INT: { // int
+            int value = as_int(given);
+            const unsigned char* bytes = (const unsigned char*)&value;
+            for (size_t i = 0; i < sizeof(int); i++) {
+                hash ^= bytes[i];
+                hash *= FNV_PRIME;
+            }
+            break;
+        }
+        case VAL_FLOAT: { // double
+            double value = as_float(given);
+            const unsigned char* bytes = (const unsigned char*)&value;
+            for (size_t i = 0; i < sizeof(double); i++) {
+                hash ^= bytes[i];
+                hash *= FNV_PRIME;
+            }
+            break;
+        }
+        case VAL_BOOL: { // bool
+            bool value = as_bool(given);
+            hash ^= value ? 1 : 0;
+            hash *= FNV_PRIME;
+            break;
+        }
+        case VAL_REF: { // pointer
+            uintptr_t ptr = (uintptr_t) as_ref(given);
+            const unsigned char* bytes = (const unsigned char*)&ptr;
+            for (size_t i = 0; i < sizeof(void*); i++) {
+                hash ^= bytes[i];
+                hash *= FNV_PRIME;
+            }
+            break;
+        }
+        default:
+            return 0; // Unknown type
+    }
+
     return hash;
 }
 

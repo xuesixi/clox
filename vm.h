@@ -12,6 +12,7 @@ typedef struct CallFrame {
     Closure *closure;
     uint8_t *PC; // program counter
     Value *FP; // frame pointer. The start of the frame
+    int mark;
 } CallFrame;
 
 typedef struct VM{
@@ -46,6 +47,7 @@ extern String *CLASS_CLASS;
 extern String *NIL_CLASS;
 
 extern String *ITERATOR;
+extern String *EQUAL;
 
 extern Module *repl_module;
 extern jmp_buf error_buf;

@@ -57,6 +57,7 @@ static void mark_roots() {
     mark_object((Object *) INIT);
     mark_object((Object *) LENGTH);
     mark_object((Object *) ITERATOR);
+    mark_object((Object *) EQUAL);
 
     mark_object((Object *) ARRAY_CLASS);
     mark_object((Object *) STRING_CLASS);

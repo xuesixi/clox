@@ -25,8 +25,8 @@ typedef struct Table {
  * 值得注意的是，中无论是key还是value都是指针，其所有权在外部，不在Map中。
  */
 typedef struct MapEntry {
-    void *key;
-    void *value;
+    Value key;
+    Value value;
 } MapEntry;
 
 typedef int (*HashFunction)(void *key); ;
@@ -36,8 +36,6 @@ typedef bool (*EqualityFunction)(void *a, void *b);
 typedef struct Map {
     int count;
     int capacity;
-    HashFunction hash;
-    EqualityFunction equal;
     MapEntry *backing;
 } Map;
 
@@ -56,17 +54,12 @@ String *table_find_string(Table *table, const char *name, int length, uint32_t h
 void table_mark(Table *table);
 void table_delete_unreachable(Table *table);
 
-void init_map(Map *map, HashFunction hash, EqualityFunction equal);
-void free_map(Map *map);
-void *map_get(Map *map, void *key);
-bool map_set(Map *map, void *key, void *value);
-void *map_delete(Map *map, void *key);
-int int_hash(void *p);
-bool int_equal(void *a, void *b);
-
-//bool entry_is_public(Entry *entry);
-//bool entry_is_const(Entry *entry);
-//void entry_set_public(Entry *entry);
-//void entry_set_const(Entry *entry);
+//void init_map(Map *map);
+//void free_map(Map *map);
+//void *map_get(Map *map, void *key);
+//bool map_set(Map *map, Value key, Value value);
+//void *map_delete(Map *map, void *key);
+//int int_hash(void *p);
+//bool int_equal(void *a, void *b);
 
 #endif

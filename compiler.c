@@ -663,7 +663,7 @@ static void function_statement(FunctionType type) {
 
                 default_value: {
                     emit_u8_u8(OP_GET_LOCAL, current_scope->local_count - 1);
-                    int default_value_end = emit_jump(OP_JUMP_IF_NOT_ABSENCE);
+                    int default_value_end = emit_jump(OP_JUMP_IF_NOT_ABSENCE_POP);
                     parse_precedence(PREC_ASSIGNMENT); // right value
                     emit_u8_u8(OP_SET_LOCAL, current_scope->local_count - 1);
                     emit_byte(OP_POP);
