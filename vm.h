@@ -35,9 +35,17 @@ extern String *INIT;
 extern String *LENGTH;
 extern String *ARRAY_CLASS;
 extern String *STRING_CLASS;
+extern String *INT_CLASS;
+extern String *FLOAT_CLASS;
+extern String *BOOL_CLASS;
+extern String *NATIVE_CLASS;
+extern String *FUNCTION_CLASS;
+extern String *METHOD_CLASS;
+extern String *MODULE_CLASS;
+extern String *CLASS_CLASS;
+extern String *NIL_CLASS;
+
 extern String *ITERATOR;
-//extern String *SCRIPT;
-//extern String *ANONYMOUS_MODULE;
 
 extern Module *repl_module;
 extern jmp_buf error_buf;

@@ -12,6 +12,15 @@
 
 Class *array_class;
 Class *string_class;
+Class *int_class;
+Class *float_class;
+Class *bool_class;
+Class *native_class;
+Class *class_class;
+Class *function_class;
+Class *method_class;
+Class *nil_class;
+Class *module_class;
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
@@ -35,14 +44,92 @@ void load_libraries() {
         exit(1);
     }
     Value array_class_value;
+    Value string_class_value;
+    Value int_class_value;
+    Value float_class_value;
+    Value bool_class_value;
+    Value native_class_value;
+    Value class_class_value;
+    Value function_class_value;
+    Value method_class_value;
+    Value module_class_value;
+    Value nil_class_value;
+
     table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
     array_class = as_class(array_class_value);
 
-    Value string_class_value;
     table_get(&vm.builtin, STRING_CLASS, &string_class_value);
     string_class = as_class(string_class_value);
 
+    table_get(&vm.builtin, INT_CLASS, &int_class_value);
+    int_class = as_class(int_class_value);
+
+    table_get(&vm.builtin, FLOAT_CLASS, &float_class_value);
+    float_class = as_class(float_class_value);
+
+    table_get(&vm.builtin, BOOL_CLASS, &bool_class_value);
+    bool_class = as_class(bool_class_value);
+
+    table_get(&vm.builtin, NATIVE_CLASS, &native_class_value);
+    native_class = as_class(native_class_value);
+
+    table_get(&vm.builtin, CLASS_CLASS, &class_class_value);
+    class_class = as_class(class_class_value);
+
+    table_get(&vm.builtin, FUNCTION_CLASS, &function_class_value);
+    function_class = as_class(function_class_value);
+
+    table_get(&vm.builtin, METHOD_CLASS, &method_class_value);
+    method_class = as_class(method_class_value);
+
+    table_get(&vm.builtin, MODULE_CLASS, &module_class_value);
+    module_class = as_class(module_class_value);
+
+    table_get(&vm.builtin, NIL_CLASS, &nil_class_value);
+    nil_class = as_class(nil_class_value);
 #endif
+}
+
+static Value native_type(int count, Value *value) {
+    (void ) count;
+    switch (value->type) {
+        case VAL_NIL:
+            return ref_value((Object *)nil_class);
+        case VAL_INT:
+            return ref_value((Object *)int_class);
+        case VAL_FLOAT:
+            return ref_value((Object *)float_class);
+        case VAL_BOOL:
+            return ref_value((Object *)bool_class);
+        case VAL_REF: {
+            switch (as_ref(*value)->type) {
+                case OBJ_STRING:
+                    return ref_value((Object *)string_class);
+                case OBJ_ARRAY:
+                    return ref_value((Object *)array_class);
+                case OBJ_CLASS:
+                    return ref_value((Object *)class_class);
+                case OBJ_NATIVE:
+                    return ref_value((Object *)native_class);
+                case OBJ_METHOD:
+                    return ref_value((Object *)method_class);
+                case OBJ_CLOSURE:
+                    return ref_value((Object *)function_class);
+                case OBJ_MODULE:
+                    return ref_value((Object *)module_class);
+                case OBJ_INSTANCE: {
+                    Instance *instance = as_instance(*value);
+                    return ref_value((Object *)instance->class);
+                }
+                default:
+                    IMPLEMENTATION_ERROR("should not happen");
+                    return nil_value();
+            }
+        }
+        case VAL_ABSENCE:
+            IMPLEMENTATION_ERROR("should not happen");
+            return nil_value();
+    }
 }
 
 /**
@@ -353,6 +440,7 @@ void init_vm_native() {
     define_native("native_string_join", native_string_join, 4);
     define_native("read", native_read, -1);
     define_native("char_at", native_char_at, 2);
+    define_native("type", native_type, 1);
 }
 
 void additional_repl_init() {

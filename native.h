@@ -9,6 +9,9 @@
 
 extern Class *array_class;
 extern Class *string_class;
+extern Class *float_class;
+extern Class *int_class;
+extern Class *bool_class;
 void additional_repl_init();
 void load_libraries();
 

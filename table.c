@@ -245,7 +245,7 @@ void table_add_all(Table *from, Table *to, bool public_only) {
         Entry *entry = from->backing + i;
         if (entry->key != NULL) {
             if (!public_only || entry->is_public) {
-                table_add_new(to,entry->key, entry->value, entry->is_public, entry->is_public);
+                table_add_new(to,entry->key, entry->value, entry->is_public, entry->is_const);
             }
         }
     }

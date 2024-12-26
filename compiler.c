@@ -1170,10 +1170,10 @@ static void while_statement() {
  *     jump -> end
  * 
  * start:
- *     expression_0
+ *     expression_0  // [value]
  * 
  * case 1:
- *     expression_1
+ *     expression_1  // [value, exp1]
  *     if not equal, jump -> case 2
  *     pop expression_1
  *     pop expression_0
@@ -1181,8 +1181,8 @@ static void while_statement() {
  *     jump -> temp
  * 
  * case 2:
- *     pop expression_1
- *     expression_2
+ *     pop expression_1 // [value]
+ *     expression_2     // [value, exp2]
  *     if not equal, jump -> default
  *     pop expression_2
  *     pop expression_0

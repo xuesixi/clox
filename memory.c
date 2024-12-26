@@ -56,9 +56,19 @@ static void mark_roots() {
 
     mark_object((Object *) INIT);
     mark_object((Object *) LENGTH);
+    mark_object((Object *) ITERATOR);
+
     mark_object((Object *) ARRAY_CLASS);
     mark_object((Object *) STRING_CLASS);
-    mark_object((Object *) ITERATOR);
+    mark_object((Object *) INT_CLASS);
+    mark_object((Object *) FLOAT_CLASS);
+    mark_object((Object *) BOOL_CLASS);
+    mark_object((Object *) NATIVE_CLASS);
+    mark_object((Object *) FUNCTION_CLASS);
+    mark_object((Object *) METHOD_CLASS);
+    mark_object((Object *) MODULE_CLASS);
+    mark_object((Object *) CLASS_CLASS);
+    mark_object((Object *) NIL_CLASS);
 
 //    // mark open upvalues ? 暂时无法理解。这些值是open的，意味着它们仍然在作用域内，要么是在stack上，要么是在globals中。我认为没必要额外标记
 //    UpValueObject *curr = vm.open_upvalues;

@@ -21,10 +21,21 @@ VM vm;
 
 String *INIT = NULL;
 String *LENGTH = NULL;
-String *ARRAY_CLASS = NULL;
-String *STRING_CLASS = NULL;
 String *ITERATOR = NULL;
 Module *repl_module = NULL;
+
+String *ARRAY_CLASS = NULL;
+String *STRING_CLASS = NULL;
+String *INT_CLASS = NULL;
+String *FLOAT_CLASS = NULL;
+String *BOOL_CLASS = NULL;
+String *NATIVE_CLASS = NULL;
+String *FUNCTION_CLASS = NULL;
+String *METHOD_CLASS = NULL;
+String *MODULE_CLASS = NULL;
+String *CLASS_CLASS = NULL;
+String *NIL_CLASS = NULL;
+
 //String *SCRIPT = NULL;
 //String *ANONYMOUS_MODULE = NULL;
 
@@ -698,11 +709,19 @@ static String *auto_length_string_copy(const char *name) {
 static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
+    ITERATOR = auto_length_string_copy("iterator");
+
     ARRAY_CLASS = auto_length_string_copy("Array");
     STRING_CLASS = auto_length_string_copy("String");
-//    SCRIPT = auto_length_string_copy("$script");
-//    ANONYMOUS_MODULE = auto_length_string_copy("$anonymous");
-    ITERATOR = auto_length_string_copy("iterator");
+    INT_CLASS = auto_length_string_copy("Int");
+    FLOAT_CLASS = auto_length_string_copy("Float");
+    BOOL_CLASS = auto_length_string_copy("Bool");
+    NATIVE_CLASS = auto_length_string_copy("Native");
+    FUNCTION_CLASS = auto_length_string_copy("Function");
+    METHOD_CLASS = auto_length_string_copy("Method");
+    MODULE_CLASS = auto_length_string_copy("Module");
+    CLASS_CLASS = auto_length_string_copy("Class");
+    NIL_CLASS = auto_length_string_copy("Nil");
 }
 
 
@@ -849,7 +868,7 @@ InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
     warmup(function, path, NULL, false);
     InterpretResult result = run_vm();
     if (result == INTERPRET_OK) {
-        table_add_all(curr_closure_global, &vm.builtin, true);
+        table_add_all(curr_closure_global, &vm.builtin, true );
     } else {
         IMPLEMENTATION_ERROR("Error when loading lib");
     }

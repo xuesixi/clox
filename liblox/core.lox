@@ -2,6 +2,42 @@ class Obj {
 
 }
 
+class Int {
+
+}
+
+class Float {
+
+}
+
+class Bool {
+
+}
+
+class Nil {
+
+}
+
+class Function {
+
+}
+
+class Method {
+
+}
+
+class Native {
+
+}
+
+class Module {
+
+}
+
+class Class {
+
+}
+
 class Array {
     iterator() {
         return ArrayIter(this);
@@ -61,5 +97,5 @@ fun string_join(arr, delimiter="", prefix="", suffix="") {
     return native_string_join(delimiter, prefix, suffix, arr);
 }
 
-export Obj, String, Array, concat, join, string_join;
+export Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, concat, join, string_join;
 
