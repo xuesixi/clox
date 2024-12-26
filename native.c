@@ -11,6 +11,7 @@
 #include "time.h"
 
 Class *array_class;
+Class *string_class;
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
@@ -36,6 +37,11 @@ void load_libraries() {
     Value array_class_value;
     table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
     array_class = as_class(array_class_value);
+
+    Value string_class_value;
+    table_get(&vm.builtin, STRING_CLASS, &string_class_value);
+    string_class = as_class(string_class_value);
+
 #endif
 }
 
@@ -234,6 +240,108 @@ static Value native_string_combine_array(int count, Value *value) {
     return native_string_combine(array->length, array->values);
 }
 
+static Value native_string_join(int count, Value *values) {
+    // 0: delimiter, 1: prefix, 2: suffix, 3: array
+    (void ) count;
+    Value v0 = values[0];
+    Value v1 = values[1];
+    Value v2 = values[2];
+    Value v3 = values[3];
+    assert_ref_type(v0, OBJ_STRING, "string");
+    assert_ref_type(v1, OBJ_STRING, "string");
+    assert_ref_type(v2, OBJ_STRING, "string");
+    assert_ref_type(v3, OBJ_ARRAY, "array");
+    String *delimiter = as_string(v0);
+    String *prefix = as_string(v1);
+    String *suffix = as_string(v2);
+    Array *array = as_array(v3);
+    int array_len = array->length;
+
+    int total_len = prefix->length + suffix->length + delimiter->length * (array_len - 1);
+
+    for (int i = 0; i < array_len; ++i) {
+        Value v = array->values[i];
+        assert_ref_type(v, OBJ_STRING, "string");
+        total_len += as_string(v)->length;
+    }
+    char *result= malloc(total_len + 1);
+    char *curr = result;
+    memcpy(curr, prefix->chars, prefix->length);
+    curr += prefix->length;
+    for (int i = 0; i < array_len; ++i) {
+        String *s = as_string(array->values[i]);
+        memcpy(curr, s->chars, s->length);
+        curr += s->length;
+        if (i != array_len - 1) {
+            memcpy(curr, delimiter->chars, delimiter->length);
+            curr += delimiter->length;
+        }
+    }
+    memcpy(curr, suffix->chars, suffix->length);
+    result[total_len] = '\0';
+    String *str = string_allocate(result, total_len);
+    return ref_value((Object *) str);
+}
+
+static Value native_value_join(int count, Value *values) {
+   // 0: delimiter, 1: prefix, 2: suffix, 3: array
+    (void ) count;
+    Value v0 = values[0];
+    Value v1 = values[1];
+    Value v2 = values[2];
+    Value v3 = values[3];
+    assert_ref_type(v0, OBJ_STRING, "string");
+    assert_ref_type(v1, OBJ_STRING, "string");
+    assert_ref_type(v2, OBJ_STRING, "string");
+    assert_ref_type(v3, OBJ_ARRAY, "array");
+    String *delimiter = as_string(v0);
+    String *prefix = as_string(v1);
+    String *suffix = as_string(v2);
+    Array *array = as_array(v3);
+    int array_len = array->length;
+
+    int total_len = prefix->length + suffix->length + delimiter->length * (array_len - 1);
+    char **css = malloc(sizeof(char *) * array_len);
+    int *lens = malloc(sizeof(int ) * array_len);
+
+    for (int i = 0; i < array_len; ++i) {
+        css[i] = value_to_chars(array->values[i], lens + i);
+        total_len += lens[i];
+    }
+    char *result= malloc(total_len + 1);
+    char *curr = result;
+    memcpy(curr, prefix->chars, prefix->length);
+    curr += prefix->length;
+    for (int i = 0; i < array_len; ++i) {
+        memcpy(curr, css[i], lens[i]);
+        curr += lens[i];
+        free(css[i]);
+        if (i != array_len - 1) {
+            memcpy(curr, delimiter->chars, delimiter->length);
+            curr += delimiter->length;
+        }
+    }
+    memcpy(curr, suffix->chars, suffix->length);
+    result[total_len] = '\0';
+    free(lens);
+    free(css);
+    String *str = string_allocate(result, total_len);
+    return ref_value((Object *) str);
+}
+
+static Value native_char_at(int count, Value *value) {
+    (void )count;
+    assert_ref_type(value[0], OBJ_STRING, "string");
+    assert_value_type(value[1], VAL_INT, "int");
+    String *string = as_string(*value);
+    int index = as_int(value[1]);
+    if (index < 0 || index >= string->length) {
+        runtime_error_and_catch("index %d is out of bound: [%d, %d]", index, 0, string->length - 1);
+    }
+    String *c = string_copy(string->chars+index, 1);
+    return ref_value((Object *) c);
+}
+
 void init_vm_native() {
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
@@ -241,7 +349,10 @@ void init_vm_native() {
     define_native("rand", native_rand, 2);
     define_native("f", native_format, -1);
     define_native("native_string_combine_array", native_string_combine_array, 1);
+    define_native("native_value_join", native_value_join, 4);
+    define_native("native_string_join", native_string_join, 4);
     define_native("read", native_read, -1);
+    define_native("char_at", native_char_at, 2);
 }
 
 void additional_repl_init() {

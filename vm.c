@@ -22,6 +22,7 @@ VM vm;
 String *INIT = NULL;
 String *LENGTH = NULL;
 String *ARRAY_CLASS = NULL;
+String *STRING_CLASS = NULL;
 String *ITERATOR = NULL;
 Module *repl_module = NULL;
 //String *SCRIPT = NULL;
@@ -70,54 +71,86 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
 
 static Method *bind_method(Class *class, String *name, Value receiver);
 
-//static Value get_property(Value target, String *property_name) {
-//    if (is_ref_of(target, OBJ_INSTANCE) == false) {
-//        switch (as_ref(target)->type) {
-//            case OBJ_ARRAY: {
-//                if (property_name == LENGTH) {
-//                    Array *array = as_array(target);
-//                    stack_push(int_value(array->length));
-//                    break;
-//                } else {
-//                    Method *method = bind_method(array_class, property_name, target);
-//                    stack_push(ref_value((Object *)method));
-//                }
-//                break;
-//            }
-//            case OBJ_CLASS: {
-//                Class *class = as_class(target);
-//                Value static_field;
-//                if (!table_get(&class->static_fields, property_name, &static_field)) {
-//                    goto OP_GET_PROPERTY_not_found;
-//                }
-//                stack_push(static_field);
-//                break;
-//            }
-//            case OBJ_MODULE: {
-//                Module *module = as_module(target);
-//                Value property;
-//                if (!table_conditional_get(&module->globals, property_name, &property, true, false)) {
-//                    runtime_error_catch_2("%s does not the have public property: %s", target, ref_value((Object *) property_name));
-//                } else {
-//                    stack_push(property);
-//                }
-//                break;
-//            }
-//            OP_GET_PROPERTY_not_found:
-//            default:
-//                runtime_error_catch_2("%s does not have the property: %s", target, ref_value((Object *) property_name));
-//        }
-//    } else {
-//        Instance *instance = as_instance(target);
-//        Value result = nil_value();
-//        bool found = table_get(&instance->fields, property_name, &result);
-//        if (found == false) {
-//            Method *method = bind_method(instance->class, property_name, target);
-//            result = ref_value((Object *) method);
-//        }
-//        stack_push(result);
-//    }
-//}
+/**
+ * 获取target的指定属性，并将之置于栈顶。
+ */
+static void get_property(Value target, String *property_name) {
+    if (is_ref_of(target, OBJ_INSTANCE) == false) {
+        switch (as_ref(target)->type) {
+            case OBJ_ARRAY: {
+                if (property_name == LENGTH) {
+                    Array *array = as_array(target);
+                    stack_push(int_value(array->length));
+                    break;
+                } else {
+                    Method *method = bind_method(array_class, property_name, target);
+                    stack_push(ref_value((Object *)method));
+                }
+                break;
+            }
+            case OBJ_STRING: {
+                if (property_name == LENGTH) {
+                    String *string = as_string(target);
+                    stack_push(int_value(string->length));
+                    break;
+                } else {
+                    Method *method = bind_method(string_class, property_name, target);
+                    stack_push(ref_value((Object *)method));
+                }
+                break;
+            }
+            case OBJ_CLASS: {
+                Class *class = as_class(target);
+                Value static_field;
+                if (!table_get(&class->static_fields, property_name, &static_field)) {
+                    goto OP_GET_PROPERTY_not_found;
+                }
+                stack_push(static_field);
+                break;
+            }
+            case OBJ_MODULE: {
+                Module *module = as_module(target);
+                Value property;
+                if (!table_conditional_get(&module->globals, property_name, &property, true, false)) {
+                    runtime_error_catch_2("%s does not the have public property: %s", target, ref_value((Object *) property_name));
+                } else {
+                    stack_push(property);
+                }
+                break;
+            }
+            OP_GET_PROPERTY_not_found:
+            default:
+                runtime_error_catch_2("%s does not have the property: %s", target, ref_value((Object *) property_name));
+        }
+    } else {
+        Instance *instance = as_instance(target);
+        Value result = nil_value();
+        bool found = table_get(&instance->fields, property_name, &result);
+        if (found == false) {
+            Method *method = bind_method(instance->class, property_name, target);
+            result = ref_value((Object *) method);
+        }
+        stack_push(result);
+    }
+}
+
+void assert_ref_type(Value value, ObjectType type, const char *message) {
+    if (!is_ref_of(value, type)) {
+        char *str = value_to_chars(value, NULL);
+        runtime_error_and_catch("Expect value of type %s, but got %s", message, str);
+        free(str);
+        catch(INTERPRET_RUNTIME_ERROR);
+    }
+}
+
+void assert_value_type(Value value, ValueType type, const char *message) {
+    if (value.type != type) {
+        char *str = value_to_chars(value, NULL);
+        runtime_error_and_catch("Expect value of type %s, but got %s", message, str);
+        free(str);
+        catch(INTERPRET_RUNTIME_ERROR);
+    }
+}
 
 /**
  * 调用一个property。receiver是stack_peek(arg_count)
@@ -143,22 +176,31 @@ static void invoke_property(String *name, int arg_count) {
             }
         }
     } else {
-        if (is_ref_of(receiver, OBJ_CLASS)) {
-            Class *class = as_class(receiver);
-            Value static_field;
-            if (table_get(&class->static_fields, name, &static_field)) {
-                call_value(static_field, arg_count);
+        switch (receiver.as.reference->type) {
+            case OBJ_CLASS: {
+                Class *class = as_class(receiver);
+                Value static_field;
+                if (table_get(&class->static_fields, name, &static_field)) {
+                    call_value(static_field, arg_count);
+                }
+                break;
             }
-        } else if (is_ref_of(receiver, OBJ_MODULE)) {
-            Module *module = as_module(receiver);
-            Value property;
-            if (table_conditional_get(&module->globals, name, &property, true, false)) {
-                call_value(property, arg_count);
+            case OBJ_MODULE: {
+                Module *module = as_module(receiver);
+                Value property;
+                if (table_conditional_get(&module->globals, name, &property, true, false)) {
+                    call_value(property, arg_count);
+                }
+                break;
             }
-        } else if (is_ref_of(receiver, OBJ_ARRAY)) {
-            invoke_from_class(array_class, name, arg_count);
-        } else {
-            runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
+            case OBJ_ARRAY:
+                invoke_from_class(array_class, name, arg_count);
+                break;
+            case OBJ_STRING:
+                invoke_from_class(string_class, name, arg_count);
+                break;
+            default:
+                runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
         }
     }
 }
@@ -368,11 +410,6 @@ void runtime_error(const char *format, ...) {
         char *name = value_to_chars(ref_value((Object *) frame->closure), NULL);
         fprintf(stderr, "%s\n", name);
         free(name);
-//        if (i == 0) {
-//            fprintf(stderr, "main()\n");
-//        } else {
-//            fprintf(stderr, "%s()\n", function->name->chars);
-//        }
     }
 
     reset_stack();
@@ -662,6 +699,7 @@ static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
     ARRAY_CLASS = auto_length_string_copy("Array");
+    STRING_CLASS = auto_length_string_copy("String");
 //    SCRIPT = auto_length_string_copy("$script");
 //    ANONYMOUS_MODULE = auto_length_string_copy("$anonymous");
     ITERATOR = auto_length_string_copy("iterator");
@@ -1195,52 +1233,64 @@ static InterpretResult run_vm() {
             case OP_GET_PROPERTY: {
                 Value value = stack_pop(); // instance
                 String *field_name = read_constant_string();
-                if (is_ref_of(value, OBJ_INSTANCE) == false) {
-                    switch (as_ref(value)->type) {
-                        case OBJ_ARRAY: {
-                            if (field_name == LENGTH) {
-                                Array *array = as_array(value);
-                                stack_push(int_value(array->length));
-                                break;
-                            } else {
-                                Method *method = bind_method(array_class, field_name, value);
-                                stack_push(ref_value((Object *)method));
-                            }
-                            break;
-                        }
-                        case OBJ_CLASS: {
-                            Class *class = as_class(value);
-                            Value static_field;
-                            if (!table_get(&class->static_fields, field_name, &static_field)) {
-                                goto OP_GET_PROPERTY_not_found;
-                            }
-                            stack_push(static_field);
-                            break;
-                        }
-                        case OBJ_MODULE: {
-                            Module *module = as_module(value);
-                            Value property;
-                            if (!table_conditional_get(&module->globals, field_name, &property, true, false)) {
-                                runtime_error_catch_2("%s does not the have public property: %s", value, ref_value((Object *) field_name));
-                            } else {
-                                stack_push(property);
-                            }
-                            break;
-                        }
-                        OP_GET_PROPERTY_not_found:
-                        default:
-                            runtime_error_catch_2("%s does not have the property: %s", value, ref_value((Object *) field_name));
-                    }
-                } else {
-                    Instance *instance = as_instance(value);
-                    Value result = nil_value();
-                    bool found = table_get(&instance->fields, field_name, &result);
-                    if (found == false) {
-                        Method *method = bind_method(instance->class, field_name, value);
-                        result = ref_value((Object *) method);
-                    }
-                    stack_push(result);
-                }
+                get_property(value, field_name);
+//                if (is_ref_of(value, OBJ_INSTANCE) == false) {
+//                    switch (as_ref(value)->type) {
+//                        case OBJ_ARRAY: {
+//                            if (field_name == LENGTH) {
+//                                Array *array = as_array(value);
+//                                stack_push(int_value(array->length));
+//                                break;
+//                            } else {
+//                                Method *method = bind_method(array_class, field_name, value);
+//                                stack_push(ref_value((Object *)method));
+//                            }
+//                            break;
+//                        }
+//                        case OBJ_STRING: {
+//                            if (field_name == LENGTH) {
+//                                String *string = as_string(value);
+//                                stack_push(int_value(string->length));
+//                                break;
+//                            } else {
+//                                Method *method = bind_method(string_class, field_name, value);
+//                                stack_push(ref_value((Object *)method));
+//                            }
+//                            break;
+//                        }
+//                        case OBJ_CLASS: {
+//                            Class *class = as_class(value);
+//                            Value static_field;
+//                            if (!table_get(&class->static_fields, field_name, &static_field)) {
+//                                goto OP_GET_PROPERTY_not_found;
+//                            }
+//                            stack_push(static_field);
+//                            break;
+//                        }
+//                        case OBJ_MODULE: {
+//                            Module *module = as_module(value);
+//                            Value property;
+//                            if (!table_conditional_get(&module->globals, field_name, &property, true, false)) {
+//                                runtime_error_catch_2("%s does not the have public property: %s", value, ref_value((Object *) field_name));
+//                            } else {
+//                                stack_push(property);
+//                            }
+//                            break;
+//                        }
+//                        OP_GET_PROPERTY_not_found:
+//                        default:
+//                            runtime_error_catch_2("%s does not have the property: %s", value, ref_value((Object *) field_name));
+//                    }
+//                } else {
+//                    Instance *instance = as_instance(value);
+//                    Value result = nil_value();
+//                    bool found = table_get(&instance->fields, field_name, &result);
+//                    if (found == false) {
+//                        Method *method = bind_method(instance->class, field_name, value);
+//                        result = ref_value((Object *) method);
+//                    }
+//                    stack_push(result);
+//                }
                 break;
             }
             case OP_SET_PROPERTY: {

@@ -34,6 +34,7 @@ typedef struct VM{
 extern String *INIT;
 extern String *LENGTH;
 extern String *ARRAY_CLASS;
+extern String *STRING_CLASS;
 extern String *ITERATOR;
 //extern String *SCRIPT;
 //extern String *ANONYMOUS_MODULE;
@@ -62,8 +63,11 @@ InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path);
 void stack_push(Value value);
 Value stack_pop();
 
+void assert_ref_type(Value value, ObjectType type, const char *message);
+void assert_value_type(Value value, ValueType type, const char *message);
 void runtime_error(const char *format, ...);
 void runtime_error_catch_1(const char *format, Value value);
+void runtime_error_catch_str_v(const char *format, const char *message, Value value);
 void runtime_error_catch_2(const char *format, Value v1, Value v2);
 void catch(InterpretResult result);
 void runtime_error_and_catch(const char *format, ...);

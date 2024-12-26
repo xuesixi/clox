@@ -8,6 +8,7 @@
 #include "object.h"
 
 extern Class *array_class;
+extern Class *string_class;
 void additional_repl_init();
 void load_libraries();
 

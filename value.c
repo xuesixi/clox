@@ -221,6 +221,228 @@ void print_value(Value value) {
     free(str);
 }
 
+//int ref_chars_len(Value value) {
+//    switch (value.as.reference->type) {
+//        case OBJ_STRING:
+//            return as_string(value)->length;
+//        case OBJ_CLOSURE: {
+//            LoxFunction *fun = as_closure(value)->function;
+//            Closure *closure = as_closure(value);
+//            if (fun->type == TYPE_MAIN) {
+//                return snprintf(NULL, 0, "<main: %s>", get_filename(closure->module->path->chars));
+//            } else if (fun->type == TYPE_LAMBDA) {
+//                return snprintf(NULL, 0, "<lambda>");
+//            } else {
+//                return snprintf(NULL, 0, "<fn: %s>", fun->name->chars);
+//            }
+//            break;
+//        }
+//        case OBJ_NATIVE:
+//            return snprintf(NULL, 0, "<native: %s>", as_native(value)->name->chars);
+//        case OBJ_FUNCTION: {
+//            LoxFunction *fun = as_function(value);
+//            if (fun->type == TYPE_MAIN) {
+//                return snprintf(NULL, 0, "<proto: main>");
+//            } else if (fun->type == TYPE_LAMBDA) {
+//                return snprintf(NULL, 0, "<proto: lambda>");
+//            } else {
+//                return snprintf(NULL, 0, "<proto: %s>", fun->name->chars);
+//            }
+//            break;
+//        }
+//        case OBJ_UPVALUE:
+//            return snprintf(NULL, 0, "<upvalue>");
+//        case OBJ_CLASS: {
+//            Class *class = as_class(value);
+//            return snprintf(NULL, 0, "<cls: %s>", class->name->chars);
+//        }
+//        case OBJ_INSTANCE: {
+//            Instance *instance = as_instance(value);
+//            if (instance->class != NULL) {
+//                return snprintf(NULL, 0, "<obj: %s>", instance->class->name->chars);
+//            }
+//            break;
+//        }
+//        case OBJ_METHOD: {
+//            Method *method = as_method(value);
+//            return snprintf(NULL, 0, "<mthd: %s>", method->closure->function->name->chars);
+//        }
+//        case OBJ_ARRAY: {
+//            Array *array = as_array(value);
+//            return snprintf(NULL, 0, "<array: %d>", array->length);
+//        }
+//        case OBJ_MODULE: {
+//            char *filename = get_filename(as_module(value)->path->chars);
+//            return snprintf(NULL, 0, "<mod: %s>", filename);
+//        }
+//        default:
+//            printf("error: encountering a value with unknown type: %d\n", value.as.reference->type);
+//            return 0;
+//    }
+//    return 0;
+//}
+
+//int value_chars_len(Value value) {
+//    int len;
+//    switch (value.type) {
+//        case VAL_FLOAT: {
+//            double decimal = as_float(value);
+//            if (decimal == (int) decimal) {
+//                return snprintf(NULL, 0, "%.1f", decimal);
+//            } else {
+//                return snprintf(NULL, 0, "%.10g", as_float(value));
+//            }
+//            break;
+//        }
+//        case VAL_INT: {
+//            return snprintf(NULL, 0, "%d", as_int(value));
+//            break;
+//        }
+//        case VAL_BOOL: {
+//            if (as_bool(value)) {
+//                return 4;
+//            } else {
+//                return 5;
+//            }
+//        }
+//        case VAL_NIL: {
+//            return 3;
+//        }
+//        case VAL_REF: {
+//            return ref_chars_len(value);
+//        }
+//        case VAL_ABSENCE: {
+//            return 7;
+//        }
+//        default:
+//            printf("error: encountering a value with unknown type: %d\n", value.type);
+//            break;
+//    }
+//    return 0;
+//}
+
+//int print_ref_to_chars(char *buffer, Value value) {
+//
+//    switch (value.as.reference->type) {
+//        case OBJ_STRING: {
+//            String *str = as_string(value);
+//            memcpy(buffer, str->chars, str->length);
+//            return str->length;
+//            break;
+//        }
+//        case OBJ_CLOSURE: {
+//            LoxFunction *fun = as_closure(value)->function;
+//            Closure *closure = as_closure(value);
+//            if (fun->type == TYPE_MAIN) {
+//                return sprintf(buffer, "<main: %s>", get_filename(closure->module->path->chars));
+//            } else if (fun->type == TYPE_LAMBDA) {
+//                return sprintf(buffer, "<lambda>");
+//            } else {
+//                return sprintf(buffer, "<fn: %s>", fun->name->chars);
+//            }
+//            break;
+//        }
+//        case OBJ_NATIVE:
+//            return sprintf(buffer, "<native: %s>", as_native(value)->name->chars);
+//            break;
+//        case OBJ_FUNCTION: {
+//            LoxFunction *fun = as_function(value);
+//            if (fun->type == TYPE_MAIN) {
+//                return sprintf(buffer, "<proto: main>");
+//            } else if (fun->type == TYPE_LAMBDA) {
+//                return sprintf(buffer, "<proto: lambda>");
+//            } else {
+//                return sprintf(buffer, "<proto: %s>", fun->name->chars);
+//            }
+//            break;
+//        }
+//        case OBJ_UPVALUE:
+//            return sprintf(buffer, "<upvalue>");
+//            break;
+//        case OBJ_CLASS: {
+//            Class *class = as_class(value);
+//            return sprintf(buffer, "<cls: %s>", class->name->chars);
+//            break;
+//        }
+//        case OBJ_INSTANCE: {
+//            Instance *instance = as_instance(value);
+//            if (instance->class != NULL) {
+//                return sprintf(buffer, "<obj: %s>", instance->class->name->chars);
+//            }
+//            break;
+//        }
+//        case OBJ_METHOD: {
+//            Method *method = as_method(value);
+//            return sprintf(buffer, "<mthd: %s>", method->closure->function->name->chars);
+//            break;
+//        }
+//        case OBJ_ARRAY: {
+//            Array *array = as_array(value);
+//            return sprintf(buffer, "<array: %d>", array->length);
+//            break;
+//        }
+//        case OBJ_MODULE: {
+//            char *filename = get_filename(as_module(value)->path->chars);
+//            return sprintf(buffer, "<mod: %s>", filename);
+//            break;
+//        }
+//        default:
+//            printf("error: encountering a value with unknown type: %d\n", value.as.reference->type);
+//            break;
+//    }
+//}
+
+//
+//int print_value_to_chars(char *buffer, Value value) {
+//    switch (value.type) {
+//        case VAL_FLOAT: {
+//            double decimal = as_float(value);
+//            if (decimal == (int) decimal) {
+//                return sprintf(buffer, "%.1f", decimal);
+//            } else {
+//                return sprintf(buffer, "%.10g", as_float(value));
+//            }
+//            break;
+//        }
+//        case VAL_INT: {
+//            return sprintf(buffer, "%d", as_int(value));
+//            break;
+//        }
+//        case VAL_BOOL: {
+//            if (as_bool(value)) {
+//                buffer = malloc(5);
+//                memcpy(buffer, "true", 5);
+//                *len = 4;
+//            } else {
+//                buffer = malloc(6);
+//                memcpy(buffer, "false", 6);
+//                *len = 5;
+//            }
+//            break;
+//        }
+//        case VAL_NIL: {
+//            buffer = malloc(4);
+//            memcpy(buffer, "nil", 4);
+//            *len = 3;
+//            break;
+//        }
+//        case VAL_REF: {
+//            buffer = ref_to_chars(value, len);
+//            break;
+//        }
+//        case VAL_ABSENCE: {
+//            buffer = malloc(8);
+//            memcpy(buffer, "absence", 8);
+//            *len = 7;
+//            break;
+//        }
+//        default:
+//            printf("error: encountering a value with unknown type: %d\n", value.type);
+//            buffer = NULL;
+//            break;
+//    }
+//}
+
 /**
  * 获取目标 value 的char*表达。调用者需要自己 free 之。
  * 如果传入的len不为NULL，则将生成的字符串长度储存在其中
@@ -271,7 +493,7 @@ char *value_to_chars(Value value, int *len) {
         case VAL_ABSENCE: {
             buffer = malloc(8);
             memcpy(buffer, "absence", 8);
-            *len = 8;
+            *len = 7;
             break;
         }
         default:

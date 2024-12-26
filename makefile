@@ -19,7 +19,7 @@ liblox_%.h: liblox_%
 	@xxd -i $< $@
 
 liblox_%: liblox/%.lox $(TARGET)
-	@clox -c $@ $<
+	@./clox -c $@ $<
 
 o: $(SRC)
 	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm # for optimized clox
@@ -41,3 +41,4 @@ clion_debug: $(OBJ)
 .PHONY: clean
 clean:
 	@rm -f *.o
+	@rm $(TARGET)

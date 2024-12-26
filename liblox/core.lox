@@ -2,9 +2,64 @@ class Obj {
 
 }
 
-fun string(values...) {
+class Array {
+    iterator() {
+        return ArrayIter(this);
+    }
+    join(delimiter = ", ", prefix = "[", suffix = "]") {
+        return native_value_join(delimiter, prefix, suffix, this);
+    }
+}
+
+class ArrayIter {
+    init(arr) {
+        this.arr = arr;
+        this.curr = -1;
+        this.limit = arr.length - 1;
+    }
+    has_next() {
+        return this.curr < this.limit;
+    }
+    next() {
+        return this.arr[this.curr += 1];
+    }
+}
+
+class String {
+    iterator() {
+        return StringIter(this);
+    }
+    char_at(index) {
+        return char_at(this, index);
+    }
+}
+
+class StringIter {
+    init(str) {
+        this.str = str;
+        this.curr = -1;
+        this.limit = str.length - 1;
+    }
+    has_next() {
+        return this.curr < this.limit;
+    }
+    next() {
+        return char_at(this.str, this.curr += 1);
+    }
+}
+
+fun concat(values...) {
     return native_string_combine_array(values);
 }
 
-export Obj, string;
+fun join(arr, delimiter="", prefix="", suffix="") {
+    return native_value_join(delimiter, prefix, suffix, arr);
+}
+
+// when the array has only strings, this function is faster
+fun string_join(arr, delimiter="", prefix="", suffix="") {
+    return native_string_join(delimiter, prefix, suffix, arr);
+}
+
+export Obj, String, Array, concat, join, string_join;
 
