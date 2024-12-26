@@ -1,0 +1,87 @@
+class Array {
+
+    iterator() {
+        return ArrayIter(this);
+    }
+    
+}
+
+class ArrayIter {
+    init(arr) {
+        this.arr = arr;
+        this.curr = 0;
+    }
+    has_next() {
+        return this.curr < this.arr.length;
+    }
+    next() {
+        return this.arr[ (this.curr += 1) - 1];
+    }
+}
+
+fun range(start, end = nil, step = 1) {
+    if (end == nil) {
+        end = start;
+        start = 0;
+    }
+    return Range(start, end, step);
+}
+
+class Range {
+    init(start, end, step) {
+        this.start = start;
+        this.step = step;
+        this.end = end;
+    }
+    iterator() {
+        return RangeIter(this.start, this.end, this.step);
+    }
+}
+
+class RangeIter {
+    init(start, end, step) {
+        this.curr = start;
+        this.step = step;
+        this.end = end;
+    }
+    has_next() {
+        return this.curr < this.end;
+    }
+    next() {
+        return (this.curr += this.step) - this.step;
+    }
+}
+
+fun foreach(iterable, handler = $(e) {print e;}) {
+    for i in iterable {
+        handler(i);
+    }
+}
+
+fun enum(iterable) {
+    return Enum(iterable);
+}
+
+class Enum {
+    init(iterable) {
+        this.iterable = iterable;
+    }
+    iterator() {
+        return EnumIter(this.iterable.iterator());
+    }
+}
+
+class EnumIter {
+    init(iter) {
+        this.curr = 0;
+        this.iter = iter;
+    }
+    has_next() {
+        return this.iter.has_next();
+    }
+    next() {
+        return (this.curr += 1) - 1, this.iter.next();
+    }
+}
+
+export foreach, Array, range, enum;

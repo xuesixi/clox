@@ -3,7 +3,8 @@
 //
 
 #include "native.h"
-#include "lib_iter.h"
+#include "liblox_core.h"
+#include "liblox_iter.h"
 #include "vm.h"
 #include "stdlib.h"
 #include "string.h"
@@ -25,12 +26,17 @@ static void define_native(const char *name, NativeImplementation impl, int arity
  * 加载标准库（执行字节码）。
  */
 void load_libraries() {
+#ifdef LOAD_LIB
     if (load_bytes(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_OK) {
+        exit(1);
+    }
+    if (load_bytes(liblox_core, liblox_core_len, "lib_core") != INTERPRET_OK) {
         exit(1);
     }
     Value array_class_value;
     table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
     array_class = as_class(array_class_value);
+#endif
 }
 
 /**
@@ -196,15 +202,46 @@ static Value native_rand(int count, Value *value) {
     return int_value(as_int(a) + rand() % as_int(b)); // NOLINT(*-msc50-cpp)
 }
 
+static Value native_string_combine(int count, Value *values) {
+    int total_len = 0;
+    char **css = malloc(sizeof(char *) * count);
+    int *lens = malloc(sizeof(int ) * count);
+    for (int i = 0; i < count; ++i) {
+        css[i] = value_to_chars(values[i], lens + i);
+        total_len += lens[i];
+    }
+    char *result= malloc(total_len + 1);
+    char *curr = result;
+    for (int i = 0; i < count; ++i) {
+        memcpy(curr, css[i], lens[i]);
+        curr += lens[i];
+        free(css[i]);
+    }
+    result[total_len] = '\0';
+    free(lens);
+    free(css);
+    String *str = string_allocate(result, total_len);
+    return ref_value((Object *) str);
+}
+
+static Value native_string_combine_array(int count, Value *value) {
+    (void ) count;
+    Value v = *value;
+    if (!is_ref_of(v, OBJ_ARRAY)) {
+        runtime_error_catch_1("The function only support one array as the argument", v);
+    }
+    Array *array = as_array(v);
+    return native_string_combine(array->length, array->values);
+}
+
 void init_vm_native() {
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
     define_native("float", native_float, 1);
     define_native("rand", native_rand, 2);
     define_native("f", native_format, -1);
+    define_native("native_string_combine_array", native_string_combine_array, 1);
     define_native("read", native_read, -1);
-
-//    load_libraries();
 }
 
 void additional_repl_init() {

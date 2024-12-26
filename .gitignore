@@ -5,11 +5,8 @@
 test
 run.sh
 lox
-liblox
 LOX_REPL
-lib_iter.h
-*.lox
-run_vm.sh
+liblox_*
 clox
 clox.sublime-project
 clox.sublime-workspace

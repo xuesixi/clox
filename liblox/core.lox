@@ -1,0 +1,10 @@
+class Obj {
+
+}
+
+fun string(values...) {
+    return native_string_combine_array(values);
+}
+
+export Obj, string;
+
