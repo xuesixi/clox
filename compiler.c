@@ -1068,7 +1068,6 @@ static void iteration_statement() {
 
     expression(); // [instance_to_iterate]
 
-//    emit_byte(OP_ITERATOR);
     emit_invoke_no_arg("iterator");
 
     Token iter = literal_token("$iter"); // [iter]

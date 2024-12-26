@@ -97,5 +97,13 @@ fun string_join(arr, delimiter="", prefix="", suffix="") {
     return native_string_join(delimiter, prefix, suffix, arr);
 }
 
-export Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, concat, join, string_join;
+fun benchmark(task) {
+    var start = clock();
+    task();
+    print f("takes time: #", clock() - start);
+}
 
+export 
+Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, 
+concat, join, string_join, benchmark
+;

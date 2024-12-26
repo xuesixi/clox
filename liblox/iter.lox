@@ -23,6 +23,25 @@ class RangeIter {
     }
 }
 
+class RangeIter2 {
+    init(start, end, step) {
+        this.curr = start;
+        this.step = step;
+        this.end = end;
+    }
+    iterator() {
+        return this;
+    }
+    has_next() {
+        return this.curr < this.end;
+    }
+    next() {
+        var result = this.curr;
+        this.curr += this.step;
+        return result;
+    }
+}
+
 fun foreach(iterable, handler = $(e) {print e;}) {
     for i in iterable {
         handler(i);

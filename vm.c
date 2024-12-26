@@ -938,6 +938,10 @@ static void build_array(int length) {
  * @return 执行的结果
  */
 static InterpretResult run_vm() {
+#ifdef COUNT_INSTRUCTIONS_RUN
+    static long run_count = 0;
+    run_count = 0;
+#endif
     InterpretResult error_code;
     if ( (error_code = setjmp(error_buf))) {
         //  运行时错误会跳转至这里
@@ -956,6 +960,11 @@ static InterpretResult run_vm() {
         }
 
         uint8_t instruction = read_byte();
+
+#ifdef COUNT_INSTRUCTIONS_RUN
+        run_count ++;
+#endif
+
         switch (instruction) {
             case OP_RETURN: {
                 Value result = stack_pop(); // 返回值
@@ -967,6 +976,9 @@ static InterpretResult run_vm() {
                     TRACE_SKIP = -1; // no skip. Step by step
                 }
                 if (vm.frame_count == 0) {
+#ifdef COUNT_INSTRUCTIONS_RUN
+                    printf("run %ld instructions\n", run_count);
+#endif
                     return INTERPRET_OK; // 程序运行结束
                 }
                 curr_const_pool = curr_frame->closure->function->chunk.constants.values;
