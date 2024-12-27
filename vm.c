@@ -23,6 +23,7 @@ String *INIT = NULL;
 String *LENGTH = NULL;
 String *ITERATOR = NULL;
 String *EQUAL = NULL;
+String *HASH = NULL;
 
 Module *repl_module = NULL;
 
@@ -93,6 +94,38 @@ static inline void stack_swap(int n) {
     Value temp = stack_peek(n);
     stack_set(n, stack_peek(0));
     stack_set(0, temp);
+}
+
+static void array_indexing_get() {
+    // [arr, index]
+    Value index_value = stack_pop();
+    if (!is_int(index_value)) {
+        runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
+    }
+    Value arr_value = stack_pop();
+    Array *array = as_array(arr_value);
+    int index = as_int(index_value);
+    if (index < 0 || index >= array->length) {
+        runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
+    }
+    stack_push(array->values[index]);
+}
+
+static void array_indexing_set() {
+    // op: [array, index, value]
+    Value value = stack_pop();
+    Value index_value = stack_pop();
+    if (!is_int(index_value)) {
+        runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
+    }
+    Value arr_value = stack_pop();
+    Array *array = as_array(arr_value);
+    int index = as_int(index_value);
+    if (index < 0 || index >= array->length) {
+        runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
+    }
+    array->values[index] = value;
+    stack_push(value);
 }
 
 /**
@@ -177,7 +210,7 @@ void assert_value_type(Value value, ValueType type, const char *message) {
 }
 
 /**
- * 调用一个property。receiver是stack_peek(arg_count)
+ * 调用一个property。receiver是stack_peek(arg_count). 如果没有找到那个属性，该函数会触发runtime error
  * @param name 名字
  * @param arg_count 参数个数
  */
@@ -206,6 +239,8 @@ static void invoke_property(String *name, int arg_count) {
                 Value static_field;
                 if (table_get(&class->static_fields, name, &static_field)) {
                     call_value(static_field, arg_count);
+                } else {
+                    goto error_handle;
                 }
                 break;
             }
@@ -214,6 +249,8 @@ static void invoke_property(String *name, int arg_count) {
                 Value property;
                 if (table_conditional_get(&module->globals, name, &property, true, false)) {
                     call_value(property, arg_count);
+                } else {
+                    goto error_handle;
                 }
                 break;
             }
@@ -224,6 +261,7 @@ static void invoke_property(String *name, int arg_count) {
                 invoke_from_class(string_class, name, arg_count);
                 break;
             default:
+            error_handle:
                 runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
         }
     }
@@ -654,7 +692,7 @@ static void call_closure(Closure *closure, int arg_count) {
     curr_frame = vm.frames + vm.frame_count - 1;
     CallFrame *frame = curr_frame;
     frame->FP = vm.stack_top - arg_count - 1;
-    frame->mark = 0;
+    frame->mark = NO_MARK;
     frame->PC = function->chunk.code;
     frame->closure = closure;
     curr_closure_global = &closure->module->globals;
@@ -725,6 +763,7 @@ static void init_static_strings() {
     LENGTH = auto_length_string_copy("length");
     ITERATOR = auto_length_string_copy("iterator");
     EQUAL = auto_length_string_copy("equal");
+    HASH = auto_length_string_copy("hash");
 
     ARRAY_CLASS = auto_length_string_copy("Array");
     STRING_CLASS = auto_length_string_copy("String");
@@ -963,6 +1002,9 @@ static InterpretResult run_vm() {
         return error_code;
     }
     while (true) {
+
+        next_instruction:
+
         if (TRACE_EXECUTION && TRACE_SKIP == -1 && preload_finished) {
             show_stack();
             if (getchar() == 'o') {
@@ -999,12 +1041,20 @@ static InterpretResult run_vm() {
                 curr_const_pool = curr_frame->closure->function->chunk.constants.values;
                 curr_closure_global = & curr_frame->closure->module->globals;
                 stack_push(result);
-                if (curr_frame->mark != 0) {
+                if (curr_frame->mark != NO_MARK) {
                     int mark = curr_frame->mark;
-                    curr_frame->mark = 0;
+                    curr_frame->mark = NO_MARK;
                     switch (mark) {
-                        case 1:
+                        case MARK_EQUAL:
                             goto label_equal;
+                            break;
+                        case MARK_MAP_GET:
+                            goto label_map_get;
+                            break;
+                        case MARK_KEY_HASHING_GET:
+                            goto label_after_hashing;
+                            break;
+                        default:
                             break;
                     }
                 }
@@ -1328,63 +1378,6 @@ static InterpretResult run_vm() {
                 Value value = stack_pop(); // instance
                 String *field_name = read_constant_string();
                 get_property(value, field_name);
-//                if (is_ref_of(value, OBJ_INSTANCE) == false) {
-//                    switch (as_ref(value)->type) {
-//                        case OBJ_ARRAY: {
-//                            if (field_name == LENGTH) {
-//                                Array *array = as_array(value);
-//                                stack_push(int_value(array->length));
-//                                break;
-//                            } else {
-//                                Method *method = bind_method(array_class, field_name, value);
-//                                stack_push(ref_value((Object *)method));
-//                            }
-//                            break;
-//                        }
-//                        case OBJ_STRING: {
-//                            if (field_name == LENGTH) {
-//                                String *string = as_string(value);
-//                                stack_push(int_value(string->length));
-//                                break;
-//                            } else {
-//                                Method *method = bind_method(string_class, field_name, value);
-//                                stack_push(ref_value((Object *)method));
-//                            }
-//                            break;
-//                        }
-//                        case OBJ_CLASS: {
-//                            Class *class = as_class(value);
-//                            Value static_field;
-//                            if (!table_get(&class->static_fields, field_name, &static_field)) {
-//                                goto OP_GET_PROPERTY_not_found;
-//                            }
-//                            stack_push(static_field);
-//                            break;
-//                        }
-//                        case OBJ_MODULE: {
-//                            Module *module = as_module(value);
-//                            Value property;
-//                            if (!table_conditional_get(&module->globals, field_name, &property, true, false)) {
-//                                runtime_error_catch_2("%s does not the have public property: %s", value, ref_value((Object *) field_name));
-//                            } else {
-//                                stack_push(property);
-//                            }
-//                            break;
-//                        }
-//                        OP_GET_PROPERTY_not_found:
-//                        default:
-//                            runtime_error_catch_2("%s does not have the property: %s", value, ref_value((Object *) field_name));
-//                    }
-//                } else {
-//                    Instance *instance = as_instance(value);
-//                    Value result = nil_value();
-//                    bool found = table_get(&instance->fields, field_name, &result);
-//                    if (found == false) {
-//                        Method *method = bind_method(instance->class, field_name, value);
-//                        result = ref_value((Object *) method);
-//                    }
-//                    stack_push(result);
-//                }
                 break;
             }
             case OP_SET_PROPERTY: {
@@ -1444,42 +1437,6 @@ static InterpretResult run_vm() {
                 String *name = read_constant_string();
                 int arg_count = read_byte();
                 invoke_property(name, arg_count);
-//                Value receiver = stack_peek(arg_count);
-//                if (!is_ref_of(receiver, OBJ_INSTANCE)) {
-//                    if (is_ref_of(receiver, OBJ_CLASS)) {
-//                        Class *class = as_class(receiver);
-//                        Value static_field;
-//                        if (table_get(&class->static_fields, name, &static_field)) {
-//                            call_value(static_field, arg_count);
-//                            break;
-//                        }
-//                    } else if (is_ref_of(receiver, OBJ_MODULE)) {
-//                        Module *module = as_module(receiver);
-//                        Value property;
-//                        if (table_conditional_get(&module->globals, name, &property, true, false)) {
-//                            call_value(property, arg_count);
-//                            break;
-//                        }
-//                    } else if (is_ref_of(receiver, OBJ_ARRAY)) {
-//                        invoke_from_class(array_class, name, arg_count);
-//                        break;
-//                    }
-//                    runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
-//                }
-//                Instance *instance = as_instance(receiver);
-//                Value closure_value;
-//                if (!table_get(&instance->fields, name, &closure_value)) {
-//                    Class *class = instance->class;
-//                    invoke_from_class(class, name, arg_count);
-//                } else {
-//                    if (is_ref_of(closure_value, OBJ_METHOD)) {
-//                        call_value(closure_value, arg_count);
-//                    } else if (is_ref_of(closure_value, OBJ_CLOSURE)) {
-//                        call_closure(as_closure(closure_value), arg_count);
-//                    } else {
-//                        runtime_error_catch_1("%s is not callable", closure_value);
-//                    }
-//                }
                 break;
             }
             case OP_INHERIT: {
@@ -1535,41 +1492,102 @@ static InterpretResult run_vm() {
                 break;
             }
             case OP_INDEXING_GET: {
-                // [arr, index, top]
-                Value index_value = stack_pop();
-                if (!is_int(index_value)) {
-                    runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
+                Value target = stack_peek(1);
+                if (is_ref_of(target, OBJ_ARRAY)) {
+                    array_indexing_get();
+                } else if (is_ref_of(target, OBJ_MAP)) {
+                    // [map, key]
+                    Map *map = as_map(stack_peek(1));
+                    if (map->count == 0) {
+                        stack_pop();
+                        stack_pop();
+                        stack_push(nil_value());
+                        break;
+                    }
+                    stack_push(stack_peek(0)); // [map, key, key]
+                    curr_frame->mark = MARK_KEY_HASHING_GET;
+                    invoke_property(HASH, 0);
+                    goto next_instruction;
+
+                    label_after_hashing:
+                    // [map, key, hash]
+                    map = as_map(stack_peek(2));
+//                    int hash = as_int(stack_peek(0));
+                    int index = MODULO(as_int(stack_peek(0)), map->capacity);
+                    for (int i = 0; i < map->capacity; ++i) {
+                        int curr = MODULO(index + i, map->capacity);
+                        MapEntry *entry = map->backing + curr;
+                        if (map_empty_entry(entry)) {
+                            stack_pop();
+                            stack_pop();
+                            stack_pop();
+                            stack_push(nil_value());
+                            goto next_instruction; // 实际上就等于双重break，但由于这里是switch+loop，用goto更简单。
+
+                        } else if (!is_absence(entry->key) && entry->hash == as_int(stack_peek(0))) {
+                            curr_frame->mark = MARK_MAP_GET;
+                            stack_push(entry->value);
+                            stack_push(entry->key);
+                            stack_push(stack_peek(1)); // [map, key, hash, value, existing_key, key]
+                            invoke_property(EQUAL, 1);
+                            goto next_instruction;
+
+                            label_map_get:
+                            // [map, key, hash, value, bool]
+                            if (!is_falsy(stack_pop())) {
+                                Value value = stack_pop();
+                                stack_set(2, value); // [value, key, hash]
+                                stack_pop();
+                                stack_pop(); // finish!
+                                goto next_instruction;
+                            } else {
+                                stack_pop();
+                            }
+                        }
+                    }
+                    // not found
+                    stack_pop();
+                    stack_pop();
+                    stack_pop();
+                    stack_push(nil_value());
+                    break;
+                } else {
+                    runtime_error_catch_1("the value: %s is neither map or array and does not support indexing", target);
                 }
-                Value arr_value = stack_pop();
-                if (!is_ref_of(arr_value, OBJ_ARRAY)) {
-                    runtime_error_catch_1("%s is not an array and does not support indexing", arr_value);
-                }
-                Array *array = as_array(arr_value);
-                int index = as_int(index_value);
-                if (index < 0 || index >= array->length) {
-                    runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
-                }
-                stack_push(array->values[index]);
                 break;
             }
             case OP_INDEXING_SET: {
-                // op: [array, index, value, top]
-                Value value = stack_pop();
-                Value index_value = stack_pop();
-                if (!is_int(index_value)) {
-                    runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
+                Value target = stack_peek(2);
+                if (is_ref_of(target, OBJ_ARRAY)) {
+                    array_indexing_set();
+                } else if (is_ref_of(target, OBJ_MAP)) {
+                    // [map, key, value]
+                    Map *map = as_map(stack_peek(2));
+                    if (map_need_resize(map)) {
+                        //..
+                    }
+                    stack_push(stack_peek(1)); // [map, key, value, key]
+                    curr_frame->mark = MARK_KEY_HASHING_SET_1;
+                    invoke_property(HASH, 0);
+
+                    label_after_set_hashing1:
+                    // [map, key, value, hash]
+                    map = as_map(stack_peek(3));
+                    int hash = as_int(stack_peek(0));
+                    int index = MODULO(, map->capacity);
+                    for (int i = 0; i < map->capacity; ++i) {
+                        int curr = MODULO(index + i, map->capacity);
+                        MapEntry *entry = map->backing + curr;
+                        if (map_empty_entry(entry)) {
+                            entry->key = stack_peek(2);
+                            entry->value = stack_peek(1); // done
+                            stack_pop();
+                        }
+                    }
+
+                } else {
+                    runtime_error_catch_1("the value: %s is neither map or array and does not support indexing", target);
                 }
-                Value arr_value = stack_pop();
-                if (!is_ref_of(arr_value, OBJ_ARRAY)) {
-                    runtime_error_catch_1("%s is not an array and does not support indexing", arr_value);
-                }
-                Array *array = as_array(arr_value);
-                int index = as_int(index_value);
-                if (index < 0 || index >= array->length) {
-                    runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
-                }
-                array->values[index] = value;
-                stack_push(value);
                 break;
             }
             case OP_BUILD_ARRAY: {

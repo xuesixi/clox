@@ -11,8 +11,6 @@ static inline bool empty_entry(Entry *entry) {
     return entry->key == NULL && is_nil(entry->value);
 }
 
-#define MODULO(a, b) ((a) & ((b) - 1))
-
 
 /**
  * del marker：如果key为NULL，值为bool，认为是一个del marker
@@ -313,33 +311,7 @@ void free_table(Table *table) {
     init_table(table);
 }
 
-void init_map(Map *map) {
-    map->backing = NULL;
-    map->capacity = 0;
-    map->count = 0;
-}
 
-void free_map(Map *map) {
-    FREE_ARRAY(MapEntry, map->backing, map->capacity);
-    map->backing = NULL;
-    map->capacity = 0;
-    map->count = 0;
-}
-
-//
-///**
-// * 键为absence，值为absence
-// */
-//static inline bool map_empty_entry(MapEntry *entry) {
-//    return is_absence(entry->key) && is_absence(entry->value);
-//}
-//
-///**
-// * 键为absence，值为nil
-// */
-//static inline bool map_del_mark(MapEntry *entry) {
-//    return is_absence(entry->key) && is_nil(entry->value);
-//}
 //
 //static inline bool map_need_resize(Map *map) {
 //    return map->count + 1 >= map->capacity * 0.75;

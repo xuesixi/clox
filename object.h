@@ -17,6 +17,7 @@ typedef enum {
   OBJ_METHOD,
   OBJ_ARRAY,
   OBJ_MODULE,
+  OBJ_MAP,
 } ObjectType;
 
 typedef struct Object{
@@ -97,6 +98,19 @@ typedef struct Instance {
     Table fields;
 } Instance;
 
+typedef struct MapEntry {
+    Value key;
+    Value value;
+    int hash;
+} MapEntry;
+
+typedef struct Map {
+    Object object;
+    int count;
+    int capacity;
+    MapEntry *backing;
+} Map;
+
 typedef Value (*NativeImplementation)(int count, Value *values);
 
 typedef struct NativeFunction {
@@ -117,6 +131,7 @@ typedef struct NativeFunction {
 #define as_method(v) ((Method *)(as_ref(v)))
 #define as_array(v) ((Array *)(as_ref(v)))
 #define as_module(v) ((Module *)(as_ref(v)))
+#define as_map(v) ((Map *)(as_ref(v)) )
 
 
 String *string_copy(const char *src, int length);
@@ -134,5 +149,17 @@ Instance *new_instance(Class *class);
 Method *new_method(Closure *closure, Value value);
 Array *new_array(int length);
 Module *new_module(String *path);
+Map *new_map();
+
+void init_map(Map *map);
+void free_map(Map *map);
+inline bool map_del_mark(MapEntry *entry);
+inline bool map_empty_entry(MapEntry *entry);
+inline bool map_need_resize(Map *map);
+
+//void *map_get(Map *map, void *key);
+//bool map_set(Map *map, Value key, Value value);
+//void *map_delete(Map *map, void *key);
+//MapEntry *map_find_entry(Map *map, uint32_t hash);
 
 #endif

@@ -241,7 +241,74 @@ Module *new_module(String *path) {
     return module;
 }
 
+Map *new_map() {
+    Map *map = (Map *) allocate_object(sizeof(Map), OBJ_MAP);
+    map->backing = NULL;
+    map->capacity = 0;
+    map->count = 0;
+    return map;
+}
 
+void init_map(Map *map) {
+    map->backing = NULL;
+    map->capacity = 0;
+    map->count = 0;
+}
 
+void free_map(Map *map) {
+    FREE_ARRAY(MapEntry, map->backing, map->capacity);
+    map->backing = NULL;
+    map->capacity = 0;
+    map->count = 0;
+}
 
+//MapEntry *map_find_entry(Map *map, uint32_t hash) {
+//    if (map->)
+//}
 
+/**
+ * 键为absence，值为absence
+ */
+inline bool map_empty_entry(MapEntry *entry) {
+    return is_absence(entry->key) && is_absence(entry->value);
+}
+
+/**
+ * 键为absence，值为nil
+ */
+inline bool map_del_mark(MapEntry *entry) {
+    return is_absence(entry->key) && is_nil(entry->value);
+}
+
+inline bool map_need_resize(Map *map) {
+    return map->count + 1 >= map->capacity * 0.75;
+}
+
+void map_resize(Map *map) {
+    int old_capacity = map->capacity;
+    int new_capacity = old_capacity < 8 ? 8 : map->capacity * 2;
+#ifdef DEBUG_LOG_GC_ALLOCATE
+    printf("map resize. old capacity: %d, new: %d\n", old_capacity, new_capacity);
+#endif
+
+    MapEntry *old_backing = map->backing;
+    MapEntry *new_backing = ALLOCATE(MapEntry , new_capacity);
+
+    for (int i = 0; i < new_capacity; ++i) {
+        new_backing[i].key = absence_value();
+        new_backing[i].value = absence_value();
+    }
+
+    map->capacity = new_capacity;
+    map->backing =new_backing;
+    map->count = 0;
+
+    for (int i = 0; i < old_capacity; ++i) {
+        MapEntry *entry = old_backing + i;
+        if (!is_absence(entry->key)) {
+            table_add_new(map, entry->key, entry->value);
+        }
+    }
+
+    FREE_ARRAY(Entry, old_backing, old_capacity);
+}

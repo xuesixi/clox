@@ -3,6 +3,8 @@
 
 #include "value.h"
 
+#define MODULO(a, b) ((a) & ((b) - 1))
+
 //#define ENTRY_CONST 0x01
 //#define ENTRY_PUBLIC 0x02
 
@@ -21,23 +23,8 @@ typedef struct Table {
     Entry *backing;
 } Table;
 
-/**
- * 值得注意的是，中无论是key还是value都是指针，其所有权在外部，不在Map中。
- */
-typedef struct MapEntry {
-    Value key;
-    Value value;
-} MapEntry;
-
 typedef int (*HashFunction)(void *key); ;
 typedef bool (*EqualityFunction)(void *a, void *b);
-
-
-typedef struct Map {
-    int count;
-    int capacity;
-    MapEntry *backing;
-} Map;
 
 void init_table(Table *table);
 void free_table(Table *table);
@@ -54,12 +41,7 @@ String *table_find_string(Table *table, const char *name, int length, uint32_t h
 void table_mark(Table *table);
 void table_delete_unreachable(Table *table);
 
-//void init_map(Map *map);
-//void free_map(Map *map);
-//void *map_get(Map *map, void *key);
-//bool map_set(Map *map, Value key, Value value);
-//void *map_delete(Map *map, void *key);
-//int int_hash(void *p);
-//bool int_equal(void *a, void *b);
+int int_hash(void *p);
+bool int_equal(void *a, void *b);
 
 #endif

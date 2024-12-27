@@ -8,11 +8,20 @@
 #include "table.h"
 #include "object.h"
 
+typedef enum GOTO_MARK {
+    NO_MARK,
+    MARK_EQUAL,
+    MARK_KEY_HASHING_GET,
+    MARK_KEY_HASHING_SET_0,
+    MARK_KEY_HASHING_SET_1,
+    MARK_MAP_GET,
+} GOTO_MARK;
+
 typedef struct CallFrame {
     Closure *closure;
     uint8_t *PC; // program counter
     Value *FP; // frame pointer. The start of the frame
-    int mark;
+    GOTO_MARK mark;
 } CallFrame;
 
 typedef struct VM{
@@ -48,6 +57,7 @@ extern String *NIL_CLASS;
 
 extern String *ITERATOR;
 extern String *EQUAL;
+extern String *HASH;
 
 extern Module *repl_module;
 extern jmp_buf error_buf;
