@@ -69,7 +69,7 @@ void free_VM();
 InterpretResult interpret(const char *src, const char *path);
 InterpretResult produce(const char *src, const char *path);
 InterpretResult read_run_bytecode(const char *path);
-InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path);
+InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const char *path);
 
 void stack_push(Value value);
 Value stack_pop();

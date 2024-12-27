@@ -48,6 +48,7 @@ static void mark_roots() {
 
     // mark global
     table_mark(&vm.builtin);
+    mark_object((Object *) repl_module);
 
     // mark existing frames。否则调用中的函数可能会被回收
     for (int i = 0; i < vm.frame_count; ++i) {

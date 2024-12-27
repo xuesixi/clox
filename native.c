@@ -33,14 +33,14 @@ static void define_native(const char *name, NativeImplementation impl, int arity
 }
 
 /**
- * 加载标准库（执行字节码）。
+ * 加载标准库（执行字节码），将标准库的成员导入builtin命名空间中。
  */
 void load_libraries() {
 #ifdef LOAD_LIB
-    if (load_bytes(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_OK) {
+    if (load_bytes_into_builtin(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_OK) {
         exit(1);
     }
-    if (load_bytes(liblox_core, liblox_core_len, "lib_core") != INTERPRET_OK) {
+    if (load_bytes_into_builtin(liblox_core, liblox_core_len, "lib_core") != INTERPRET_OK) {
         exit(1);
     }
     Value array_class_value;
@@ -87,6 +87,8 @@ void load_libraries() {
 
     table_get(&vm.builtin, NIL_CLASS, &nil_class_value);
     nil_class = as_class(nil_class_value);
+
+    preload_finished = true;
 #endif
 }
 

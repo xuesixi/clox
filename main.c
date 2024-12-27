@@ -70,6 +70,8 @@ static void repl() {
     String *path_string = string_copy(repl_path,  len);
     repl_module = new_module(path_string);
 
+    load_libraries();
+
     additional_repl_init();
     printf("You are in the clox REPL mode. Type help() for more information, exit() to exit. \nYour compiled input will be saved in the file LOX_REPL.\n\n");
 
@@ -151,6 +153,7 @@ static void run_file(const char *path) {
         printf("error when opening file %s\n", path);
         exit(1);
     }
+    load_libraries();
     InterpretResult result = interpret(src, path);
     free(src);
 #ifdef COLOR_RUN_FILE_RESULT
@@ -164,6 +167,7 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
         printf("error when opening file %s\n", code_path);
         exit(1);
     }
+    load_libraries();
     InterpretResult result = produce(src, result_path);
     free(src);
 #ifdef COLOR_RUN_FILE_RESULT

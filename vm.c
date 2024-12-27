@@ -804,15 +804,12 @@ static void import(const char *src, String *path) {
     stack_push(ref_value((Object *) vm.current_module));
     // [old_module, top]
 
-    DISABLE_GC;
     LoxFunction *function = compile(src);
 
     if (function == NULL) {
         runtime_error_and_catch("the module fails to compile");
         return;
     }
-
-    ENABLE_GC;
 
     warmup(function, NULL, path, false);
 
@@ -863,15 +860,15 @@ InterpretResult read_run_bytecode(const char *path) {
 }
 
 /**
- * 用fmemopen()从目标字节数组处打开一个流，然后读取并执行起字节码。运行后，将全局命名空间中的public元素添加到builtin命名空间中
+ * 用fmemopen()从目标字节数组处打开一个流，创建一个新的全局命名空间，然后读取并执行字节码。运行后，将全局命名空间中的public元素添加到builtin命名空间中
  */
-InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
+InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const char *path) {
     FILE *file = fmemopen(bytes, len, "rb");
 
     DISABLE_GC;
     LoxFunction *function = read_function(file);
-    ENABLE_GC;
     fclose(file);
+    ENABLE_GC;
 
     warmup(function, path, NULL, false);
 
@@ -900,13 +897,13 @@ InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
  */
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl) {
 
-    if (preload_started || COMPILE_ONLY) {
-
-    } else {
-        preload_started = true;
-        load_libraries();
-        preload_finished = true;
-    }
+//    if (preload_started || COMPILE_ONLY) {
+//
+//    } else {
+//        preload_started = true;
+//        load_libraries();
+//        preload_finished = true;
+//    }
 
     DISABLE_GC;
 
