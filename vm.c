@@ -54,6 +54,8 @@ static void reset_stack();
 
 //static Value read_constant();
 
+static InterpretResult run_frame_until(int end_when);
+
 static inline bool if_read_byte(OpCode op);
 
 static Value read_constant16();
@@ -169,7 +171,6 @@ void assert_value_type(Value value, ValueType type, const char *message) {
  * @param arg_count 参数个数
  */
 static void invoke_property(String *name, int arg_count) {
-//    int arg_count = read_byte();
     Value receiver = stack_peek(arg_count);
     if (is_ref_of(receiver, OBJ_INSTANCE)) {
         Instance *instance = as_instance(receiver);
@@ -178,13 +179,7 @@ static void invoke_property(String *name, int arg_count) {
             Class *class = instance->class;
             invoke_from_class(class, name, arg_count);
         } else {
-            if (is_ref_of(closure_value, OBJ_METHOD)) {
-                call_value(closure_value, arg_count);
-            } else if (is_ref_of(closure_value, OBJ_CLOSURE)) {
-                call_closure(as_closure(closure_value), arg_count);
-            } else {
-                runtime_error_catch_1("%s is not callable", closure_value);
-            }
+            call_value(closure_value, arg_count);;
         }
     } else {
         switch (receiver.as.reference->type) {
@@ -796,7 +791,7 @@ InterpretResult interpret(const char *src, const char *path) {
 
     ENABLE_GC;
 
-    return run_vm();
+    return run_frame_until(0);
 }
 
 static void import(const char *src, String *path) {
@@ -856,7 +851,7 @@ InterpretResult read_run_bytecode(const char *path) {
 
     ENABLE_GC;
 
-    return run_vm();
+    return run_frame_until(0);
 }
 
 /**
@@ -866,7 +861,7 @@ InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
     FILE *file = fmemopen(bytes, len, "rb");
     LoxFunction *function = read_function(file);
     warmup(function, path, NULL, false);
-    InterpretResult result = run_vm();
+    InterpretResult result = run_frame_until(0);
     if (result == INTERPRET_OK) {
         table_add_all(curr_closure_global, &vm.builtin, true );
     } else {
@@ -933,21 +928,21 @@ static void build_array(int length) {
 }
 
 /**
- * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之
+ * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之. 运行直到vm.frame_count == end_when.
  * 如果发生了runtime error，该函数将立刻返回。
  * @return 执行的结果
  */
-static InterpretResult run_vm() {
-#ifdef COUNT_INSTRUCTIONS_RUN
-    static long run_count = 0;
-    run_count = 0;
-#endif
-    InterpretResult error_code;
-    if ( (error_code = setjmp(error_buf))) {
-        //  运行时错误会跳转至这里
-        return error_code;
+static InterpretResult run_frame_until(int end_when) {
+    if (vm.frame_count == end_when) {
+        return INTERPRET_OK;
     }
+    InterpretResult error;
+    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+        return error;
+    }
+
     while (true) {
+
         if (TRACE_EXECUTION && TRACE_SKIP == -1 && preload_finished) {
             show_stack();
             if (getchar() == 'o') {
@@ -960,11 +955,6 @@ static InterpretResult run_vm() {
         }
 
         uint8_t instruction = read_byte();
-
-#ifdef COUNT_INSTRUCTIONS_RUN
-        run_count ++;
-#endif
-
         switch (instruction) {
             case OP_RETURN: {
                 Value result = stack_pop(); // 返回值
@@ -975,15 +965,14 @@ static InterpretResult run_vm() {
                 if (vm.frame_count == TRACE_SKIP) {
                     TRACE_SKIP = -1; // no skip. Step by step
                 }
-                if (vm.frame_count == 0) {
-#ifdef COUNT_INSTRUCTIONS_RUN
-                    printf("run %ld instructions\n", run_count);
-#endif
-                    return INTERPRET_OK; // 程序运行结束
+                if (vm.frame_count != 0) {
+                    curr_const_pool = curr_frame->closure->function->chunk.constants.values;
+                    curr_closure_global = & curr_frame->closure->module->globals;
                 }
-                curr_const_pool = curr_frame->closure->function->chunk.constants.values;
-                curr_closure_global = & curr_frame->closure->module->globals;
                 stack_push(result);
+                if (vm.frame_count == end_when) {
+                    return INTERPRET_OK;
+                }
                 break;
             }
             case OP_CONSTANT: {
@@ -1265,63 +1254,6 @@ static InterpretResult run_vm() {
                 Value value = stack_pop(); // instance
                 String *field_name = read_constant_string();
                 get_property(value, field_name);
-//                if (is_ref_of(value, OBJ_INSTANCE) == false) {
-//                    switch (as_ref(value)->type) {
-//                        case OBJ_ARRAY: {
-//                            if (field_name == LENGTH) {
-//                                Array *array = as_array(value);
-//                                stack_push(int_value(array->length));
-//                                break;
-//                            } else {
-//                                Method *method = bind_method(array_class, field_name, value);
-//                                stack_push(ref_value((Object *)method));
-//                            }
-//                            break;
-//                        }
-//                        case OBJ_STRING: {
-//                            if (field_name == LENGTH) {
-//                                String *string = as_string(value);
-//                                stack_push(int_value(string->length));
-//                                break;
-//                            } else {
-//                                Method *method = bind_method(string_class, field_name, value);
-//                                stack_push(ref_value((Object *)method));
-//                            }
-//                            break;
-//                        }
-//                        case OBJ_CLASS: {
-//                            Class *class = as_class(value);
-//                            Value static_field;
-//                            if (!table_get(&class->static_fields, field_name, &static_field)) {
-//                                goto OP_GET_PROPERTY_not_found;
-//                            }
-//                            stack_push(static_field);
-//                            break;
-//                        }
-//                        case OBJ_MODULE: {
-//                            Module *module = as_module(value);
-//                            Value property;
-//                            if (!table_conditional_get(&module->globals, field_name, &property, true, false)) {
-//                                runtime_error_catch_2("%s does not the have public property: %s", value, ref_value((Object *) field_name));
-//                            } else {
-//                                stack_push(property);
-//                            }
-//                            break;
-//                        }
-//                        OP_GET_PROPERTY_not_found:
-//                        default:
-//                            runtime_error_catch_2("%s does not have the property: %s", value, ref_value((Object *) field_name));
-//                    }
-//                } else {
-//                    Instance *instance = as_instance(value);
-//                    Value result = nil_value();
-//                    bool found = table_get(&instance->fields, field_name, &result);
-//                    if (found == false) {
-//                        Method *method = bind_method(instance->class, field_name, value);
-//                        result = ref_value((Object *) method);
-//                    }
-//                    stack_push(result);
-//                }
                 break;
             }
             case OP_SET_PROPERTY: {
@@ -1381,42 +1313,6 @@ static InterpretResult run_vm() {
                 String *name = read_constant_string();
                 int arg_count = read_byte();
                 invoke_property(name, arg_count);
-//                Value receiver = stack_peek(arg_count);
-//                if (!is_ref_of(receiver, OBJ_INSTANCE)) {
-//                    if (is_ref_of(receiver, OBJ_CLASS)) {
-//                        Class *class = as_class(receiver);
-//                        Value static_field;
-//                        if (table_get(&class->static_fields, name, &static_field)) {
-//                            call_value(static_field, arg_count);
-//                            break;
-//                        }
-//                    } else if (is_ref_of(receiver, OBJ_MODULE)) {
-//                        Module *module = as_module(receiver);
-//                        Value property;
-//                        if (table_conditional_get(&module->globals, name, &property, true, false)) {
-//                            call_value(property, arg_count);
-//                            break;
-//                        }
-//                    } else if (is_ref_of(receiver, OBJ_ARRAY)) {
-//                        invoke_from_class(array_class, name, arg_count);
-//                        break;
-//                    }
-//                    runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
-//                }
-//                Instance *instance = as_instance(receiver);
-//                Value closure_value;
-//                if (!table_get(&instance->fields, name, &closure_value)) {
-//                    Class *class = instance->class;
-//                    invoke_from_class(class, name, arg_count);
-//                } else {
-//                    if (is_ref_of(closure_value, OBJ_METHOD)) {
-//                        call_value(closure_value, arg_count);
-//                    } else if (is_ref_of(closure_value, OBJ_CLOSURE)) {
-//                        call_closure(as_closure(closure_value), arg_count);
-//                    } else {
-//                        runtime_error_catch_1("%s is not callable", closure_value);
-//                    }
-//                }
                 break;
             }
             case OP_INHERIT: {
@@ -1515,7 +1411,6 @@ static InterpretResult run_vm() {
                 break;
             }
             case OP_UNPACK_ARRAY: {
-//                int length = read_byte();
                 read_byte();
                 break;
             }
@@ -1590,5 +1485,7 @@ static InterpretResult run_vm() {
                 break;
             }
         }
+
     }
 }
+
