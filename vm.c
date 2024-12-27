@@ -22,6 +22,8 @@ VM vm;
 String *INIT = NULL;
 String *LENGTH = NULL;
 String *ITERATOR = NULL;
+String *HAS_NEXT = NULL;
+String *NEXT = NULL;
 Module *repl_module = NULL;
 
 String *ARRAY_CLASS = NULL;
@@ -705,6 +707,8 @@ static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
     ITERATOR = auto_length_string_copy("iterator");
+    HAS_NEXT = auto_length_string_copy("has_next");
+    NEXT = auto_length_string_copy("next");
 
     ARRAY_CLASS = auto_length_string_copy("Array");
     STRING_CLASS = auto_length_string_copy("String");
@@ -785,11 +789,12 @@ InterpretResult interpret(const char *src, const char *path) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    DISABLE_GC;
-
     warmup(function, path, NULL, true);
 
-    ENABLE_GC;
+    InterpretResult error;
+    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+        return error;
+    }
 
     return run_frame_until(0);
 }
@@ -799,18 +804,17 @@ static void import(const char *src, String *path) {
     stack_push(ref_value((Object *) vm.current_module));
     // [old_module, top]
 
-    LoxFunction *function = compile(src);
-
     DISABLE_GC;
+    LoxFunction *function = compile(src);
 
     if (function == NULL) {
         runtime_error_and_catch("the module fails to compile");
         return;
     }
 
-    warmup(function, NULL, path, false);
-
     ENABLE_GC;
+
+    warmup(function, NULL, path, false);
 
 }
 
@@ -844,12 +848,16 @@ InterpretResult read_run_bytecode(const char *path) {
     }
 
     DISABLE_GC;
-
     LoxFunction *function = read_function(file);
+    ENABLE_GC;
+
     fclose(file);
     warmup(function, path, NULL, false);
 
-    ENABLE_GC;
+    InterpretResult error;
+    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+        return error;
+    }
 
     return run_frame_until(0);
 }
@@ -859,8 +867,19 @@ InterpretResult read_run_bytecode(const char *path) {
  */
 InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
     FILE *file = fmemopen(bytes, len, "rb");
+
+    DISABLE_GC;
     LoxFunction *function = read_function(file);
+    ENABLE_GC;
+    fclose(file);
+
     warmup(function, path, NULL, false);
+
+    InterpretResult error;
+    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+        return error;
+    }
+
     InterpretResult result = run_frame_until(0);
     if (result == INTERPRET_OK) {
         table_add_all(curr_closure_global, &vm.builtin, true );
@@ -889,6 +908,8 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
         preload_finished = true;
     }
 
+    DISABLE_GC;
+
     vm.frame_count++;
 
     curr_frame = vm.frames + vm.frame_count - 1;
@@ -913,6 +934,8 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
     curr_const_pool = closure->function->chunk.constants.values;
 
     stack_push(ref_value((Object *) closure));
+
+    ENABLE_GC;
 }
 
 /**
@@ -936,10 +959,10 @@ static InterpretResult run_frame_until(int end_when) {
     if (vm.frame_count == end_when) {
         return INTERPRET_OK;
     }
-    InterpretResult error;
-    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
-        return error;
-    }
+//    InterpretResult error;
+//    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+//        return error;
+//    }
 
     while (true) {
 
@@ -968,8 +991,8 @@ static InterpretResult run_frame_until(int end_when) {
                 if (vm.frame_count != 0) {
                     curr_const_pool = curr_frame->closure->function->chunk.constants.values;
                     curr_closure_global = & curr_frame->closure->module->globals;
+                    stack_push(result);
                 }
-                stack_push(result);
                 if (vm.frame_count == end_when) {
                     return INTERPRET_OK;
                 }
@@ -1478,6 +1501,23 @@ static InterpretResult run_frame_until(int end_when) {
                 if (!is_absence(stack_pop())) {
                     curr_frame->PC += offset;
                 }
+                break;
+            }
+            case OP_JUMP_FOR_ITER: {
+                // [iter]
+                int offset = read_uint16();
+                stack_push(stack_peek(0)); // [iter, iter]
+                int frame_count = vm.frame_count;
+                invoke_property(HAS_NEXT, 0);
+                run_frame_until(frame_count); // [iter, bool]
+                if (is_falsy(stack_pop())) {
+                    curr_frame->PC += offset;
+                    break;
+                }
+                // [iter]
+                stack_push(stack_peek(0));
+                invoke_property(NEXT, 0);
+                // [iter, item]
                 break;
             }
             default: {

@@ -126,6 +126,8 @@ static inline void return_statement();
 
 static void iteration_statement();
 
+static void new_iteration_statement();
+
 static void set_new_scope(Scope *scope, FunctionType type);
 
 static void error_at(Token *token, const char *message);
@@ -452,7 +454,7 @@ static void import_statement() {
         emit_byte(OP_IMPORT);
         emit_byte(OP_RESTORE_MODULE);
         do {
-            consume(TOKEN_IDENTIFIER, "Expect identifier for this import statement");
+            consume(TOKEN_IDENTIFIER, "Expect identifier for the import statement");
             int as_name;
             uint16_t property_name = identifier_constant(&parser.previous);
             if (match(TOKEN_AS)) {
@@ -921,7 +923,8 @@ static void statement() {
         if (check(TOKEN_LEFT_PAREN)) {
             for_statement();
         } else {
-            iteration_statement();
+            new_iteration_statement();
+//            iteration_statement();
         }
     } else if (match(TOKEN_SWITCH)) {
         switch_statement();
@@ -1109,6 +1112,91 @@ static void iteration_statement() {
     patch_jump(to_end);
 
     end_scope();
+
+    restore_continue_point();
+    restore_break_point();
+}
+
+/**
+ *
+ * {
+ *     var iterator = arr.iterator();
+ *     while (iterator.has_next()) {
+ *          var item = iterator.next;
+ *          body...
+ *     }
+ * }
+ *
+ * get iterator: [iter]
+ *
+ * begin scope 1
+ * break point:
+ *      jump if false -> break_out
+ *
+ * continue point:
+ * condition: // [iter]
+ *      jump for iter -> end
+ *      begin_scope 2   // [iter, item]
+ *      declare item
+ * body:
+ *      ... // [iter, item]
+ *      end_scope 2 // [iter]
+ *      jump -> condition
+ *
+ * break_out:
+ *      pop
+ *
+ * end scope 1
+ *
+ *
+ */
+static void new_iteration_statement() {
+
+    consume(TOKEN_IDENTIFIER, "Expect an identifier");
+    Token item = parser.previous;
+    consume(TOKEN_IN, "Expect 'in'");
+
+    expression(); // [iterable]
+
+    begin_scope();
+    emit_invoke_no_arg("iterator"); // [iter]
+    Token iter = literal_token("$iter");
+    mark_initialized();
+
+    declare_identifier_token(&iter);
+
+    // break point
+    save_break_point();
+    int to_break_out = emit_jump(OP_JUMP_IF_FALSE);
+
+    // continue point
+    save_continue_point();
+
+    // condition
+    int condition = current_chunk()->count;
+
+    int to_end = emit_jump(OP_JUMP_FOR_ITER);
+
+    begin_scope();
+    declare_identifier_token(&item);
+    mark_initialized(); // [iter, item]
+
+    consume(TOKEN_LEFT_BRACE, "A { is required");
+    while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
+        declaration();
+    }
+    consume(TOKEN_RIGHT_BRACE, "A } is required");
+
+    end_scope();
+
+    loop_back(condition); // jump -> condition
+
+    patch_jump(to_break_out);
+    emit_byte(OP_POP);
+
+    // end
+    patch_jump(to_end);
+    end_scope(); // this clear the iterator
 
     restore_continue_point();
     restore_break_point();
@@ -2129,7 +2217,7 @@ static void init_parser(Parser *the_parser) {
  * */
 LoxFunction *compile(const char *src) {
 
-    gc_enabled = false;
+    DISABLE_GC;
 
     init_scanner(src);
     init_parser(&parser);
@@ -2145,7 +2233,7 @@ LoxFunction *compile(const char *src) {
 
     LoxFunction *function = end_compiler();
 
-    gc_enabled = true;
+    ENABLE_GC;
 
     if (parser.has_error) {
         parser.has_error = false;

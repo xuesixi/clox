@@ -73,6 +73,8 @@ typedef enum OpCode{
     OP_ABSENCE,
     OP_JUMP_IF_NOT_ABSENCE, // op, offset16
     OP_ARR_AS_VAR_ARG, // op
+    OP_JUMP_FOR_ITER, // op, offset16: [iter] -> [iter, item]
+//    OP_GET_ITERATOR, // op: [iterable] -> [iterator]
 } OpCode;
 
 typedef struct Chunk{

@@ -33,6 +33,9 @@ typedef struct VM{
 
 extern String *INIT;
 extern String *LENGTH;
+extern String *HAS_NEXT;
+extern String *NEXT;
+
 extern String *ARRAY_CLASS;
 extern String *STRING_CLASS;
 extern String *INT_CLASS;
