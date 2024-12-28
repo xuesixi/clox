@@ -431,6 +431,26 @@ static Value native_char_at(int count, Value *value) {
     return ref_value((Object *) c);
 }
 
+static Value native_range(int count, Value *value) {
+    // curr, limit, step
+    (void ) count;
+    NativeObject *native_object = new_native_object(NativeRangeIter, 3);
+    native_object->values[2] = value[2]; // step
+    native_object->values[0] = int_value(as_int(value[0]) - as_int(value[2])); // curr
+    native_object->values[1] = int_value(as_int(value[1]) - as_int(value[2])); // limit
+    return ref_value((Object *) native_object);
+}
+
+static Value native_array_iter(int count, Value *value) {
+    (void ) count;
+    // curr, array
+    assert_ref_type(*value, OBJ_ARRAY, "array");
+    NativeObject *nativeObject = new_native_object(NativeArrayIter, 2);
+    nativeObject->values[0] = int_value(0);
+    nativeObject->values[1] = *value;
+    return ref_value((Object *) nativeObject);
+}
+
 void init_vm_native() {
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
@@ -443,6 +463,8 @@ void init_vm_native() {
     define_native("read", native_read, -1);
     define_native("char_at", native_char_at, 2);
     define_native("type", native_type, 1);
+    define_native("native_range", native_range, 3);
+    define_native("native_array_iter", native_array_iter, 1);
 }
 
 void additional_repl_init() {

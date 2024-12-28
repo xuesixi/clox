@@ -44,11 +44,13 @@ void print_value_with_color(Value value) {
             break;
         case VAL_REF: {
             switch (as_ref(value)->type) {
+                case OBJ_NATIVE:
+                case OBJ_NATIVE_OBJECT:
+                    break;
                 case OBJ_STRING:
                     start_color(MAGENTA);
                     break;
                 case OBJ_CLOSURE:
-                case OBJ_NATIVE:
                 case OBJ_FUNCTION:
                 case OBJ_METHOD:
                     start_color(BLUE);
@@ -204,8 +206,12 @@ static char *ref_to_chars(Value value, int *len) {
             *len = asprintf(&buffer, "<mod: %s>", filename);
             break;
         }
+        case OBJ_NATIVE_OBJECT: {
+            *len = asprintf(&buffer, "<native obj>");
+            break;
+        }
         default:
-            printf("error: encountering a value with unknown type: %d\n", type);
+            printf("ref_to_chars(): error: encountering a value with unknown type: %d\n", type);
             break;
     }
     return buffer;

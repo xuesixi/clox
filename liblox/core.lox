@@ -40,7 +40,7 @@ class Class {
 
 class Array {
     iterator() {
-        return ArrayIter(this);
+        return native_array_iter(this);
     }
     join(delimiter = ", ", prefix = "[", suffix = "]") {
         return native_value_join(delimiter, prefix, suffix, this);

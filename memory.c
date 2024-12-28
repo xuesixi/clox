@@ -148,6 +148,13 @@ static void blacken_object(Object *object) {
             table_mark(&module->globals);
             break;
         }
+        case OBJ_NATIVE_OBJECT: {
+            NativeObject *nativeObject = (NativeObject *) object;
+            for (int i = 0; i < NATIVE_OBJECT_VALUE_SIZE; ++i) {
+                mark_value(nativeObject->values[i]);
+            }
+            break;
+        }
     }
 }
 

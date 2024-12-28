@@ -124,7 +124,7 @@ static inline void block_statement();
 
 static inline void return_statement();
 
-static void iteration_statement();
+//static void iteration_statement();
 
 static void new_iteration_statement();
 
@@ -1039,94 +1039,6 @@ static void emit_invoke_no_arg(const char *method_name) {
  *     }
  * }
  *
- * begin_scope 1
- * get iterator: [iter]
- *
- * continue point:
- * condition:
- *      iter.has_next()  // [iter, bool]
- * break point:
- *      pop, if false, jump -> end
- *
- *      begin_scope 2
- *
- *      iter.next()     // [iter, item]
- *
- * body:
- *      ... // [iter, item]
- *      end_scope 2
- *      jump -> condition
- *
- * end:
- * end_scope 1
- *
- */
-static void iteration_statement() {
-
-    begin_scope();
-
-    consume(TOKEN_IDENTIFIER, "Expect an identifier");
-    Token item = parser.previous;
-    consume(TOKEN_IN, "Expect 'in'");
-
-    expression(); // [instance_to_iterate]
-
-    emit_invoke_no_arg("iterator");
-
-    Token iter = literal_token("$iter"); // [iter]
-    declare_identifier_token(&iter);
-    mark_initialized();
-
-    save_continue_point(); // continue point
-
-    // condition
-    int condition = current_chunk()->count;
-
-    emit_byte(OP_COPY); // [iter, iter]
-    emit_invoke_no_arg("has_next"); // [iter, bool]
-
-    save_break_point(); // break point
-
-    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
-
-    begin_scope(); // [iter]
-
-    emit_byte(OP_COPY);  // [iter, iter]
-    emit_invoke_no_arg("next"); // [iter, item]
-
-    declare_identifier_token(&item);
-    mark_initialized();
-
-    consume(TOKEN_LEFT_BRACE, "A { is required");
-    while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
-        declaration();
-    }
-    consume(TOKEN_RIGHT_BRACE, "A } is required");
-
-    end_scope();
-
-    loop_back(condition); // jump -> condition
-
-
-    // end
-    patch_jump(to_end);
-
-    end_scope();
-
-    restore_continue_point();
-    restore_break_point();
-}
-
-/**
- *
- * {
- *     var iterator = arr.iterator();
- *     while (iterator.has_next()) {
- *          var item = iterator.next;
- *          body...
- *     }
- * }
- *
  * get iterator: [iter]
  *
  * begin scope 1
@@ -1159,11 +1071,12 @@ static void new_iteration_statement() {
     expression(); // [iterable]
 
     begin_scope();
-    emit_invoke_no_arg("iterator"); // [iter]
+//    emit_invoke_no_arg("iterator"); // [iter]
+    emit_byte(OP_GET_ITERATOR);
     Token iter = literal_token("$iter");
-    mark_initialized();
-
     declare_identifier_token(&iter);
+
+    mark_initialized();
 
     // break point
     save_break_point();

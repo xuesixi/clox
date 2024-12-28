@@ -48,6 +48,7 @@ static Table *curr_closure_global;
 static Value *curr_const_pool;
 
 static uint8_t read_byte();
+
 static uint16_t read_uint16();
 
 static bool is_falsy(Value value);
@@ -61,8 +62,6 @@ static InterpretResult run_frame_until(int end_when);
 static inline bool if_read_byte(OpCode op);
 
 static Value read_constant16();
-
-static InterpretResult run_vm();
 
 static void import(const char *src, String *path);
 
@@ -87,6 +86,13 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
 static Method *bind_method(Class *class, String *name, Value receiver);
 
 /**
+ * 移除栈顶的n个元素
+ */
+inline static void stack_clear(int n) {
+    vm.stack_top -= n;
+}
+
+/**
  * 获取target的指定属性，并将之置于栈顶。
  */
 static void get_property(Value target, String *property_name) {
@@ -99,7 +105,7 @@ static void get_property(Value target, String *property_name) {
                     break;
                 } else {
                     Method *method = bind_method(array_class, property_name, target);
-                    stack_push(ref_value((Object *)method));
+                    stack_push(ref_value((Object *) method));
                 }
                 break;
             }
@@ -110,7 +116,7 @@ static void get_property(Value target, String *property_name) {
                     break;
                 } else {
                     Method *method = bind_method(string_class, property_name, target);
-                    stack_push(ref_value((Object *)method));
+                    stack_push(ref_value((Object *) method));
                 }
                 break;
             }
@@ -127,7 +133,8 @@ static void get_property(Value target, String *property_name) {
                 Module *module = as_module(target);
                 Value property;
                 if (!table_conditional_get(&module->globals, property_name, &property, true, false)) {
-                    runtime_error_catch_2("%s does not the have public property: %s", target, ref_value((Object *) property_name));
+                    runtime_error_catch_2("%s does not the have public property: %s", target,
+                                          ref_value((Object *) property_name));
                 } else {
                     stack_push(property);
                 }
@@ -168,11 +175,73 @@ void assert_value_type(Value value, ValueType type, const char *message) {
 }
 
 /**
+ * 根据interface，执行native_object的对应行为。如果不匹配，该函数会导致runtime error
+ * @param arg_count 参数个数。stack_peek(ar_count)就是native_object
+ * @param interface 接口（预期行为）
+ * @param native_object
+ */
+static void invoke_native_object(int arg_count, NativeInterface interface, NativeObject *native_object) {
+    switch (interface) {
+        case INTER_ITERATOR:
+            switch (native_object->native_type) {
+                case NativeRangeIter: {
+                    // do nothing, it is by itself an iterator
+                    return;
+                }
+                default:
+                    goto error;
+            }
+            break;
+        case INTER_HAS_NEXT: // [iter, iter] -> [iter, bool]
+            switch (native_object->native_type) {
+                case NativeRangeIter: {
+                    // curr, limit, step
+                    stack_pop();
+                    bool has_next = as_int(native_object->values[0]) < as_int(native_object->values[1]);
+                    stack_push(bool_value(has_next));
+                    return;
+                }
+                case NativeArrayIter: {
+                    stack_pop();
+                    bool has_next = as_int(native_object->values[0]) < as_array(native_object->values[1])->length;
+                    stack_push(bool_value(has_next));
+                    return;
+                }
+                default:
+                    goto error;
+            }
+            break;
+        case INTER_NEXT: // [iter, iter] -> [iter, item]
+            switch (native_object->native_type) {
+                case NativeRangeIter: {
+                    stack_pop();
+                    int result = as_int(native_object->values[0]) += as_int(native_object->values[2]);
+                    stack_push(int_value(result));
+                    return;
+                }
+                case NativeArrayIter: {
+                    stack_pop();
+                    Value result = as_array(native_object->values[1])->values[as_int(native_object->values[0])++];
+                    stack_push(result);
+                    return;
+                }
+                default:
+                    goto error;
+            }
+            break;
+        default:
+            goto error;
+    }
+    error:
+    runtime_error_catch_1("%s does not support such operation", ref_value((Object *) native_object));
+}
+
+/**
  * 调用一个property。receiver是stack_peek(arg_count)
  * @param name 名字
  * @param arg_count 参数个数
  */
-static void invoke_property(String *name, int arg_count) {
+static void invoke_property(String *name, int arg_count, NativeInterface interface) {
     Value receiver = stack_peek(arg_count);
     if (is_ref_of(receiver, OBJ_INSTANCE)) {
         Instance *instance = as_instance(receiver);
@@ -207,6 +276,11 @@ static void invoke_property(String *name, int arg_count) {
             case OBJ_STRING:
                 invoke_from_class(string_class, name, arg_count);
                 break;
+            case OBJ_NATIVE_OBJECT: {
+                NativeObject *native_object = as_native_object(receiver);
+                invoke_native_object(arg_count, interface, native_object);
+                break;
+            }
             default:
                 runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
         }
@@ -609,7 +683,7 @@ static void call_closure(Closure *closure, int arg_count) {
             arg_count = fixed_arg_count + optional_arg_count;
             if (function->var_arg) {
                 stack_push(ref_value((Object *) new_array(0)));
-                arg_count ++;
+                arg_count++;
             }
         } else if (function->var_arg) { // more than expect
             arg_count = fixed_arg_count + optional_arg_count + 1;
@@ -626,10 +700,12 @@ static void call_closure(Closure *closure, int arg_count) {
                 build_array(-num_absence);
             }
         } else {
-            runtime_error_and_catch("%s expects at most %d arguments, but got %d", function->name->chars, fixed_arg_count + optional_arg_count, arg_count);
+            runtime_error_and_catch("%s expects at most %d arguments, but got %d", function->name->chars,
+                                    fixed_arg_count + optional_arg_count, arg_count);
         }
     } else {
-        runtime_error_and_catch("%s expects at least %d arguments, but got %d", function->name->chars, fixed_arg_count, arg_count);
+        runtime_error_and_catch("%s expects at least %d arguments, but got %d", function->name->chars, fixed_arg_count,
+                                arg_count);
     }
     if (vm.frame_count == FRAME_MAX) {
         runtime_error_and_catch("Stack overflow.");
@@ -792,7 +868,7 @@ InterpretResult interpret(const char *src, const char *path) {
     warmup(function, path, NULL, true);
 
     InterpretResult error;
-    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+    if ((error = setjmp(error_buf)) != INTERPRET_OK) {
         return error;
     }
 
@@ -852,7 +928,7 @@ InterpretResult read_run_bytecode(const char *path) {
     warmup(function, path, NULL, false);
 
     InterpretResult error;
-    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+    if ((error = setjmp(error_buf)) != INTERPRET_OK) {
         return error;
     }
 
@@ -873,13 +949,13 @@ InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const 
     warmup(function, path, NULL, false);
 
     InterpretResult error;
-    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+    if ((error = setjmp(error_buf)) != INTERPRET_OK) {
         return error;
     }
 
     InterpretResult result = run_frame_until(0);
     if (result == INTERPRET_OK) {
-        table_add_all(curr_closure_global, &vm.builtin, true );
+        table_add_all(curr_closure_global, &vm.builtin, true);
     } else {
         IMPLEMENTATION_ERROR("Error when loading lib");
     }
@@ -970,7 +1046,8 @@ static InterpretResult run_frame_until(int end_when) {
                 while (getchar() != '\n');
             } else {
                 CallFrame *frame = curr_frame;
-                disassemble_instruction(&frame->closure->function->chunk, (int) (frame->PC - frame->closure->function->chunk.code));
+                disassemble_instruction(&frame->closure->function->chunk,
+                                        (int) (frame->PC - frame->closure->function->chunk.code));
             }
         }
 
@@ -987,7 +1064,7 @@ static InterpretResult run_frame_until(int end_when) {
                 }
                 if (vm.frame_count != 0) {
                     curr_const_pool = curr_frame->closure->function->chunk.constants.values;
-                    curr_closure_global = & curr_frame->closure->module->globals;
+                    curr_closure_global = &curr_frame->closure->module->globals;
                     stack_push(result);
                 }
                 if (vm.frame_count == end_when) {
@@ -1112,7 +1189,7 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             case OP_DEF_GLOBAL: {
                 String *name = read_constant_string();
-                if (! table_add_new(curr_closure_global, name, stack_peek(0), false, false)) {
+                if (!table_add_new(curr_closure_global, name, stack_peek(0), false, false)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1128,7 +1205,7 @@ static InterpretResult run_frame_until(int end_when) {
             }
             case OP_DEF_PUB_GLOBAL: {
                 String *name = read_constant_string();
-                if (! table_add_new(curr_closure_global, name, stack_peek(0), true, false)) {
+                if (!table_add_new(curr_closure_global, name, stack_peek(0), true, false)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1136,7 +1213,7 @@ static InterpretResult run_frame_until(int end_when) {
             }
             case OP_DEF_PUB_GLOBAL_CONST: {
                 String *name = read_constant_string();
-                if (! table_add_new(curr_closure_global, name, stack_peek(0), true, true)) {
+                if (!table_add_new(curr_closure_global, name, stack_peek(0), true, true)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1284,7 +1361,8 @@ static InterpretResult run_frame_until(int end_when) {
                     if (is_ref_of(target, OBJ_CLASS)) {
                         Class *class = as_class(target);
                         if (table_set_existent(&class->static_fields, property_name, value, false)) {
-                            runtime_error_catch_2("%s does not have the static field: %s", ref_value((Object *) class), ref_value((Object *) property_name));
+                            runtime_error_catch_2("%s does not have the static field: %s", ref_value((Object *) class),
+                                                  ref_value((Object *) property_name));
                         }
                         break;
                     } else if (is_ref_of(target, OBJ_MODULE)) {
@@ -1294,13 +1372,15 @@ static InterpretResult run_frame_until(int end_when) {
                             case 0:
                                 break;
                             case 1:
-                                runtime_error_catch_2("%s does not have the property: %s", target, ref_value((Object *) property_name));
+                                runtime_error_catch_2("%s does not have the property: %s", target,
+                                                      ref_value((Object *) property_name));
                                 break;
                             case 2:
                                 runtime_error_and_catch("cannot modify the const property: %s", property_name->chars);
                                 break;
                             case 3:
-                                runtime_error_and_catch("cannot access the non-public property: %s", property_name->chars);
+                                runtime_error_and_catch("cannot access the non-public property: %s",
+                                                        property_name->chars);
                                 break;
                             default:
                                 IMPLEMENTATION_ERROR("bad");
@@ -1332,7 +1412,7 @@ static InterpretResult run_frame_until(int end_when) {
                 // code: op, name_index, arg_count
                 String *name = read_constant_string();
                 int arg_count = read_byte();
-                invoke_property(name, arg_count);
+                invoke_property(name, arg_count, INTER_NULL);
                 break;
             }
             case OP_INHERIT: {
@@ -1466,7 +1546,7 @@ static InterpretResult run_frame_until(int end_when) {
             case OP_SWAP: {
                 int n = read_byte();
                 Value temp = stack_peek(n);
-                vm.stack_top[-1-n] = stack_peek(0);
+                vm.stack_top[-1 - n] = stack_peek(0);
                 vm.stack_top[-1] = temp;
                 break;
             }
@@ -1500,20 +1580,24 @@ static InterpretResult run_frame_until(int end_when) {
                 }
                 break;
             }
+            case OP_GET_ITERATOR: {
+                invoke_property(ITERATOR, 0, INTER_ITERATOR);
+                break;
+            }
             case OP_JUMP_FOR_ITER: {
                 // [iter]
                 int offset = read_uint16();
                 stack_push(stack_peek(0)); // [iter, iter]
                 int frame_count = vm.frame_count;
-                invoke_property(HAS_NEXT, 0);
+                invoke_property(HAS_NEXT, 0, INTER_HAS_NEXT);
                 run_frame_until(frame_count); // [iter, bool]
                 if (is_falsy(stack_pop())) {
                     curr_frame->PC += offset;
                     break;
                 }
-                // [iter]
+                // [iter, iter]
                 stack_push(stack_peek(0));
-                invoke_property(NEXT, 0);
+                invoke_property(NEXT, 0, INTER_NEXT);
                 // [iter, item]
                 break;
             }

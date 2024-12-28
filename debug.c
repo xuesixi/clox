@@ -252,6 +252,8 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("ARR_AS_VAR_ARG", offset);
         case OP_JUMP_FOR_ITER:
             return jump_instruction("JUMP_FOR_ITER", chunk, offset, true);
+        case OP_GET_ITERATOR:
+            return simple_instruction("GET_ITERATOR", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return offset + 1;

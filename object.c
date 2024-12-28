@@ -193,6 +193,19 @@ Module *new_module(String *path) {
     return module;
 }
 
+/**
+ * 创建一个新的native object。
+ * value_used 表示将要使用的数据的个数，该函数会根据之来将没有使用的值初始化为nil。
+ */
+NativeObject *new_native_object(NativeObjectType type, int value_used) {
+    NativeObject *native_obj = (NativeObject *) allocate_object(sizeof(NativeObject), OBJ_NATIVE_OBJECT);
+    native_obj->native_type = type;
+    for (int i = value_used; i < NATIVE_OBJECT_VALUE_SIZE; ++i) {
+        native_obj->values[i] = nil_value();
+    }
+    return native_obj;
+}
+
 
 
 
