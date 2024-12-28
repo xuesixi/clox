@@ -1,6 +1,7 @@
 #ifndef CLOX_OBJECT_H
 
 #define CLOX_OBJECT_H
+#define NATIVE_OBJECT_VALUE_SIZE 4
 
 #include "value.h"
 #include "chunk.h"
@@ -17,8 +18,21 @@ typedef enum {
   OBJ_METHOD,
   OBJ_ARRAY,
   OBJ_MODULE,
+  OBJ_NATIVE_OBJECT,
   OBJ_MAP,
 } ObjectType;
+
+typedef enum NativeObjectType {
+    NativeRangeIter,
+    NativeArrayIter,
+} NativeObjectType;
+
+typedef enum NativeInterface {
+    INTER_NULL,
+    INTER_HAS_NEXT,
+    INTER_NEXT,
+    INTER_ITERATOR,
+} NativeInterface;
 
 typedef struct Object{
     ObjectType type;
@@ -120,6 +134,12 @@ typedef struct NativeFunction {
     int arity; // -1 means variable amount of arguments
 } NativeFunction;
 
+typedef struct NativeObject {
+    Object object;
+    Value values[NATIVE_OBJECT_VALUE_SIZE];
+    NativeObjectType native_type;
+} NativeObject;
+
 #define is_ref_of(value, ref_type) (is_ref(value) && as_ref(value)->type == (ref_type))
 
 #define as_string(v) ((String *)(as_ref(v)))
@@ -131,6 +151,7 @@ typedef struct NativeFunction {
 #define as_method(v) ((Method *)(as_ref(v)))
 #define as_array(v) ((Array *)(as_ref(v)))
 #define as_module(v) ((Module *)(as_ref(v)))
+#define as_native_object(v) ((NativeObject *)as_ref(v) )
 #define as_map(v) ((Map *)(as_ref(v)) )
 
 
@@ -161,5 +182,6 @@ inline bool map_need_resize(Map *map);
 //bool map_set(Map *map, Value key, Value value);
 //void *map_delete(Map *map, void *key);
 //MapEntry *map_find_entry(Map *map, uint32_t hash);
+NativeObject *new_native_object(NativeObjectType type, int num_used);
 
 #endif

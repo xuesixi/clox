@@ -22,6 +22,8 @@ VM vm;
 String *INIT = NULL;
 String *LENGTH = NULL;
 String *ITERATOR = NULL;
+String *HAS_NEXT = NULL;
+String *NEXT = NULL;
 String *EQUAL = NULL;
 String *HASH = NULL;
 
@@ -57,6 +59,8 @@ static void reset_stack();
 
 //static Value read_constant();
 
+static InterpretResult run_frame_until(int end_when);
+
 static inline bool if_read_byte(OpCode op);
 
 static Value read_constant16();
@@ -84,6 +88,13 @@ static Value multi_dimension_array(int dimension, Value *lens);
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl);
 
 static Method *bind_method(Class *class, String *name, Value receiver);
+
+/**
+ * 移除栈顶的n个元素
+ */
+inline static void stack_clear(int n) {
+    vm.stack_top -= n;
+}
 
 
 static inline void stack_set(int n, Value value) {
@@ -141,7 +152,7 @@ static void get_property(Value target, String *property_name) {
                     break;
                 } else {
                     Method *method = bind_method(array_class, property_name, target);
-                    stack_push(ref_value((Object *)method));
+                    stack_push(ref_value((Object *) method));
                 }
                 break;
             }
@@ -152,7 +163,7 @@ static void get_property(Value target, String *property_name) {
                     break;
                 } else {
                     Method *method = bind_method(string_class, property_name, target);
-                    stack_push(ref_value((Object *)method));
+                    stack_push(ref_value((Object *) method));
                 }
                 break;
             }
@@ -210,12 +221,73 @@ void assert_value_type(Value value, ValueType type, const char *message) {
 }
 
 /**
+ * 根据interface，执行native_object的对应行为。如果不匹配，该函数会导致runtime error
+ * @param arg_count 参数个数。stack_peek(ar_count)就是native_object
+ * @param interface 接口（预期行为）
+ * @param native_object
+ */
+static void invoke_native_object(int arg_count, NativeInterface interface, NativeObject *native_object) {
+    switch (interface) {
+        case INTER_ITERATOR:
+            switch (native_object->native_type) {
+                case NativeRangeIter: {
+                    // do nothing, it is by itself an iterator
+                    return;
+                }
+                default:
+                    goto error;
+            }
+            break;
+        case INTER_HAS_NEXT: // [iter, iter] -> [iter, bool]
+            switch (native_object->native_type) {
+                case NativeRangeIter: {
+                    // curr, limit, step
+                    stack_pop();
+                    bool has_next = as_int(native_object->values[0]) < as_int(native_object->values[1]);
+                    stack_push(bool_value(has_next));
+                    return;
+                }
+                case NativeArrayIter: {
+                    stack_pop();
+                    bool has_next = as_int(native_object->values[0]) < as_array(native_object->values[1])->length;
+                    stack_push(bool_value(has_next));
+                    return;
+                }
+                default:
+                    goto error;
+            }
+            break;
+        case INTER_NEXT: // [iter, iter] -> [iter, item]
+            switch (native_object->native_type) {
+                case NativeRangeIter: {
+                    stack_pop();
+                    int result = as_int(native_object->values[0]) += as_int(native_object->values[2]);
+                    stack_push(int_value(result));
+                    return;
+                }
+                case NativeArrayIter: {
+                    stack_pop();
+                    Value result = as_array(native_object->values[1])->values[as_int(native_object->values[0])++];
+                    stack_push(result);
+                    return;
+                }
+                default:
+                    goto error;
+            }
+            break;
+        default:
+            goto error;
+    }
+    error:
+    runtime_error_catch_1("%s does not support such operation", ref_value((Object *) native_object));
+}
+
+/**
  * 调用一个property。receiver是stack_peek(arg_count). 如果没有找到那个属性，该函数会触发runtime error
  * @param name 名字
  * @param arg_count 参数个数
  */
-static void invoke_property(String *name, int arg_count) {
-//    int arg_count = read_byte();
+static void invoke_property(String *name, int arg_count, NativeInterface interface) {
     Value receiver = stack_peek(arg_count);
     if (is_ref_of(receiver, OBJ_INSTANCE)) {
         Instance *instance = as_instance(receiver);
@@ -224,13 +296,7 @@ static void invoke_property(String *name, int arg_count) {
             Class *class = instance->class;
             invoke_from_class(class, name, arg_count);
         } else {
-            if (is_ref_of(closure_value, OBJ_METHOD)) {
-                call_value(closure_value, arg_count);
-            } else if (is_ref_of(closure_value, OBJ_CLOSURE)) {
-                call_closure(as_closure(closure_value), arg_count);
-            } else {
-                runtime_error_catch_1("%s is not callable", closure_value);
-            }
+            call_value(closure_value, arg_count);;
         }
     } else {
         switch (receiver.as.reference->type) {
@@ -260,6 +326,11 @@ static void invoke_property(String *name, int arg_count) {
             case OBJ_STRING:
                 invoke_from_class(string_class, name, arg_count);
                 break;
+            case OBJ_NATIVE_OBJECT: {
+                NativeObject *native_object = as_native_object(receiver);
+                invoke_native_object(arg_count, interface, native_object);
+                break;
+            }
             default:
             error_handle:
                 runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
@@ -692,7 +763,6 @@ static void call_closure(Closure *closure, int arg_count) {
     curr_frame = vm.frames + vm.frame_count - 1;
     CallFrame *frame = curr_frame;
     frame->FP = vm.stack_top - arg_count - 1;
-    frame->mark = NO_MARK;
     frame->PC = function->chunk.code;
     frame->closure = closure;
     curr_closure_global = &closure->module->globals;
@@ -762,6 +832,8 @@ static void init_static_strings() {
     INIT = auto_length_string_copy("init");
     LENGTH = auto_length_string_copy("length");
     ITERATOR = auto_length_string_copy("iterator");
+    HAS_NEXT = auto_length_string_copy("has_next");
+    NEXT = auto_length_string_copy("next");
     EQUAL = auto_length_string_copy("equal");
     HASH = auto_length_string_copy("hash");
 
@@ -844,13 +916,14 @@ InterpretResult interpret(const char *src, const char *path) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    DISABLE_GC;
-
     warmup(function, path, NULL, true);
 
-    ENABLE_GC;
+    InterpretResult error;
+    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
+        return error;
+    }
 
-    return run_vm();
+    return run_frame_until(0);
 }
 
 static void import(const char *src, String *path) {
@@ -860,8 +933,6 @@ static void import(const char *src, String *path) {
 
     LoxFunction *function = compile(src);
 
-    DISABLE_GC;
-
     if (function == NULL) {
         runtime_error_and_catch("the module fails to compile");
         return;
@@ -869,15 +940,10 @@ static void import(const char *src, String *path) {
 
     warmup(function, NULL, path, false);
 
-    ENABLE_GC;
-
 }
 
 /**
- * 目前还没写好。因为chunk内部是code指针
- * @param src
- * @param path
- * @return
+ * 编译源代码，输出字节码
  */
 InterpretResult produce(const char *src, const char *path) {
     LoxFunction *function = compile(src);
@@ -888,44 +954,79 @@ InterpretResult produce(const char *src, const char *path) {
     FILE *file = fopen(path, "wb");
     if (file == NULL) {
         printf("Error when opening the file: %s\n", path);
-        return INTERPRET_PRODUCE_ERROR;
+        return INTERPRET_BYTECODE_WRITE_ERROR;
     }
     write_function(file, function);
     fclose(file);
-    return INTERPRET_OK;
+    return INTERPRET_PRODUCE_OK;
 }
 
 InterpretResult read_run_bytecode(const char *path) {
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
         printf("Error when opening the file: %s\n", path);
-        return INTERPRET_READ_ERROR;
+        return INTERPRET_BYTECODE_READ_ERROR;
     }
 
     DISABLE_GC;
-
     LoxFunction *function = read_function(file);
+    ENABLE_GC;
+
     fclose(file);
     warmup(function, path, NULL, false);
 
+    InterpretResult error;
+    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
+        return error;
+    }
+
+    return run_frame_until(0);
+}
+
+InterpretResult disassemble_byte_code(const char *path) {
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        printf("Error when opening the file: %s\n", path);
+        return INTERPRET_BYTECODE_READ_ERROR;
+    }
+
+    DISABLE_GC;
+    LoxFunction *function = read_function(file);
     ENABLE_GC;
 
-    return run_vm();
+    int result = disassemble_chunk(&function->chunk, path);
+    if (result == -1) {
+        return INTERPRET_BYTECODE_DISASSEMBLE_ERROR;
+    } else {
+        return INTERPRET_BYTECODE_DISASSEMBLE_OK;
+    }
 }
 
 /**
- * 用fmemopen()从目标字节数组处打开一个流，然后读取并执行起字节码。运行后，将全局命名空间中的public元素添加到builtin命名空间中
+ * 用fmemopen()从目标字节数组处打开一个流，创建一个新的全局命名空间，然后读取并执行字节码。运行后，将全局命名空间中的public元素添加到builtin命名空间中
  */
-InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
+InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const char *path) {
     FILE *file = fmemopen(bytes, len, "rb");
+
+    DISABLE_GC;
     LoxFunction *function = read_function(file);
+    fclose(file);
+    ENABLE_GC;
+
     warmup(function, path, NULL, false);
-    InterpretResult result = run_vm();
-    if (result == INTERPRET_OK) {
-        table_add_all(curr_closure_global, &vm.builtin, true );
+
+    InterpretResult error;
+    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
+        return error;
+    }
+
+    InterpretResult result = run_frame_until(0);
+    if (result == INTERPRET_EXECUTE_OK) {
+        table_add_all(curr_closure_global, &vm.builtin, true);
     } else {
         IMPLEMENTATION_ERROR("Error when loading lib");
     }
+
     return result;
 }
 
@@ -940,13 +1041,15 @@ InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path) {
  */
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl) {
 
-    if (preload_started || COMPILE_ONLY) {
+//    if (preload_started || COMPILE_ONLY) {
+//
+//    } else {
+//        preload_started = true;
+//        load_libraries();
+//        preload_finished = true;
+//    }
 
-    } else {
-        preload_started = true;
-        load_libraries();
-        preload_finished = true;
-    }
+    DISABLE_GC;
 
     vm.frame_count++;
 
@@ -972,6 +1075,8 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
     curr_const_pool = closure->function->chunk.constants.values;
 
     stack_push(ref_value((Object *) closure));
+
+    ENABLE_GC;
 }
 
 /**
@@ -987,23 +1092,20 @@ static void build_array(int length) {
 }
 
 /**
- * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之
+ * 遍历虚拟机的 curr_frame 的 function 的 chunk 中的每一个指令，执行之. 运行直到vm.frame_count == end_when.
  * 如果发生了runtime error，该函数将立刻返回。
  * @return 执行的结果
  */
-static InterpretResult run_vm() {
-#ifdef COUNT_INSTRUCTIONS_RUN
-    static long run_count = 0;
-    run_count = 0;
-#endif
-    InterpretResult error_code;
-    if ( (error_code = setjmp(error_buf))) {
-        //  运行时错误会跳转至这里
-        return error_code;
+static InterpretResult run_frame_until(int end_when) {
+    if (vm.frame_count == end_when) {
+        return INTERPRET_EXECUTE_OK;
     }
-    while (true) {
+//    InterpretResult error;
+//    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
+//        return error;
+//    }
 
-        next_instruction:
+    while (true) {
 
         if (TRACE_EXECUTION && TRACE_SKIP == -1 && preload_finished) {
             show_stack();
@@ -1012,16 +1114,12 @@ static InterpretResult run_vm() {
                 while (getchar() != '\n');
             } else {
                 CallFrame *frame = curr_frame;
-                disassemble_instruction(&frame->closure->function->chunk, (int) (frame->PC - frame->closure->function->chunk.code));
+                disassemble_instruction(&frame->closure->function->chunk,
+                                        (int) (frame->PC - frame->closure->function->chunk.code), false);
             }
         }
 
         uint8_t instruction = read_byte();
-
-#ifdef COUNT_INSTRUCTIONS_RUN
-        run_count ++;
-#endif
-
         switch (instruction) {
             case OP_RETURN: {
                 Value result = stack_pop(); // 返回值
@@ -1032,35 +1130,17 @@ static InterpretResult run_vm() {
                 if (vm.frame_count == TRACE_SKIP) {
                     TRACE_SKIP = -1; // no skip. Step by step
                 }
-                if (vm.frame_count == 0) {
-#ifdef COUNT_INSTRUCTIONS_RUN
-                    printf("run %ld instructions\n", run_count);
-#endif
-                    return INTERPRET_OK; // 程序运行结束
+                if (vm.frame_count != 0) {
+                    curr_const_pool = curr_frame->closure->function->chunk.constants.values;
+                    curr_closure_global = &curr_frame->closure->module->globals;
+                    stack_push(result);
                 }
-                curr_const_pool = curr_frame->closure->function->chunk.constants.values;
-                curr_closure_global = & curr_frame->closure->module->globals;
-                stack_push(result);
-                if (curr_frame->mark != NO_MARK) {
-                    int mark = curr_frame->mark;
-                    curr_frame->mark = NO_MARK;
-                    switch (mark) {
-                        case MARK_EQUAL:
-                            goto label_equal;
-                            break;
-                        case MARK_MAP_GET:
-                            goto label_map_get;
-                            break;
-                        case MARK_KEY_HASHING_GET:
-                            goto label_after_hashing;
-                            break;
-                        default:
-                            break;
-                    }
+                if (vm.frame_count == end_when) {
+                    return INTERPRET_EXECUTE_OK;
                 }
                 break;
             }
-            case OP_CONSTANT: {
+            case OP_LOAD_CONSTANT: {
                 Value value = read_constant16();
                 stack_push(value);
                 break;
@@ -1123,70 +1203,31 @@ static InterpretResult run_vm() {
                 }
                 break;
             }
-            case OP_LESS: {
+            case OP_TEST_LESS: {
                 Value b = stack_pop();
                 Value a = stack_pop();
                 binary_number_op(a, b, '<');
                 break;
             }
-            case OP_GREATER: {
+            case OP_TEST_GREATER: {
                 Value b = stack_pop();
                 Value a = stack_pop();
                 binary_number_op(a, b, '>');
                 break;
             }
-            case OP_EQUAL: {
-                Value b = stack_peek(0);
-                Value a = stack_peek(1);
-                if (is_ref_of(a, OBJ_INSTANCE) && is_ref_of(b, OBJ_INSTANCE)) {
-                    Instance *ia = as_instance(a);
-                    Instance *ib = as_instance(b);
-                    Value value;
-                    Closure *closure;
-                    if (table_get(&ia->class->methods, EQUAL, &value)) {
-                        // [a, b]
-                        closure = as_closure(value);
-                        stack_push(stack_peek(1));
-                        stack_push(stack_peek(1));
-                        // [a, b, a, b]
-                        curr_frame->mark = 1;
-                        call_closure(closure, 1);
-                        continue;
-                        label_equal:
-                        printf("try second equal\n");
-                        // [a, b, bool]
-                        if (is_falsy(stack_peek(0)) && table_get(&ib->class->methods, EQUAL, &value)) {
-                            closure = as_closure(value); // [a, b, false]
-                            stack_pop();
-                            stack_swap(1); // [b, a];
-                            call_closure(closure, 1);
-                        } else {
-                            Value result = stack_pop();
-                            stack_pop();
-                            stack_set(0, result);
-                        }
-                    } else if (table_get(&ib->class->methods, EQUAL, &value)){
-
-                    } else {
-                        stack_pop();
-                        stack_pop();
-                        stack_push(bool_value(value_equal(a, b)));
-                    }
-                } else {
-                    stack_pop();
-                    stack_pop();
-                    stack_push(bool_value(value_equal(a, b)));
-                }
-
+            case OP_TEST_EQUAL: {
+                Value b = stack_pop();
+                Value a = stack_pop();
+                stack_push(bool_value(value_equal(a, b)));
                 break;
             }
-            case OP_NIL:
+            case OP_LOAD_NIL:
                 stack_push(nil_value());
                 break;
-            case OP_TRUE:
+            case OP_LOAD_TRUE:
                 stack_push(bool_value(true));
                 break;
-            case OP_FALSE:
+            case OP_LOAD_FALSE:
                 stack_push(bool_value(false));
                 break;
             case OP_NOT:
@@ -1216,7 +1257,7 @@ static InterpretResult run_vm() {
                 break;
             case OP_DEF_GLOBAL: {
                 String *name = read_constant_string();
-                if (! table_add_new(curr_closure_global, name, stack_peek(0), false, false)) {
+                if (!table_add_new(curr_closure_global, name, stack_peek(0), false, false)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1232,7 +1273,7 @@ static InterpretResult run_vm() {
             }
             case OP_DEF_PUB_GLOBAL: {
                 String *name = read_constant_string();
-                if (! table_add_new(curr_closure_global, name, stack_peek(0), true, false)) {
+                if (!table_add_new(curr_closure_global, name, stack_peek(0), true, false)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1240,7 +1281,7 @@ static InterpretResult run_vm() {
             }
             case OP_DEF_PUB_GLOBAL_CONST: {
                 String *name = read_constant_string();
-                if (! table_add_new(curr_closure_global, name, stack_peek(0), true, true)) {
+                if (!table_add_new(curr_closure_global, name, stack_peek(0), true, true)) {
                     runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
@@ -1313,14 +1354,14 @@ static InterpretResult run_vm() {
                 }
                 break;
             }
-            case OP_JUMP_IF_FALSE_POP: {
+            case OP_POP_JUMP_IF_FALSE: {
                 uint16_t offset = read_uint16();
                 if (is_falsy(stack_pop())) {
                     curr_frame->PC += offset;
                 }
                 break;
             }
-            case OP_JUMP_IF_TRUE_POP: {
+            case OP_POP_JUMP_IF_TRUE: {
                 uint16_t offset = read_uint16();
                 if (!is_falsy(stack_pop())) {
                     curr_frame->PC += offset;
@@ -1333,7 +1374,7 @@ static InterpretResult run_vm() {
                 call_value(callee, count);
                 break;
             }
-            case OP_CLOSURE: {
+            case OP_MAKE_CLOSURE: {
                 /* 值得注意的是，对于嵌套的closure，虽然在编译时，是内部的
                  * 函数先编译，但是在运行时，是先执行外层函数的OP_closure。
                  * 然后等到外层函数被调用、内层函数被定义后，内层函数的OP_closure
@@ -1369,7 +1410,7 @@ static InterpretResult run_vm() {
                 stack_pop();
                 break;
             }
-            case OP_CLASS: {
+            case OP_MAKE_CLASS: {
                 String *name = read_constant_string();
                 stack_push(ref_value((Object *) new_class(name)));
                 break;
@@ -1388,7 +1429,8 @@ static InterpretResult run_vm() {
                     if (is_ref_of(target, OBJ_CLASS)) {
                         Class *class = as_class(target);
                         if (table_set_existent(&class->static_fields, property_name, value, false)) {
-                            runtime_error_catch_2("%s does not have the static field: %s", ref_value((Object *) class), ref_value((Object *) property_name));
+                            runtime_error_catch_2("%s does not have the static field: %s", ref_value((Object *) class),
+                                                  ref_value((Object *) property_name));
                         }
                         break;
                     } else if (is_ref_of(target, OBJ_MODULE)) {
@@ -1398,13 +1440,15 @@ static InterpretResult run_vm() {
                             case 0:
                                 break;
                             case 1:
-                                runtime_error_catch_2("%s does not have the property: %s", target, ref_value((Object *) property_name));
+                                runtime_error_catch_2("%s does not have the property: %s", target,
+                                                      ref_value((Object *) property_name));
                                 break;
                             case 2:
                                 runtime_error_and_catch("cannot modify the const property: %s", property_name->chars);
                                 break;
                             case 3:
-                                runtime_error_and_catch("cannot access the non-public property: %s", property_name->chars);
+                                runtime_error_and_catch("cannot access the non-public property: %s",
+                                                        property_name->chars);
                                 break;
                             default:
                                 IMPLEMENTATION_ERROR("bad");
@@ -1422,7 +1466,7 @@ static InterpretResult run_vm() {
                 }
                 break;
             }
-            case OP_METHOD: {
+            case OP_MAKE_METHOD: {
                 // stack: class, closure,
                 // op-method
                 Closure *closure = as_closure(stack_peek(0));
@@ -1436,7 +1480,7 @@ static InterpretResult run_vm() {
                 // code: op, name_index, arg_count
                 String *name = read_constant_string();
                 int arg_count = read_byte();
-                invoke_property(name, arg_count);
+                invoke_property(name, arg_count, INTER_NULL);
                 break;
             }
             case OP_INHERIT: {
@@ -1492,115 +1536,53 @@ static InterpretResult run_vm() {
                 break;
             }
             case OP_INDEXING_GET: {
-                Value target = stack_peek(1);
-                if (is_ref_of(target, OBJ_ARRAY)) {
-                    array_indexing_get();
-                } else if (is_ref_of(target, OBJ_MAP)) {
-                    // [map, key]
-                    Map *map = as_map(stack_peek(1));
-                    if (map->count == 0) {
-                        stack_pop();
-                        stack_pop();
-                        stack_push(nil_value());
-                        break;
-                    }
-                    stack_push(stack_peek(0)); // [map, key, key]
-                    curr_frame->mark = MARK_KEY_HASHING_GET;
-                    invoke_property(HASH, 0);
-                    goto next_instruction;
-
-                    label_after_hashing:
-                    // [map, key, hash]
-                    map = as_map(stack_peek(2));
-//                    int hash = as_int(stack_peek(0));
-                    int index = MODULO(as_int(stack_peek(0)), map->capacity);
-                    for (int i = 0; i < map->capacity; ++i) {
-                        int curr = MODULO(index + i, map->capacity);
-                        MapEntry *entry = map->backing + curr;
-                        if (map_empty_entry(entry)) {
-                            stack_pop();
-                            stack_pop();
-                            stack_pop();
-                            stack_push(nil_value());
-                            goto next_instruction; // 实际上就等于双重break，但由于这里是switch+loop，用goto更简单。
-
-                        } else if (!is_absence(entry->key) && entry->hash == as_int(stack_peek(0))) {
-                            curr_frame->mark = MARK_MAP_GET;
-                            stack_push(entry->value);
-                            stack_push(entry->key);
-                            stack_push(stack_peek(1)); // [map, key, hash, value, existing_key, key]
-                            invoke_property(EQUAL, 1);
-                            goto next_instruction;
-
-                            label_map_get:
-                            // [map, key, hash, value, bool]
-                            if (!is_falsy(stack_pop())) {
-                                Value value = stack_pop();
-                                stack_set(2, value); // [value, key, hash]
-                                stack_pop();
-                                stack_pop(); // finish!
-                                goto next_instruction;
-                            } else {
-                                stack_pop();
-                            }
-                        }
-                    }
-                    // not found
-                    stack_pop();
-                    stack_pop();
-                    stack_pop();
-                    stack_push(nil_value());
-                    break;
-                } else {
-                    runtime_error_catch_1("the value: %s is neither map or array and does not support indexing", target);
+                // [arr, index, top]
+                Value index_value = stack_pop();
+                if (!is_int(index_value)) {
+                    runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
                 }
+                Value arr_value = stack_pop();
+                if (!is_ref_of(arr_value, OBJ_ARRAY)) {
+                    runtime_error_catch_1("%s is not an array and does not support indexing", arr_value);
+                }
+                Array *array = as_array(arr_value);
+                int index = as_int(index_value);
+                if (index < 0 || index >= array->length) {
+                    runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
+                }
+                stack_push(array->values[index]);
                 break;
             }
             case OP_INDEXING_SET: {
-                Value target = stack_peek(2);
-                if (is_ref_of(target, OBJ_ARRAY)) {
-                    array_indexing_set();
-                } else if (is_ref_of(target, OBJ_MAP)) {
-                    // [map, key, value]
-                    Map *map = as_map(stack_peek(2));
-                    if (map_need_resize(map)) {
-                        //..
-                    }
-                    stack_push(stack_peek(1)); // [map, key, value, key]
-                    curr_frame->mark = MARK_KEY_HASHING_SET_1;
-                    invoke_property(HASH, 0);
-
-                    label_after_set_hashing1:
-                    // [map, key, value, hash]
-                    map = as_map(stack_peek(3));
-                    int hash = as_int(stack_peek(0));
-                    int index = MODULO(, map->capacity);
-                    for (int i = 0; i < map->capacity; ++i) {
-                        int curr = MODULO(index + i, map->capacity);
-                        MapEntry *entry = map->backing + curr;
-                        if (map_empty_entry(entry)) {
-                            entry->key = stack_peek(2);
-                            entry->value = stack_peek(1); // done
-                            stack_pop();
-                        }
-                    }
-
-                } else {
-                    runtime_error_catch_1("the value: %s is neither map or array and does not support indexing", target);
+                // op: [array, index, value, top]
+                Value value = stack_pop();
+                Value index_value = stack_pop();
+                if (!is_int(index_value)) {
+                    runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
                 }
+                Value arr_value = stack_pop();
+                if (!is_ref_of(arr_value, OBJ_ARRAY)) {
+                    runtime_error_catch_1("%s is not an array and does not support indexing", arr_value);
+                }
+                Array *array = as_array(arr_value);
+                int index = as_int(index_value);
+                if (index < 0 || index >= array->length) {
+                    runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
+                }
+                array->values[index] = value;
+                stack_push(value);
                 break;
             }
-            case OP_BUILD_ARRAY: {
+            case OP_MAKE_ARRAY: {
                 int length = read_byte();
                 build_array(length);
                 break;
             }
             case OP_UNPACK_ARRAY: {
-//                int length = read_byte();
                 read_byte();
                 break;
             }
-            case OP_CLASS_STATIC_FIELD: {
+            case OP_MAKE_STATIC_FIELD: {
                 // [class, field, top]
                 String *name = read_constant_string();
                 Value field = stack_peek(0);
@@ -1632,7 +1614,7 @@ static InterpretResult run_vm() {
             case OP_SWAP: {
                 int n = read_byte();
                 Value temp = stack_peek(n);
-                vm.stack_top[-1-n] = stack_peek(0);
+                vm.stack_top[-1 - n] = stack_peek(0);
                 vm.stack_top[-1] = temp;
                 break;
             }
@@ -1656,14 +1638,35 @@ static InterpretResult run_vm() {
                 }
                 break;
             }
-            case OP_ABSENCE:
+            case OP_LOAD_ABSENCE:
                 stack_push(absence_value());
                 break;
-            case OP_JUMP_IF_NOT_ABSENCE_POP: {
+            case OP_JUMP_IF_NOT_ABSENCE: {
                 int offset = read_uint16();
                 if (!is_absence(stack_pop())) {
                     curr_frame->PC += offset;
                 }
+                break;
+            }
+            case OP_GET_ITERATOR: {
+                invoke_property(ITERATOR, 0, INTER_ITERATOR);
+                break;
+            }
+            case OP_JUMP_FOR_ITER: {
+                // [iter]
+                int offset = read_uint16();
+                stack_push(stack_peek(0)); // [iter, iter]
+                int frame_count = vm.frame_count;
+                invoke_property(HAS_NEXT, 0, INTER_HAS_NEXT);
+                run_frame_until(frame_count); // [iter, bool]
+                if (is_falsy(stack_pop())) {
+                    curr_frame->PC += offset;
+                    break;
+                }
+                // [iter, iter]
+                stack_push(stack_peek(0));
+                invoke_property(NEXT, 0, INTER_NEXT);
+                // [iter, item]
                 break;
             }
             default: {
@@ -1671,5 +1674,7 @@ static InterpretResult run_vm() {
                 break;
             }
         }
+
     }
 }
+

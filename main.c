@@ -9,12 +9,14 @@
 
 #define REPL_FILE_NAME "LOX_REPL"
 
+char OUTPUT_PATH[100];
+
 bool COMPILE_ONLY = false;
 bool RUN_BYTECODE = false;
-char OUTPUT_PATH[100];
+bool DISASSEMBLE_ONLY = false;
 bool REPL = false;
+bool LOAD_LIB = true;
 bool preload_finished = false;
-bool preload_started = false;
 bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
 int TRACE_SKIP = -1;
@@ -31,18 +33,34 @@ static void print_result_with_color(InterpretResult result) {
             start_color(RED);
             printf("== runtime error ==\n");
             break;
-        case INTERPRET_PRODUCE_ERROR:
+        case INTERPRET_BYTECODE_WRITE_ERROR:
             start_color(RED);
-            printf("== produce error ==\n");
+            printf("== bytecode writing error ==\n");
             break;
-        case INTERPRET_READ_ERROR:
+        case INTERPRET_BYTECODE_DISASSEMBLE_ERROR:
             start_color(RED);
-            printf("== file reading error");
+            printf("== bytecode disassembling error ==\n");
             break;
-        case INTERPRET_OK:
-        case INTERPRET_REPL_EXIT:
+        case INTERPRET_BYTECODE_READ_ERROR:
+            start_color(RED);
+            printf("== bytecode reading error ==\n");
+            break;
+        case INTERPRET_PRODUCE_OK:
+            start_color(GREEN);
+            printf("== bytecode produced ==\n");
+            break;
+        case INTERPRET_BYTECODE_DISASSEMBLE_OK:
+            start_color(GREEN);
+            printf("== bytecode disassembling finished ==\n");
+            break;
+        case INTERPRET_EXECUTE_OK:
             start_color(GREEN);
             printf("== execution finished ==\n");
+            break;
+        case INTERPRET_REPL_EXIT:
+            start_color(GREEN);
+            printf("== repl exited ==\n");
+            break;
     }
     end_color();
 }
@@ -69,6 +87,8 @@ static void repl() {
     memcpy(repl_path + strlen(repl_path), "/"REPL_FILE_NAME, len + 1); // +1 to copy the '/0'
     String *path_string = string_copy(repl_path,  len);
     repl_module = new_module(path_string);
+
+    load_libraries();
 
     additional_repl_init();
     printf("You are in the clox REPL mode. Type help() for more information, exit() to exit. \nYour compiled input will be saved in the file LOX_REPL.\n\n");
@@ -151,6 +171,7 @@ static void run_file(const char *path) {
         printf("error when opening file %s\n", path);
         exit(1);
     }
+    load_libraries();
     InterpretResult result = interpret(src, path);
     free(src);
 #ifdef COLOR_RUN_FILE_RESULT
@@ -164,6 +185,7 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
         printf("error when opening file %s\n", code_path);
         exit(1);
     }
+    load_libraries();
     InterpretResult result = produce(src, result_path);
     free(src);
 #ifdef COLOR_RUN_FILE_RESULT
@@ -173,7 +195,15 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
 
 static void main_run_bytecode(const char *code_path) {
 
+    load_libraries();
     InterpretResult result = read_run_bytecode(code_path);
+#ifdef COLOR_RUN_FILE_RESULT
+    print_result_with_color(result);
+#endif
+}
+
+static void main_disassemble_bytecode(const char *code_path) {
+    InterpretResult result = disassemble_byte_code(code_path);
 #ifdef COLOR_RUN_FILE_RESULT
     print_result_with_color(result);
 #endif
@@ -186,25 +216,32 @@ int main(int argc, char *const argv[]) {
     run_file(argv[1]);
     return 0;
 #endif
-    char *options = "dlsc:bh";
+    char *options = "dlsc:bhnv";
     int op;
     while ((op = getopt(argc, argv, options)) != -1) {
         switch (op) {
-            case 'd':
+            case 'd': // debug mode
                 TRACE_EXECUTION = true;
                 break;
-            case 's':
+            case 's': // disassemble bytecode
                 SHOW_COMPILE_RESULT = true;
                 break;
-            case 'l':
+            case 'l': // unused
                 SHOW_LABEL = true;
                 break;
-            case 'c':
+            case 'c': // compile only
                 COMPILE_ONLY = true;
+                LOAD_LIB = false;
                 strcpy(OUTPUT_PATH, optarg);
                 break;
-            case 'b':
+            case 'b': // run bytecode
                 RUN_BYTECODE = true;
+                break;
+            case 'v':
+                DISASSEMBLE_ONLY = true;
+                break;
+            case 'n': // do not load libraries
+                LOAD_LIB = false;
                 break;
             case 'h':
             default:
@@ -219,6 +256,8 @@ int main(int argc, char *const argv[]) {
     if (optind < argc) {
         if (COMPILE_ONLY) {
             produce_bytecode(argv[optind], OUTPUT_PATH);
+        } else if (DISASSEMBLE_ONLY){
+            main_disassemble_bytecode(argv[optind]);
         } else if (RUN_BYTECODE) {
             main_run_bytecode(argv[optind]);
         } else {

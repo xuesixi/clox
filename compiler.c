@@ -124,7 +124,9 @@ static inline void block_statement();
 
 static inline void return_statement();
 
-static void iteration_statement();
+//static void iteration_statement();
+
+static void new_iteration_statement();
 
 static void set_new_scope(Scope *scope, FunctionType type);
 
@@ -326,7 +328,7 @@ static void array_literal(bool can_assign) {
 //        expression();
 //        emit_two_bytes(OP_UNPACK_ARRAY, length);
 //    } else {
-    emit_u8_u8(OP_BUILD_ARRAY, length);
+    emit_u8_u8(OP_MAKE_ARRAY, length);
 //    }
 }
 
@@ -360,7 +362,7 @@ static void string(bool can_assign) {
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
     Value value = ref_value((Object *) str);
     uint16_t index = make_constant(value);
-    emit_u8_u16(OP_CONSTANT, index);
+    emit_u8_u16(OP_LOAD_CONSTANT, index);
 //    emit_constant(index);
 }
 
@@ -418,7 +420,7 @@ static void class_member() {
             // static function
             function_statement(TYPE_FUNCTION);
 
-            emit_u8_u16(OP_CLASS_STATIC_FIELD, name);
+            emit_u8_u16(OP_MAKE_STATIC_FIELD, name);
         } else {
             // static field
             // static num = 10;
@@ -427,9 +429,9 @@ static void class_member() {
                 consume(TOKEN_SEMICOLON, "Expect semicolon");
             } else {
                 consume(TOKEN_SEMICOLON, "Expect expression or semicolon");
-                emit_byte(OP_NIL);
+                emit_byte(OP_LOAD_NIL);
             }
-            emit_u8_u16(OP_CLASS_STATIC_FIELD, name);
+            emit_u8_u16(OP_MAKE_STATIC_FIELD, name);
         }
     } else {
         consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
@@ -438,7 +440,7 @@ static void class_member() {
             type = TYPE_INITIALIZER;
         }
         function_statement(type);
-        emit_byte(OP_METHOD);
+        emit_byte(OP_MAKE_METHOD);
     }
 }
 
@@ -452,7 +454,7 @@ static void import_statement() {
         emit_byte(OP_IMPORT);
         emit_byte(OP_RESTORE_MODULE);
         do {
-            consume(TOKEN_IDENTIFIER, "Expect identifier for this import statement");
+            consume(TOKEN_IDENTIFIER, "Expect identifier for the import statement");
             int as_name;
             uint16_t property_name = identifier_constant(&parser.previous);
             if (match(TOKEN_AS)) {
@@ -507,7 +509,7 @@ static void class_declaration(bool is_public) {
     new_class.has_super = false;
     current_class = &new_class;
 
-    emit_u8_u16(OP_CLASS, name_index);
+    emit_u8_u16(OP_MAKE_CLASS, name_index);
 
     if (current_scope->depth > 0) {
         declare_local(false, &class_name);
@@ -695,7 +697,7 @@ static void function_statement(FunctionType type) {
     uint16_t index = make_constant(ref_value((Object *) function));
 
     // OP_closure 后面紧跟着的是一个function，而非closure对象。这个function对象会在运行时被包装成closure
-    emit_u8_u16(OP_CLOSURE, index);
+    emit_u8_u16(OP_MAKE_CLOSURE, index);
 
     for (int i = 0; i < function->upvalue_count; ++i) {
         emit_byte(scope.upvalues[i].is_local);
@@ -728,7 +730,7 @@ static void var_declaration(bool is_public) {
     if (match(TOKEN_EQUAL)) {
         expression();
     } else {
-        emit_byte(OP_NIL);
+        emit_byte(OP_LOAD_NIL);
     }
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the var statement");
 
@@ -921,7 +923,8 @@ static void statement() {
         if (check(TOKEN_LEFT_PAREN)) {
             for_statement();
         } else {
-            iteration_statement();
+            new_iteration_statement();
+//            iteration_statement();
         }
     } else if (match(TOKEN_SWITCH)) {
         switch_statement();
@@ -993,7 +996,7 @@ static void if_statement() {
     consume(TOKEN_RIGHT_PAREN, "Expect ) to end the condition");
 
     // jump to else if false
-    int to_else = emit_jump(OP_JUMP_IF_FALSE_POP);
+    int to_else = emit_jump(OP_POP_JUMP_IF_FALSE);
 
     statement();
     // jump to after
@@ -1036,63 +1039,60 @@ static void emit_invoke_no_arg(const char *method_name) {
  *     }
  * }
  *
- * begin_scope 1
  * get iterator: [iter]
  *
- * continue point:
- * condition:
- *      iter.has_next()  // [iter, bool]
+ * begin scope 1
  * break point:
- *      pop, if false, jump -> end
+ *      jump if false -> break_out
  *
- *      begin_scope 2
- *
- *      iter.next()     // [iter, item]
- *
+ * continue point:
+ * condition: // [iter]
+ *      jump for iter -> end
+ *      begin_scope 2   // [iter, item]
+ *      declare item
  * body:
  *      ... // [iter, item]
- *      end_scope 2
+ *      end_scope 2 // [iter]
  *      jump -> condition
  *
- * end:
- * end_scope 1
+ * break_out:
+ *      pop
+ *
+ * end scope 1
+ *
  *
  */
-static void iteration_statement() {
-
-    begin_scope();
+static void new_iteration_statement() {
 
     consume(TOKEN_IDENTIFIER, "Expect an identifier");
     Token item = parser.previous;
     consume(TOKEN_IN, "Expect 'in'");
 
-    expression(); // [instance_to_iterate]
+    expression(); // [iterable]
 
-    emit_invoke_no_arg("iterator");
-
-    Token iter = literal_token("$iter"); // [iter]
+    begin_scope();
+//    emit_invoke_no_arg("iterator"); // [iter]
+    emit_byte(OP_GET_ITERATOR);
+    Token iter = literal_token("$iter");
     declare_identifier_token(&iter);
+
     mark_initialized();
 
-    save_continue_point(); // continue point
+    // break point
+    save_break_point();
+    int to_break_out = emit_jump(OP_JUMP_IF_FALSE);
+
+    // continue point
+    save_continue_point();
 
     // condition
     int condition = current_chunk()->count;
 
-    emit_byte(OP_COPY); // [iter, iter]
-    emit_invoke_no_arg("has_next"); // [iter, bool]
+    int to_end = emit_jump(OP_JUMP_FOR_ITER);
 
-    save_break_point(); // break point
-
-    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
-
-    begin_scope(); // [iter]
-
-    emit_byte(OP_COPY);  // [iter, iter]
-    emit_invoke_no_arg("next"); // [iter, item]
-
+    begin_scope();
     declare_identifier_token(&item);
-    mark_initialized();
+    mark_initialized(); // [iter, item]
 
     consume(TOKEN_LEFT_BRACE, "A { is required");
     while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
@@ -1104,11 +1104,12 @@ static void iteration_statement() {
 
     loop_back(condition); // jump -> condition
 
+    patch_jump(to_break_out);
+    emit_byte(OP_POP);
 
     // end
     patch_jump(to_end);
-
-    end_scope();
+    end_scope(); // this clear the iterator
 
     restore_continue_point();
     restore_break_point();
@@ -1148,7 +1149,7 @@ static void while_statement() {
     expression();
     consume(TOKEN_RIGHT_PAREN, "Expect ) to end the condition");
     save_break_point();
-    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
+    int to_end = emit_jump(OP_POP_JUMP_IF_FALSE);
 
     // body: 
     statement();
@@ -1309,11 +1310,11 @@ static void for_statement() {
         expression(); // not expression_statement() because we want to keep the condition code
         consume(TOKEN_SEMICOLON, "the for initializer needs a ;");
     } else {
-        emit_byte(OP_TRUE);
+        emit_byte(OP_LOAD_TRUE);
     }
 
     save_break_point();
-    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
+    int to_end = emit_jump(OP_POP_JUMP_IF_FALSE);
     int to_body = emit_jump(OP_JUMP);
 
     int increment = current_chunk()->count;
@@ -1396,7 +1397,7 @@ static void parse_break(bool can_assign) {
         return;
     }
     emit_pops_to_clear(parser.continue_point_depth);
-    emit_byte(OP_FALSE);
+    emit_byte(OP_LOAD_FALSE);
     emit_goto(parser.break_point);
 }
 
@@ -1731,24 +1732,24 @@ static void binary(bool can_assign) {
             emit_byte(OP_MOD);
             break;
         case TOKEN_LESS:
-            emit_byte(OP_LESS);
+            emit_byte(OP_TEST_LESS);
             break;
         case TOKEN_GREATER:
-            emit_byte(OP_GREATER);
+            emit_byte(OP_TEST_GREATER);
             break;
         case TOKEN_EQUAL_EQUAL:
-            emit_byte(OP_EQUAL);
+            emit_byte(OP_TEST_EQUAL);
             break;
         case TOKEN_LESS_EQUAL:
-            emit_byte(OP_GREATER);
+            emit_byte(OP_TEST_GREATER);
             emit_byte(OP_NOT);
             break;
         case TOKEN_GREATER_EQUAL:
-            emit_byte(OP_LESS);
+            emit_byte(OP_TEST_LESS);
             emit_byte(OP_NOT);
             break;
         case TOKEN_BANG_EQUAL:
-            emit_byte(OP_EQUAL);
+            emit_byte(OP_TEST_EQUAL);
             emit_byte(OP_NOT);
             break;
         default:
@@ -1825,27 +1826,27 @@ static inline void float_num(bool can_assign) {
     (void) can_assign;
     double value = strtod(parser.previous.start, NULL);
     uint16_t index = make_constant(float_value(value));
-    emit_u8_u16(OP_CONSTANT, index);
+    emit_u8_u16(OP_LOAD_CONSTANT, index);
 }
 
 static inline void int_num(bool can_assign) {
     (void) can_assign;
     int value = (int) strtol(parser.previous.start, NULL, 10);
     uint16_t index = make_constant(int_value(value));
-    emit_u8_u16(OP_CONSTANT, index);
+    emit_u8_u16(OP_LOAD_CONSTANT, index);
 }
 
 static void literal(bool can_assign) {
     (void) can_assign;
     switch (parser.previous.type) {
         case TOKEN_NIL:
-            emit_byte(OP_NIL);
+            emit_byte(OP_LOAD_NIL);
             break;
         case TOKEN_TRUE:
-            emit_byte(OP_TRUE);
+            emit_byte(OP_LOAD_TRUE);
             break;
         case TOKEN_FALSE:
-            emit_byte(OP_FALSE);
+            emit_byte(OP_LOAD_FALSE);
             break;
         default:
             error_at_previous("No such literal");
@@ -1921,7 +1922,7 @@ static inline void emit_return() {
     if (current_scope->functionType == TYPE_INITIALIZER) {
         emit_u8_u8(OP_GET_LOCAL, 0);
     } else {
-        emit_byte(OP_NIL);
+        emit_byte(OP_LOAD_NIL);
     }
     emit_byte(OP_RETURN);
 }
@@ -2094,6 +2095,7 @@ static void set_new_scope(Scope *scope, FunctionType type) {
         name = string_copy(parser.previous.start, parser.previous.length);
     }
     scope->function = new_function(type);
+    init_chunk(&scope->function->chunk);
     scope->function->name = name;
 
     if (type == TYPE_MAIN) {
@@ -2129,7 +2131,7 @@ static void init_parser(Parser *the_parser) {
  * */
 LoxFunction *compile(const char *src) {
 
-    gc_enabled = false;
+    DISABLE_GC;
 
     init_scanner(src);
     init_parser(&parser);
@@ -2145,7 +2147,7 @@ LoxFunction *compile(const char *src) {
 
     LoxFunction *function = end_compiler();
 
-    gc_enabled = true;
+    ENABLE_GC;
 
     if (parser.has_error) {
         parser.has_error = false;

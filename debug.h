@@ -8,8 +8,8 @@
 #include "chunk.h"
 //#include "table.h"
 
-void disassemble_chunk(Chunk *chunk, const char *name);
-int disassemble_instruction(Chunk *chunk, int offset);
+int disassemble_chunk(Chunk *chunk, const char *name);
+int disassemble_instruction(Chunk *chunk, int offset, bool line_break);
 
 //extern Map label_map;
 

@@ -9,7 +9,7 @@
 
 typedef enum OpCode{
     OP_RETURN,
-    OP_CONSTANT, // OP, index：将const[index]置于栈顶
+    OP_LOAD_CONSTANT, // OP, index：将const[index]置于栈顶
     OP_CONSTANT2, // OP, index16: 将const[index16]置于栈顶。
     OP_NEGATE,
     OP_ADD,
@@ -18,13 +18,13 @@ typedef enum OpCode{
     OP_DIVIDE,
     OP_MOD,
     OP_POWER,
-    OP_NIL,
-    OP_TRUE,
-    OP_FALSE,
+    OP_LOAD_NIL,
+    OP_LOAD_TRUE,
+    OP_LOAD_FALSE,
     OP_NOT,
-    OP_LESS,
-    OP_GREATER,
-    OP_EQUAL,
+    OP_TEST_LESS,
+    OP_TEST_GREATER,
+    OP_TEST_EQUAL,
     OP_PRINT,
     OP_REPL_AUTO_PRINT,
     OP_POP,
@@ -41,15 +41,15 @@ typedef enum OpCode{
     OP_JUMP_BACK, // op, offset16: ip -= offset16. 不消耗栈顶的值
     OP_JUMP, // op, offset16: 无条件跳转：ip += offset16
     OP_JUMP_IF_NOT_EQUAL, // op, offset16: 如果栈顶的两个值不相等，则跳转
-    OP_JUMP_IF_FALSE_POP,
-    OP_JUMP_IF_TRUE_POP,
+    OP_POP_JUMP_IF_FALSE,
+    OP_POP_JUMP_IF_TRUE,
     OP_CALL, // op, arg_count: 将栈顶的值视为一个可调用对象，调用之。
-    OP_CLOSURE, // op, index16: const[index]是一个函数，使用那个函数创建一个closure
+    OP_MAKE_CLOSURE, // op, index16: const[index]是一个函数，使用那个函数创建一个closure
     OP_CLOSE_UPVALUE, // op：将栈顶的值视为一个upvalue，将其close，然后从栈中移除之
-    OP_CLASS, // op，index16：创建一个class对象，它的名字是const[index]。将这个class置入栈顶
+    OP_MAKE_CLASS, // op，index16：创建一个class对象，它的名字是const[index]。将这个class置入栈顶
     OP_GET_PROPERTY, // op, index16：将栈顶的值视为一个instance，移除之，然后获取其名为const[index]的字段或者方法，置入栈顶
     OP_SET_PROPERTY, // op, index16: [instance, value, top], 将value赋值给这个instance的名为const[index]的字段。该指令移除instance，但保留栈顶的value
-    OP_METHOD, // op：[class, closure, top], 将closure储存为class的一个method。移除closure
+    OP_MAKE_METHOD, // op：[class, closure, top], 将closure储存为class的一个method。移除closure
     OP_PROPERTY_INVOKE, // op, index16, arg_count: [receiver, args..., top]：从receiver中寻找名为const[index]的属性，然后调用之
     OP_INHERIT, // op: [superclass, subclass, top]: 让subclass继承superclass。移除subclass
     OP_SUPER_ACCESS, // op, index16: [receiver, superclass, top]: 从superclass中寻找名为const[index]的方法，然后绑定给receiver。receiver和superclass都被移除，将帮绑定后的method置入栈顶。
@@ -60,9 +60,9 @@ typedef enum OpCode{
     OP_INDEXING_GET, // op: [array, index, top]
     OP_INDEXING_SET, // op: [array, index, value, top]
     OP_DIMENSION_ARRAY, // op, dimension,
-    OP_BUILD_ARRAY, // op, length
+    OP_MAKE_ARRAY, // op, length
     OP_UNPACK_ARRAY, // op, length
-    OP_CLASS_STATIC_FIELD, // op, name_index16: [class, field, top] -> [class, top]
+    OP_MAKE_STATIC_FIELD, // op, name_index16: [class, field, top] -> [class, top]
     OP_IMPORT, // op : [path_string, top]
     OP_RESTORE_MODULE, // op:  [old_module, nil, top] -> [new_module, top]
     OP_SWAP, // op, index: swap(top, top - index)
@@ -70,9 +70,11 @@ typedef enum OpCode{
     OP_DEF_PUB_GLOBAL, // op, name_index16
     OP_DEF_PUB_GLOBAL_CONST, // op, name_index16
     OP_EXPORT, // op, name_index16
-    OP_ABSENCE,
-    OP_JUMP_IF_NOT_ABSENCE_POP, // op, offset16
+    OP_LOAD_ABSENCE,
+    OP_JUMP_IF_NOT_ABSENCE, // op, offset16
     OP_ARR_AS_VAR_ARG, // op
+    OP_JUMP_FOR_ITER, // op, offset16: [iter] -> [iter, item], 如果还有下一个元素，则将之置于栈顶，否则跳转
+    OP_GET_ITERATOR, // op: [iterable] -> [iterator]
 } OpCode;
 
 typedef struct Chunk{

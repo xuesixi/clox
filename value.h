@@ -63,7 +63,7 @@ char *value_to_chars(Value value, int *len);
 #define bool_value(v) ((Value) {.type = VAL_BOOL, .as = {.boolean = (v)}})
 #define int_value(v) ((Value) {.type = VAL_INT, .as = {.integer = (v)}})
 #define float_value(v) ((Value) {.type = VAL_FLOAT, .as = {.decimal = (v)}})
-#define nil_value(v) ((Value) {.type = VAL_NIL, .as = {}})
+#define nil_value() ((Value) {.type = VAL_NIL, .as = {}})
 #define ref_value(v) ((Value) {.type = VAL_REF, .as = {.reference = (v)}})
 #define absence_value() ((Value) {.type = VAL_ABSENCE, .as = {}})
 

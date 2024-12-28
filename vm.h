@@ -43,6 +43,9 @@ typedef struct VM{
 
 extern String *INIT;
 extern String *LENGTH;
+extern String *HAS_NEXT;
+extern String *NEXT;
+
 extern String *ARRAY_CLASS;
 extern String *STRING_CLASS;
 extern String *INT_CLASS;
@@ -63,11 +66,14 @@ extern Module *repl_module;
 extern jmp_buf error_buf;
 
 typedef enum InterpretResult{
-    INTERPRET_OK,
+    INTERPRET_EXECUTE_OK,
+    INTERPRET_PRODUCE_OK,
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR,
-    INTERPRET_PRODUCE_ERROR,
-    INTERPRET_READ_ERROR,
+    INTERPRET_BYTECODE_WRITE_ERROR,
+    INTERPRET_BYTECODE_READ_ERROR,
+    INTERPRET_BYTECODE_DISASSEMBLE_ERROR,
+    INTERPRET_BYTECODE_DISASSEMBLE_OK,
     INTERPRET_REPL_EXIT,
 } InterpretResult;
 
@@ -78,7 +84,8 @@ void free_VM();
 InterpretResult interpret(const char *src, const char *path);
 InterpretResult produce(const char *src, const char *path);
 InterpretResult read_run_bytecode(const char *path);
-InterpretResult load_bytes(unsigned char *bytes, size_t len, const char *path);
+InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const char *path);
+InterpretResult disassemble_byte_code(const char *path);
 
 void stack_push(Value value);
 Value stack_pop();

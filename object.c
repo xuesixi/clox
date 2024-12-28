@@ -162,7 +162,6 @@ LoxFunction *new_function(FunctionType type) {
     function->var_arg = false;
     function->type = type;
     function->upvalue_count = 0;
-    init_chunk(&function->chunk);
     return function;
 }
 
@@ -239,6 +238,19 @@ Module *new_module(String *path) {
     module->path = path;
     init_table(&module->globals);
     return module;
+}
+
+/**
+ * 创建一个新的native object。
+ * value_used 表示将要使用的数据的个数，该函数会根据之来将没有使用的值初始化为nil。
+ */
+NativeObject *new_native_object(NativeObjectType type, int value_used) {
+    NativeObject *native_obj = (NativeObject *) allocate_object(sizeof(NativeObject), OBJ_NATIVE_OBJECT);
+    native_obj->native_type = type;
+    for (int i = value_used; i < NATIVE_OBJECT_VALUE_SIZE; ++i) {
+        native_obj->values[i] = nil_value();
+    }
+    return native_obj;
 }
 
 Map *new_map() {

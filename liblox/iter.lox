@@ -3,43 +3,7 @@ fun range(start, end = nil, step = 1) {
         end = start;
         start = 0;
     }
-    return RangeIter(start, end, step);
-}
-
-class RangeIter {
-    init(start, end, step) {
-        this.curr = start - step;
-        this.step = step;
-        this.limit = end - step;
-    }
-    iterator() {
-        return this;
-    }
-    has_next() {
-        return this.curr < this.limit;
-    }
-    next() {
-        return this.curr += this.step;
-    }
-}
-
-class RangeIter2 {
-    init(start, end, step) {
-        this.curr = start;
-        this.step = step;
-        this.end = end;
-    }
-    iterator() {
-        return this;
-    }
-    has_next() {
-        return this.curr < this.end;
-    }
-    next() {
-        var result = this.curr;
-        this.curr += this.step;
-        return result;
-    }
+    return native_range(start, end, step);
 }
 
 fun foreach(iterable, handler = $(e) {print e;}) {

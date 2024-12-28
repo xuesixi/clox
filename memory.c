@@ -48,6 +48,7 @@ static void mark_roots() {
 
     // mark global
     table_mark(&vm.builtin);
+    mark_object((Object *) repl_module);
 
     // mark existing frames。否则调用中的函数可能会被回收
     for (int i = 0; i < vm.frame_count; ++i) {
@@ -56,6 +57,8 @@ static void mark_roots() {
 
     mark_object((Object *) INIT);
     mark_object((Object *) LENGTH);
+    mark_object((Object *) HAS_NEXT);
+    mark_object((Object *) NEXT);
     mark_object((Object *) ITERATOR);
     mark_object((Object *) EQUAL);
     mark_object((Object *) HASH);
@@ -145,6 +148,13 @@ static void blacken_object(Object *object) {
             Module *module = (Module *) object;
             mark_object((Object *) module->path);
             table_mark(&module->globals);
+            break;
+        }
+        case OBJ_NATIVE_OBJECT: {
+            NativeObject *nativeObject = (NativeObject *) object;
+            for (int i = 0; i < NATIVE_OBJECT_VALUE_SIZE; ++i) {
+                mark_value(nativeObject->values[i]);
+            }
             break;
         }
     }
@@ -312,6 +322,11 @@ void free_object(Object *object) {
             Module *module = (Module *) object;
             free_table(&module->globals);
             re_allocate(object, sizeof(Module), 0);
+            break;
+        }
+        case OBJ_NATIVE_OBJECT: {
+//            NativeObject *nativeObject = (NativeObject *) object;
+            re_allocate(object, sizeof(NativeObject), 0);
             break;
         }
         default:

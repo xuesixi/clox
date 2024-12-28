@@ -16,8 +16,8 @@
 
 //#define JUST_SCRIPT
 #define COLOR_RUN_FILE_RESULT
-//#define IMPLEMENTATION_CHECK
-#define LOAD_LIB
+#define IMPLEMENTATION_CHECK
+//#define LOAD_LIB
 //#define COUNT_INSTRUCTIONS_RUN
 
 #define FRAME_MAX 64
@@ -29,7 +29,7 @@ extern bool COMPILE_ONLY;
 extern int TRACE_SKIP;
 extern bool SHOW_LABEL;
 extern bool REPL;
-extern bool preload_started;
+extern bool LOAD_LIB;
 extern bool preload_finished;
 
 char *read_file(const char *path);
