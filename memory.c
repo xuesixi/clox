@@ -322,6 +322,11 @@ void free_object(Object *object) {
             re_allocate(object, sizeof(Module), 0);
             break;
         }
+        case OBJ_NATIVE_OBJECT: {
+//            NativeObject *nativeObject = (NativeObject *) object;
+            re_allocate(object, sizeof(NativeObject), 0);
+            break;
+        }
         default:
             return;
     }

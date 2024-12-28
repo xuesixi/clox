@@ -868,7 +868,7 @@ InterpretResult interpret(const char *src, const char *path) {
     warmup(function, path, NULL, true);
 
     InterpretResult error;
-    if ((error = setjmp(error_buf)) != INTERPRET_OK) {
+    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
         return error;
     }
 
@@ -892,10 +892,7 @@ static void import(const char *src, String *path) {
 }
 
 /**
- * 目前还没写好。因为chunk内部是code指针
- * @param src
- * @param path
- * @return
+ * 编译源代码，输出字节码
  */
 InterpretResult produce(const char *src, const char *path) {
     LoxFunction *function = compile(src);
@@ -906,18 +903,18 @@ InterpretResult produce(const char *src, const char *path) {
     FILE *file = fopen(path, "wb");
     if (file == NULL) {
         printf("Error when opening the file: %s\n", path);
-        return INTERPRET_PRODUCE_ERROR;
+        return INTERPRET_BYTECODE_WRITE_ERROR;
     }
     write_function(file, function);
     fclose(file);
-    return INTERPRET_OK;
+    return INTERPRET_PRODUCE_OK;
 }
 
 InterpretResult read_run_bytecode(const char *path) {
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
         printf("Error when opening the file: %s\n", path);
-        return INTERPRET_READ_ERROR;
+        return INTERPRET_BYTECODE_READ_ERROR;
     }
 
     DISABLE_GC;
@@ -928,7 +925,7 @@ InterpretResult read_run_bytecode(const char *path) {
     warmup(function, path, NULL, false);
 
     InterpretResult error;
-    if ((error = setjmp(error_buf)) != INTERPRET_OK) {
+    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
         return error;
     }
 
@@ -949,12 +946,12 @@ InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const 
     warmup(function, path, NULL, false);
 
     InterpretResult error;
-    if ((error = setjmp(error_buf)) != INTERPRET_OK) {
+    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
         return error;
     }
 
     InterpretResult result = run_frame_until(0);
-    if (result == INTERPRET_OK) {
+    if (result == INTERPRET_EXECUTE_OK) {
         table_add_all(curr_closure_global, &vm.builtin, true);
     } else {
         IMPLEMENTATION_ERROR("Error when loading lib");
@@ -1031,7 +1028,7 @@ static void build_array(int length) {
  */
 static InterpretResult run_frame_until(int end_when) {
     if (vm.frame_count == end_when) {
-        return INTERPRET_OK;
+        return INTERPRET_EXECUTE_OK;
     }
 //    InterpretResult error;
 //    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
@@ -1069,7 +1066,7 @@ static InterpretResult run_frame_until(int end_when) {
                     stack_push(result);
                 }
                 if (vm.frame_count == end_when) {
-                    return INTERPRET_OK;
+                    return INTERPRET_EXECUTE_OK;
                 }
                 break;
             }

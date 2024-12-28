@@ -32,18 +32,26 @@ static void print_result_with_color(InterpretResult result) {
             start_color(RED);
             printf("== runtime error ==\n");
             break;
-        case INTERPRET_PRODUCE_ERROR:
+        case INTERPRET_BYTECODE_WRITE_ERROR:
             start_color(RED);
-            printf("== produce error ==\n");
+            printf("== bytecode writing error ==\n");
             break;
-        case INTERPRET_READ_ERROR:
+        case INTERPRET_BYTECODE_READ_ERROR:
             start_color(RED);
-            printf("== file reading error");
+            printf("== bytecode reading error ==\n");
             break;
-        case INTERPRET_OK:
-        case INTERPRET_REPL_EXIT:
+        case INTERPRET_PRODUCE_OK:
+            start_color(GREEN);
+            printf("== bytecode produced ==\n");
+            break;
+        case INTERPRET_EXECUTE_OK:
             start_color(GREEN);
             printf("== execution finished ==\n");
+            break;
+        case INTERPRET_REPL_EXIT:
+            start_color(GREEN);
+            printf("== repl exited ==\n");
+            break;
     }
     end_color();
 }
@@ -178,6 +186,7 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
 
 static void main_run_bytecode(const char *code_path) {
 
+    load_libraries();
     InterpretResult result = read_run_bytecode(code_path);
 #ifdef COLOR_RUN_FILE_RESULT
     print_result_with_color(result);
