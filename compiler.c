@@ -328,7 +328,7 @@ static void array_literal(bool can_assign) {
 //        expression();
 //        emit_two_bytes(OP_UNPACK_ARRAY, length);
 //    } else {
-    emit_u8_u8(OP_BUILD_ARRAY, length);
+    emit_u8_u8(OP_MAKE_ARRAY, length);
 //    }
 }
 
@@ -362,7 +362,7 @@ static void string(bool can_assign) {
     String *str = string_copy(parser.previous.start + 1, parser.previous.length - 2);
     Value value = ref_value((Object *) str);
     uint16_t index = make_constant(value);
-    emit_u8_u16(OP_CONSTANT, index);
+    emit_u8_u16(OP_LOAD_CONSTANT, index);
 //    emit_constant(index);
 }
 
@@ -420,7 +420,7 @@ static void class_member() {
             // static function
             function_statement(TYPE_FUNCTION);
 
-            emit_u8_u16(OP_CLASS_STATIC_FIELD, name);
+            emit_u8_u16(OP_MAKE_STATIC_FIELD, name);
         } else {
             // static field
             // static num = 10;
@@ -429,9 +429,9 @@ static void class_member() {
                 consume(TOKEN_SEMICOLON, "Expect semicolon");
             } else {
                 consume(TOKEN_SEMICOLON, "Expect expression or semicolon");
-                emit_byte(OP_NIL);
+                emit_byte(OP_LOAD_NIL);
             }
-            emit_u8_u16(OP_CLASS_STATIC_FIELD, name);
+            emit_u8_u16(OP_MAKE_STATIC_FIELD, name);
         }
     } else {
         consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
@@ -440,7 +440,7 @@ static void class_member() {
             type = TYPE_INITIALIZER;
         }
         function_statement(type);
-        emit_byte(OP_METHOD);
+        emit_byte(OP_MAKE_METHOD);
     }
 }
 
@@ -509,7 +509,7 @@ static void class_declaration(bool is_public) {
     new_class.has_super = false;
     current_class = &new_class;
 
-    emit_u8_u16(OP_CLASS, name_index);
+    emit_u8_u16(OP_MAKE_CLASS, name_index);
 
     if (current_scope->depth > 0) {
         declare_local(false, &class_name);
@@ -697,7 +697,7 @@ static void function_statement(FunctionType type) {
     uint16_t index = make_constant(ref_value((Object *) function));
 
     // OP_closure 后面紧跟着的是一个function，而非closure对象。这个function对象会在运行时被包装成closure
-    emit_u8_u16(OP_CLOSURE, index);
+    emit_u8_u16(OP_MAKE_CLOSURE, index);
 
     for (int i = 0; i < function->upvalue_count; ++i) {
         emit_byte(scope.upvalues[i].is_local);
@@ -730,7 +730,7 @@ static void var_declaration(bool is_public) {
     if (match(TOKEN_EQUAL)) {
         expression();
     } else {
-        emit_byte(OP_NIL);
+        emit_byte(OP_LOAD_NIL);
     }
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the var statement");
 
@@ -996,7 +996,7 @@ static void if_statement() {
     consume(TOKEN_RIGHT_PAREN, "Expect ) to end the condition");
 
     // jump to else if false
-    int to_else = emit_jump(OP_JUMP_IF_FALSE_POP);
+    int to_else = emit_jump(OP_POP_JUMP_IF_FALSE);
 
     statement();
     // jump to after
@@ -1149,7 +1149,7 @@ static void while_statement() {
     expression();
     consume(TOKEN_RIGHT_PAREN, "Expect ) to end the condition");
     save_break_point();
-    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
+    int to_end = emit_jump(OP_POP_JUMP_IF_FALSE);
 
     // body: 
     statement();
@@ -1310,11 +1310,11 @@ static void for_statement() {
         expression(); // not expression_statement() because we want to keep the condition code
         consume(TOKEN_SEMICOLON, "the for initializer needs a ;");
     } else {
-        emit_byte(OP_TRUE);
+        emit_byte(OP_LOAD_TRUE);
     }
 
     save_break_point();
-    int to_end = emit_jump(OP_JUMP_IF_FALSE_POP);
+    int to_end = emit_jump(OP_POP_JUMP_IF_FALSE);
     int to_body = emit_jump(OP_JUMP);
 
     int increment = current_chunk()->count;
@@ -1397,7 +1397,7 @@ static void parse_break(bool can_assign) {
         return;
     }
     emit_pops_to_clear(parser.continue_point_depth);
-    emit_byte(OP_FALSE);
+    emit_byte(OP_LOAD_FALSE);
     emit_goto(parser.break_point);
 }
 
@@ -1732,24 +1732,24 @@ static void binary(bool can_assign) {
             emit_byte(OP_MOD);
             break;
         case TOKEN_LESS:
-            emit_byte(OP_LESS);
+            emit_byte(OP_TEST_LESS);
             break;
         case TOKEN_GREATER:
-            emit_byte(OP_GREATER);
+            emit_byte(OP_TEST_GREATER);
             break;
         case TOKEN_EQUAL_EQUAL:
-            emit_byte(OP_EQUAL);
+            emit_byte(OP_TEST_EQUAL);
             break;
         case TOKEN_LESS_EQUAL:
-            emit_byte(OP_GREATER);
+            emit_byte(OP_TEST_GREATER);
             emit_byte(OP_NOT);
             break;
         case TOKEN_GREATER_EQUAL:
-            emit_byte(OP_LESS);
+            emit_byte(OP_TEST_LESS);
             emit_byte(OP_NOT);
             break;
         case TOKEN_BANG_EQUAL:
-            emit_byte(OP_EQUAL);
+            emit_byte(OP_TEST_EQUAL);
             emit_byte(OP_NOT);
             break;
         default:
@@ -1826,27 +1826,27 @@ static inline void float_num(bool can_assign) {
     (void) can_assign;
     double value = strtod(parser.previous.start, NULL);
     uint16_t index = make_constant(float_value(value));
-    emit_u8_u16(OP_CONSTANT, index);
+    emit_u8_u16(OP_LOAD_CONSTANT, index);
 }
 
 static inline void int_num(bool can_assign) {
     (void) can_assign;
     int value = (int) strtol(parser.previous.start, NULL, 10);
     uint16_t index = make_constant(int_value(value));
-    emit_u8_u16(OP_CONSTANT, index);
+    emit_u8_u16(OP_LOAD_CONSTANT, index);
 }
 
 static void literal(bool can_assign) {
     (void) can_assign;
     switch (parser.previous.type) {
         case TOKEN_NIL:
-            emit_byte(OP_NIL);
+            emit_byte(OP_LOAD_NIL);
             break;
         case TOKEN_TRUE:
-            emit_byte(OP_TRUE);
+            emit_byte(OP_LOAD_TRUE);
             break;
         case TOKEN_FALSE:
-            emit_byte(OP_FALSE);
+            emit_byte(OP_LOAD_FALSE);
             break;
         default:
             error_at_previous("No such literal");
@@ -1922,7 +1922,7 @@ static inline void emit_return() {
     if (current_scope->functionType == TYPE_INITIALIZER) {
         emit_u8_u8(OP_GET_LOCAL, 0);
     } else {
-        emit_byte(OP_NIL);
+        emit_byte(OP_LOAD_NIL);
     }
     emit_byte(OP_RETURN);
 }

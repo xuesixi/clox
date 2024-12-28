@@ -1064,7 +1064,7 @@ static InterpretResult run_frame_until(int end_when) {
             } else {
                 CallFrame *frame = curr_frame;
                 disassemble_instruction(&frame->closure->function->chunk,
-                                        (int) (frame->PC - frame->closure->function->chunk.code));
+                                        (int) (frame->PC - frame->closure->function->chunk.code), false);
             }
         }
 
@@ -1089,7 +1089,7 @@ static InterpretResult run_frame_until(int end_when) {
                 }
                 break;
             }
-            case OP_CONSTANT: {
+            case OP_LOAD_CONSTANT: {
                 Value value = read_constant16();
                 stack_push(value);
                 break;
@@ -1152,31 +1152,31 @@ static InterpretResult run_frame_until(int end_when) {
                 }
                 break;
             }
-            case OP_LESS: {
+            case OP_TEST_LESS: {
                 Value b = stack_pop();
                 Value a = stack_pop();
                 binary_number_op(a, b, '<');
                 break;
             }
-            case OP_GREATER: {
+            case OP_TEST_GREATER: {
                 Value b = stack_pop();
                 Value a = stack_pop();
                 binary_number_op(a, b, '>');
                 break;
             }
-            case OP_EQUAL: {
+            case OP_TEST_EQUAL: {
                 Value b = stack_pop();
                 Value a = stack_pop();
                 stack_push(bool_value(value_equal(a, b)));
                 break;
             }
-            case OP_NIL:
+            case OP_LOAD_NIL:
                 stack_push(nil_value());
                 break;
-            case OP_TRUE:
+            case OP_LOAD_TRUE:
                 stack_push(bool_value(true));
                 break;
-            case OP_FALSE:
+            case OP_LOAD_FALSE:
                 stack_push(bool_value(false));
                 break;
             case OP_NOT:
@@ -1303,14 +1303,14 @@ static InterpretResult run_frame_until(int end_when) {
                 }
                 break;
             }
-            case OP_JUMP_IF_FALSE_POP: {
+            case OP_POP_JUMP_IF_FALSE: {
                 uint16_t offset = read_uint16();
                 if (is_falsy(stack_pop())) {
                     curr_frame->PC += offset;
                 }
                 break;
             }
-            case OP_JUMP_IF_TRUE_POP: {
+            case OP_POP_JUMP_IF_TRUE: {
                 uint16_t offset = read_uint16();
                 if (!is_falsy(stack_pop())) {
                     curr_frame->PC += offset;
@@ -1323,7 +1323,7 @@ static InterpretResult run_frame_until(int end_when) {
                 call_value(callee, count);
                 break;
             }
-            case OP_CLOSURE: {
+            case OP_MAKE_CLOSURE: {
                 /* 值得注意的是，对于嵌套的closure，虽然在编译时，是内部的
                  * 函数先编译，但是在运行时，是先执行外层函数的OP_closure。
                  * 然后等到外层函数被调用、内层函数被定义后，内层函数的OP_closure
@@ -1359,7 +1359,7 @@ static InterpretResult run_frame_until(int end_when) {
                 stack_pop();
                 break;
             }
-            case OP_CLASS: {
+            case OP_MAKE_CLASS: {
                 String *name = read_constant_string();
                 stack_push(ref_value((Object *) new_class(name)));
                 break;
@@ -1415,7 +1415,7 @@ static InterpretResult run_frame_until(int end_when) {
                 }
                 break;
             }
-            case OP_METHOD: {
+            case OP_MAKE_METHOD: {
                 // stack: class, closure,
                 // op-method
                 Closure *closure = as_closure(stack_peek(0));
@@ -1522,7 +1522,7 @@ static InterpretResult run_frame_until(int end_when) {
                 stack_push(value);
                 break;
             }
-            case OP_BUILD_ARRAY: {
+            case OP_MAKE_ARRAY: {
                 int length = read_byte();
                 build_array(length);
                 break;
@@ -1531,7 +1531,7 @@ static InterpretResult run_frame_until(int end_when) {
                 read_byte();
                 break;
             }
-            case OP_CLASS_STATIC_FIELD: {
+            case OP_MAKE_STATIC_FIELD: {
                 // [class, field, top]
                 String *name = read_constant_string();
                 Value field = stack_peek(0);
@@ -1587,7 +1587,7 @@ static InterpretResult run_frame_until(int end_when) {
                 }
                 break;
             }
-            case OP_ABSENCE:
+            case OP_LOAD_ABSENCE:
                 stack_push(absence_value());
                 break;
             case OP_JUMP_IF_NOT_ABSENCE: {
