@@ -9,13 +9,14 @@
 
 #define REPL_FILE_NAME "LOX_REPL"
 
+char OUTPUT_PATH[100];
+
 bool COMPILE_ONLY = false;
 bool RUN_BYTECODE = false;
-char OUTPUT_PATH[100];
+bool DISASSEMBLE_ONLY = false;
 bool REPL = false;
 bool LOAD_LIB = true;
 bool preload_finished = false;
-bool preload_started = false;
 bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
 int TRACE_SKIP = -1;
@@ -36,6 +37,10 @@ static void print_result_with_color(InterpretResult result) {
             start_color(RED);
             printf("== bytecode writing error ==\n");
             break;
+        case INTERPRET_BYTECODE_DISASSEMBLE_ERROR:
+            start_color(RED);
+            printf("== bytecode disassembling error ==\n");
+            break;
         case INTERPRET_BYTECODE_READ_ERROR:
             start_color(RED);
             printf("== bytecode reading error ==\n");
@@ -43,6 +48,10 @@ static void print_result_with_color(InterpretResult result) {
         case INTERPRET_PRODUCE_OK:
             start_color(GREEN);
             printf("== bytecode produced ==\n");
+            break;
+        case INTERPRET_BYTECODE_DISASSEMBLE_OK:
+            start_color(GREEN);
+            printf("== bytecode disassembling finished ==\n");
             break;
         case INTERPRET_EXECUTE_OK:
             start_color(GREEN);
@@ -193,6 +202,13 @@ static void main_run_bytecode(const char *code_path) {
 #endif
 }
 
+static void main_disassemble_bytecode(const char *code_path) {
+    InterpretResult result = disassemble_byte_code(code_path);
+#ifdef COLOR_RUN_FILE_RESULT
+    print_result_with_color(result);
+#endif
+}
+
 int main(int argc, char *const argv[]) {
 
     init_VM();
@@ -200,7 +216,7 @@ int main(int argc, char *const argv[]) {
     run_file(argv[1]);
     return 0;
 #endif
-    char *options = "dlsc:bhn";
+    char *options = "dlsc:bhnv";
     int op;
     while ((op = getopt(argc, argv, options)) != -1) {
         switch (op) {
@@ -221,7 +237,10 @@ int main(int argc, char *const argv[]) {
             case 'b': // run bytecode
                 RUN_BYTECODE = true;
                 break;
-            case 'n': // do not load library
+            case 'v':
+                DISASSEMBLE_ONLY = true;
+                break;
+            case 'n': // do not load libraries
                 LOAD_LIB = false;
                 break;
             case 'h':
@@ -237,6 +256,8 @@ int main(int argc, char *const argv[]) {
     if (optind < argc) {
         if (COMPILE_ONLY) {
             produce_bytecode(argv[optind], OUTPUT_PATH);
+        } else if (DISASSEMBLE_ONLY){
+            main_disassemble_bytecode(argv[optind]);
         } else if (RUN_BYTECODE) {
             main_run_bytecode(argv[optind]);
         } else {

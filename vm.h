@@ -60,6 +60,8 @@ typedef enum InterpretResult{
     INTERPRET_RUNTIME_ERROR,
     INTERPRET_BYTECODE_WRITE_ERROR,
     INTERPRET_BYTECODE_READ_ERROR,
+    INTERPRET_BYTECODE_DISASSEMBLE_ERROR,
+    INTERPRET_BYTECODE_DISASSEMBLE_OK,
     INTERPRET_REPL_EXIT,
 } InterpretResult;
 
@@ -71,6 +73,7 @@ InterpretResult interpret(const char *src, const char *path);
 InterpretResult produce(const char *src, const char *path);
 InterpretResult read_run_bytecode(const char *path);
 InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const char *path);
+InterpretResult disassemble_byte_code(const char *path);
 
 void stack_push(Value value);
 Value stack_pop();

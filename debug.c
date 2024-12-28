@@ -8,16 +8,19 @@
 
 /**
  *
- * @param chunk
- * @param name
+ * @return -1 if error, 0 if ok
  */
-void disassemble_chunk(Chunk *chunk, const char *name) {
+int disassemble_chunk(Chunk *chunk, const char *name) {
     assert(chunk != NULL);
     printf("== %s ==\n", name);
     for (int offset = 0; offset < chunk->count; ) {
         offset = disassemble_instruction(chunk, offset);
+        if (offset == -1) {
+            return - 1;
+        }
     }
     NEW_LINE();
+    return 0;
 }
 
 static int simple_instruction(const char *name, int offset) {
@@ -62,35 +65,14 @@ static int invoke_instruction(const char *name, const Chunk *chunk, int offset) 
     return offset + 3;
 }
 
-//static int constant2_instruction(const char *name, const Chunk *chunk, int offset) {
-//    uint8_t i0 = chunk->code[offset + 1];
-//    uint8_t i1 = chunk->code[offset + 2];
-//    int index = u8_to_u16(i0, i1);
-//    printf("%-23s %4d : ", name, index);
-//    Value value = chunk->constants.values[index];
-//    print_value_with_color(value);
-//    NEW_LINE();
-//    return offset + 3;
-//}
-
 static int jump_instruction(const char *name, const Chunk *chunk, int offset, bool forward) {
     uint8_t i0 = chunk->code[offset + 1];
     uint8_t i1 = chunk->code[offset + 2];
     int index = u8_to_u16(i0, i1);
     int target = forward ? offset + 3 + index : offset + 3 - index;
-    printf("%-23s   -> %04d\n", name, target);
+    printf("%-23s   -> %4d\n", name, target);
     return offset + 3;
 }
-
-//static int jump_u16_u8_instruction(const char *name, const Chunk *chunk, int offset){
-//    uint8_t i0 = chunk->code[offset + 1];
-//    uint8_t i1 = chunk->code[offset + 2];
-//    int index = u8_to_u16(i0, i1);
-//    int local_index = chunk->code[offset + 3];
-//    int target = forward ? offset + 4 + index : offset + 4 - index;
-//    printf("%-23s   -> %04d; %d\n", name, target, local_index);
-//    return offset + 4;
-//}
 
 /**
  * 给定一个 offset，将对应的 instruction 的信息打印
@@ -98,15 +80,15 @@ static int jump_instruction(const char *name, const Chunk *chunk, int offset, bo
  */
 int disassemble_instruction(Chunk *chunk, int offset) {
 
-    // code index
-    printf("%04d ", offset);
-
     // print line number
     if (offset > 0 && chunk->lines[offset] == chunk->lines[offset-1]) {
-        printf("     | ");
+        printf("     ");
     }else {
-        printf("  %4d ", chunk->lines[offset]);
+        printf("\n%4d ", chunk->lines[offset]);
     }
+
+    printf("     %4d   ", offset);
+
     int instruction = chunk->code[offset];
     switch (instruction) {
         case OP_RETURN:
@@ -256,6 +238,6 @@ int disassemble_instruction(Chunk *chunk, int offset) {
             return simple_instruction("GET_ITERATOR", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
-            return offset + 1;
+            return -1;
     }
 }

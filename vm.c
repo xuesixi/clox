@@ -932,6 +932,25 @@ InterpretResult read_run_bytecode(const char *path) {
     return run_frame_until(0);
 }
 
+InterpretResult disassemble_byte_code(const char *path) {
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        printf("Error when opening the file: %s\n", path);
+        return INTERPRET_BYTECODE_READ_ERROR;
+    }
+
+    DISABLE_GC;
+    LoxFunction *function = read_function(file);
+    ENABLE_GC;
+
+    int result = disassemble_chunk(&function->chunk, path);
+    if (result == -1) {
+        return INTERPRET_BYTECODE_DISASSEMBLE_ERROR;
+    } else {
+        return INTERPRET_BYTECODE_DISASSEMBLE_OK;
+    }
+}
+
 /**
  * 用fmemopen()从目标字节数组处打开一个流，创建一个新的全局命名空间，然后读取并执行字节码。运行后，将全局命名空间中的public元素添加到builtin命名空间中
  */

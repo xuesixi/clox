@@ -30,7 +30,6 @@ extern int TRACE_SKIP;
 extern bool SHOW_LABEL;
 extern bool REPL;
 extern bool LOAD_LIB;
-extern bool preload_started;
 extern bool preload_finished;
 
 char *read_file(const char *path);
