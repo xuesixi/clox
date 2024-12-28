@@ -114,7 +114,6 @@ LoxFunction *new_function(FunctionType type) {
     function->var_arg = false;
     function->type = type;
     function->upvalue_count = 0;
-    init_chunk(&function->chunk);
     return function;
 }
 

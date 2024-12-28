@@ -2095,6 +2095,7 @@ static void set_new_scope(Scope *scope, FunctionType type) {
         name = string_copy(parser.previous.start, parser.previous.length);
     }
     scope->function = new_function(type);
+    init_chunk(&scope->function->chunk);
     scope->function->name = name;
 
     if (type == TYPE_MAIN) {

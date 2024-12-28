@@ -47,20 +47,6 @@ class Array {
     }
 }
 
-class ArrayIter {
-    init(arr) {
-        this.arr = arr;
-        this.curr = -1;
-        this.limit = arr.length - 1;
-    }
-    has_next() {
-        return this.curr < this.limit;
-    }
-    next() {
-        return this.arr[this.curr += 1];
-    }
-}
-
 class String {
     iterator() {
         return StringIter(this);

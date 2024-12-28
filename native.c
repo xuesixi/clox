@@ -36,60 +36,60 @@ static void define_native(const char *name, NativeImplementation impl, int arity
  * 加载标准库（执行字节码），将标准库的成员导入builtin命名空间中。
  */
 void load_libraries() {
-#ifdef LOAD_LIB
-    if (load_bytes_into_builtin(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_OK) {
-        exit(1);
+    if (LOAD_LIB) {
+        if (load_bytes_into_builtin(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_OK) {
+            exit(1);
+        }
+        if (load_bytes_into_builtin(liblox_core, liblox_core_len, "lib_core") != INTERPRET_OK) {
+            exit(1);
+        }
+        Value array_class_value;
+        Value string_class_value;
+        Value int_class_value;
+        Value float_class_value;
+        Value bool_class_value;
+        Value native_class_value;
+        Value class_class_value;
+        Value function_class_value;
+        Value method_class_value;
+        Value module_class_value;
+        Value nil_class_value;
+
+        table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
+        array_class = as_class(array_class_value);
+
+        table_get(&vm.builtin, STRING_CLASS, &string_class_value);
+        string_class = as_class(string_class_value);
+
+        table_get(&vm.builtin, INT_CLASS, &int_class_value);
+        int_class = as_class(int_class_value);
+
+        table_get(&vm.builtin, FLOAT_CLASS, &float_class_value);
+        float_class = as_class(float_class_value);
+
+        table_get(&vm.builtin, BOOL_CLASS, &bool_class_value);
+        bool_class = as_class(bool_class_value);
+
+        table_get(&vm.builtin, NATIVE_CLASS, &native_class_value);
+        native_class = as_class(native_class_value);
+
+        table_get(&vm.builtin, CLASS_CLASS, &class_class_value);
+        class_class = as_class(class_class_value);
+
+        table_get(&vm.builtin, FUNCTION_CLASS, &function_class_value);
+        function_class = as_class(function_class_value);
+
+        table_get(&vm.builtin, METHOD_CLASS, &method_class_value);
+        method_class = as_class(method_class_value);
+
+        table_get(&vm.builtin, MODULE_CLASS, &module_class_value);
+        module_class = as_class(module_class_value);
+
+        table_get(&vm.builtin, NIL_CLASS, &nil_class_value);
+        nil_class = as_class(nil_class_value);
+
     }
-    if (load_bytes_into_builtin(liblox_core, liblox_core_len, "lib_core") != INTERPRET_OK) {
-        exit(1);
-    }
-    Value array_class_value;
-    Value string_class_value;
-    Value int_class_value;
-    Value float_class_value;
-    Value bool_class_value;
-    Value native_class_value;
-    Value class_class_value;
-    Value function_class_value;
-    Value method_class_value;
-    Value module_class_value;
-    Value nil_class_value;
-
-    table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
-    array_class = as_class(array_class_value);
-
-    table_get(&vm.builtin, STRING_CLASS, &string_class_value);
-    string_class = as_class(string_class_value);
-
-    table_get(&vm.builtin, INT_CLASS, &int_class_value);
-    int_class = as_class(int_class_value);
-
-    table_get(&vm.builtin, FLOAT_CLASS, &float_class_value);
-    float_class = as_class(float_class_value);
-
-    table_get(&vm.builtin, BOOL_CLASS, &bool_class_value);
-    bool_class = as_class(bool_class_value);
-
-    table_get(&vm.builtin, NATIVE_CLASS, &native_class_value);
-    native_class = as_class(native_class_value);
-
-    table_get(&vm.builtin, CLASS_CLASS, &class_class_value);
-    class_class = as_class(class_class_value);
-
-    table_get(&vm.builtin, FUNCTION_CLASS, &function_class_value);
-    function_class = as_class(function_class_value);
-
-    table_get(&vm.builtin, METHOD_CLASS, &method_class_value);
-    method_class = as_class(method_class_value);
-
-    table_get(&vm.builtin, MODULE_CLASS, &module_class_value);
-    module_class = as_class(module_class_value);
-
-    table_get(&vm.builtin, NIL_CLASS, &nil_class_value);
-    nil_class = as_class(nil_class_value);
-
     preload_finished = true;
-#endif
 }
 
 static Value native_type(int count, Value *value) {

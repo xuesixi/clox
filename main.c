@@ -13,6 +13,7 @@ bool COMPILE_ONLY = false;
 bool RUN_BYTECODE = false;
 char OUTPUT_PATH[100];
 bool REPL = false;
+bool LOAD_LIB = true;
 bool preload_finished = false;
 bool preload_started = false;
 bool SHOW_COMPILE_RESULT = false;
@@ -190,25 +191,29 @@ int main(int argc, char *const argv[]) {
     run_file(argv[1]);
     return 0;
 #endif
-    char *options = "dlsc:bh";
+    char *options = "dlsc:bhn";
     int op;
     while ((op = getopt(argc, argv, options)) != -1) {
         switch (op) {
-            case 'd':
+            case 'd': // debug mode
                 TRACE_EXECUTION = true;
                 break;
-            case 's':
+            case 's': // disassemble bytecode
                 SHOW_COMPILE_RESULT = true;
                 break;
-            case 'l':
+            case 'l': // unused
                 SHOW_LABEL = true;
                 break;
-            case 'c':
+            case 'c': // compile only
                 COMPILE_ONLY = true;
+                LOAD_LIB = false;
                 strcpy(OUTPUT_PATH, optarg);
                 break;
-            case 'b':
+            case 'b': // run bytecode
                 RUN_BYTECODE = true;
+                break;
+            case 'n': // do not load library
+                LOAD_LIB = false;
                 break;
             case 'h':
             default:

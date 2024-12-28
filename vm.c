@@ -959,6 +959,7 @@ InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const 
     } else {
         IMPLEMENTATION_ERROR("Error when loading lib");
     }
+
     return result;
 }
 
