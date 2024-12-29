@@ -9,25 +9,24 @@
 
 typedef enum OpCode{
     OP_RETURN,
-    OP_LOAD_CONSTANT, // OP, index：将const[index]置于栈顶
-    OP_CONSTANT2, // OP, index16: 将const[index16]置于栈顶。
-    OP_NEGATE,
-    OP_ADD,
-    OP_SUBTRACT,
-    OP_MULTIPLY,
-    OP_DIVIDE,
-    OP_MOD,
-    OP_POWER,
-    OP_LOAD_NIL,
-    OP_LOAD_TRUE,
-    OP_LOAD_FALSE,
-    OP_NOT,
-    OP_TEST_LESS,
-    OP_TEST_GREATER,
-    OP_TEST_EQUAL,
-    OP_PRINT,
+    OP_LOAD_CONSTANT, // OP, index16：将const[index16]置于栈顶
+    OP_NEGATE, // [value] -> [-value]
+    OP_ADD, // [a, b] -> [ a + b ]
+    OP_SUBTRACT, // [a, b] -> [ a - b]
+    OP_MULTIPLY, // [a, b] -> [ a * b ]
+    OP_DIVIDE, // [a, b] -> [ a / b ]
+    OP_MOD, // [a, b] -> [a % b]
+    OP_POWER, // [ a, b] -> [a ** b]
+    OP_LOAD_NIL, // [ ] -> [nil]
+    OP_LOAD_TRUE, // [ ] -> [true]
+    OP_LOAD_FALSE, // [ ] -> [false]
+    OP_NOT, // [a] -> [-a]
+    OP_TEST_LESS, // [a, b ] -> [a < b]
+    OP_TEST_GREATER, // [a, b] -> [a > b]
+    OP_TEST_EQUAL, // [a, b] -> [a == b]
+    OP_PRINT, // [a] -> [ ], print a
     OP_REPL_AUTO_PRINT,
-    OP_POP,
+    OP_POP, // [a] -> [ ]
     OP_DEF_GLOBAL, // OP, index16: 定义一个全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
     OP_DEF_GLOBAL_CONST, // OP, index16: 定义一个const全局变量，变量名是为const[index]之字符串。以栈顶的值为初始化值，消耗之。
     OP_GET_GLOBAL, // OP, index16: 向栈中添加一个全局变量的值，该变量名为const[index]之字符串
@@ -48,23 +47,23 @@ typedef enum OpCode{
     OP_CLOSE_UPVALUE, // op：将栈顶的值视为一个upvalue，将其close，然后从栈中移除之
     OP_MAKE_CLASS, // op，index16：创建一个class对象，它的名字是const[index]。将这个class置入栈顶
     OP_GET_PROPERTY, // op, index16：将栈顶的值视为一个instance，移除之，然后获取其名为const[index]的字段或者方法，置入栈顶
-    OP_SET_PROPERTY, // op, index16: [instance, value, top], 将value赋值给这个instance的名为const[index]的字段。该指令移除instance，但保留栈顶的value
-    OP_MAKE_METHOD, // op：[class, closure, top], 将closure储存为class的一个method。移除closure
-    OP_PROPERTY_INVOKE, // op, index16, arg_count: [receiver, args..., top]：从receiver中寻找名为const[index]的属性，然后调用之
-    OP_INHERIT, // op: [superclass, subclass, top]: 让subclass继承superclass。移除subclass
-    OP_SUPER_ACCESS, // op, index16: [receiver, superclass, top]: 从superclass中寻找名为const[index]的方法，然后绑定给receiver。receiver和superclass都被移除，将帮绑定后的method置入栈顶。
-    OP_SUPER_INVOKE, // op, index16, arg_count: [receiver, args..., superclass, top]: 从superclass中寻找名为const[index]的方法，立刻调用之。
-    OP_COPY, // op: 复制栈顶的值，将其置入栈顶. [a, top] -> [a, a, top]
-    OP_COPY2, // op: 赋值栈顶的两个值，将他们置入栈顶。[a, b, top] -> [a, b, a, b, top]
+    OP_SET_PROPERTY, // op, index16: [instance, value], 将value赋值给这个instance的名为const[index]的字段。该指令移除instance，但保留栈顶的value
+    OP_MAKE_METHOD, // op：[class, closure], 将closure储存为class的一个method。移除closure
+    OP_PROPERTY_INVOKE, // op, index16, arg_count: [receiver, args...]：从receiver中寻找名为const[index]的属性，然后调用之
+    OP_INHERIT, // op: [superclass, subclass]: 让subclass继承superclass。移除subclass
+    OP_SUPER_ACCESS, // op, index16: [receiver, superclass]: 从superclass中寻找名为const[index]的方法，然后绑定给receiver。receiver和superclass都被移除，将帮绑定后的method置入栈顶。
+    OP_SUPER_INVOKE, // op, index16, arg_count: [receiver, args..., superclass]: 从superclass中寻找名为const[index]的方法，立刻调用之。
+    OP_COPY, // op: 复制栈顶的值，将其置入栈顶. [a] -> [a, a]
+    OP_COPY2, // op: 赋值栈顶的两个值，将他们置入栈顶。[a, b] -> [a, b, a, b]
     OP_COPY_N, // op, n: push(stack_peek(n))
-    OP_INDEXING_GET, // op: [array, index, top]
-    OP_INDEXING_SET, // op: [array, index, value, top]
+    OP_INDEXING_GET, // op: [array, index]
+    OP_INDEXING_SET, // op: [array, index, value]
     OP_DIMENSION_ARRAY, // op, dimension,
     OP_MAKE_ARRAY, // op, length
     OP_UNPACK_ARRAY, // op, length
-    OP_MAKE_STATIC_FIELD, // op, name_index16: [class, field, top] -> [class, top]
-    OP_IMPORT, // op : [path_string, top]
-    OP_RESTORE_MODULE, // op:  [old_module, nil, top] -> [new_module, top]
+    OP_MAKE_STATIC_FIELD, // op, name_index16: [class, field] -> [class]
+    OP_IMPORT, // op : [path_string]
+    OP_RESTORE_MODULE, // op:  [old_module, nil] -> [new_module]
     OP_SWAP, // op, index: swap(top, top - index)
     NOP,
     OP_DEF_PUB_GLOBAL, // op, name_index16
@@ -75,6 +74,8 @@ typedef enum OpCode{
     OP_ARR_AS_VAR_ARG, // op
     OP_JUMP_FOR_ITER, // op, offset16: [iter] -> [iter, item], 如果还有下一个元素，则将之置于栈顶，否则跳转
     OP_GET_ITERATOR, // op: [iterable] -> [iterator]
+    OP_MAP_ADD_PAIR, // op, [map, k0, v0] -> [map]
+    OP_NEW_MAP, // op: [] -> [map]
 } OpCode;
 
 typedef struct Chunk{

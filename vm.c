@@ -36,13 +36,12 @@ String *FLOAT_CLASS = NULL;
 String *BOOL_CLASS = NULL;
 String *NATIVE_CLASS = NULL;
 String *FUNCTION_CLASS = NULL;
+String *MAP_CLASS = NULL;
+String *CLOSURE_CLASS = NULL;
 String *METHOD_CLASS = NULL;
 String *MODULE_CLASS = NULL;
 String *CLASS_CLASS = NULL;
 String *NIL_CLASS = NULL;
-
-//String *SCRIPT = NULL;
-//String *ANONYMOUS_MODULE = NULL;
 
 jmp_buf error_buf;
 
@@ -50,22 +49,21 @@ static CallFrame *curr_frame;
 static Table *curr_closure_global;
 static Value *curr_const_pool;
 
-static uint8_t read_byte();
-static uint16_t read_uint16();
+static inline uint8_t read_byte();
 
-static bool is_falsy(Value value);
+static inline uint16_t read_uint16();
 
-static void reset_stack();
+static inline bool is_falsy(Value value);
 
-//static Value read_constant();
+static inline void reset_stack();
 
 static InterpretResult run_frame_until(int end_when);
 
+static void invoke_property(String *name, int arg_count, NativeInterface interface);
+
 static inline bool if_read_byte(OpCode op);
 
-static Value read_constant16();
-
-static InterpretResult run_vm();
+static inline Value read_constant16();
 
 static void import(const char *src, String *path);
 
@@ -89,22 +87,55 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
 
 static Method *bind_method(Class *class, String *name, Value receiver);
 
-/**
- * 移除栈顶的n个元素
- */
-inline static void stack_clear(int n) {
-    vm.stack_top -= n;
-}
-
+static void invoke_native_object(int arg_count, NativeInterface interface, NativeObject *native_object);
 
 static inline void stack_set(int n, Value value) {
     vm.stack_top[-1 - n] = value;
 }
 
+static Class *value_class(Value value) {
+    switch (value.type) {
+        case VAL_INT:
+            return int_class;
+        case VAL_FLOAT:
+            return float_class;
+        case VAL_BOOL:
+            return bool_class;
+        case VAL_NIL:
+            return nil_class;
+        default:
+            IMPLEMENTATION_ERROR("bad");
+            return NULL;
+    }
+}
+
+/**
+ * 将value置于stack_top处，然后自增stack_top
+ * @param value 想要添加的value
+ */
+inline void stack_push(Value value) {
+    *vm.stack_top = value;
+    vm.stack_top++;
+}
+
+inline Value stack_pop() {
+    vm.stack_top--;
+    return *(vm.stack_top);
+}
+
+/**
+ * 将栈顶值和stack_peek(n)交换
+ */
 static inline void stack_swap(int n) {
     Value temp = stack_peek(n);
     stack_set(n, stack_peek(0));
     stack_set(0, temp);
+}
+
+static inline void invoke_and_wait(String *name, int arg_count, NativeInterface interface) {
+    int count = vm.frame_count;
+    invoke_property(name, arg_count, interface);
+    run_frame_until(count);
 }
 
 static void array_indexing_get() {
@@ -139,11 +170,173 @@ static void array_indexing_set() {
     stack_push(value);
 }
 
+static void map_indexing_get() {
+    // [map, key0]
+    Map *map = as_map(stack_peek(1));
+    stack_push(stack_peek(0)); // [map, key0, key0]
+    invoke_and_wait(HASH, 0, INTER_HASH);
+    Value hash_result = stack_pop();
+    assert_value_type(hash_result, VAL_INT, "int");
+    int hash = as_int(hash_result); // [map, key0, hash]
+    int index = MODULO(hash, map->capacity);
+//    int index = hash % map->capacity;
+    for (int i = 0; i < map->capacity; ++i) { ;
+        int curr = MODULO(index + i, map->capacity);
+//        int curr = (index + i) % map->capacity;
+        MapEntry *entry = map->backing + curr;
+        if (map_empty_entry(entry)) {
+            stack_pop();
+            stack_pop();
+            stack_push(nil_value());
+            return;
+        } else if (entry->hash == hash) {
+            stack_push(entry->key); // map, key0, key1
+            stack_push(stack_peek(1)); // map, key0, key1, key0
+            invoke_and_wait(EQUAL, 1, INTER_EQUAL); // map, key0, bool
+            Value cmp_result = stack_pop(); // map, key0
+            assert_value_type(cmp_result, VAL_BOOL, "bool");
+            bool eq = as_bool(cmp_result);
+            if (eq) {
+                stack_pop();
+                stack_pop();
+                stack_push(entry->value);
+                return;
+            }
+        }
+    }
+    stack_pop();
+    stack_pop();
+    stack_push(nil_value());
+}
+
+/**
+ * [map, key0, value0, hash] -> [map | value]
+ * @param keep_map true: keep the map on the top of the stack, false: keep value on top
+ */
+static void map_indexing_set_with_hash(bool keep_map) {
+
+    Map *map = as_map(stack_peek(3));
+    Value hash_result = stack_pop(); // map, key0, value
+    assert_value_type(hash_result, VAL_INT, "int");
+    MapEntry *mark = NULL;
+
+    int hash = as_int(hash_result); // map, key0, value
+    int index = MODULO(hash, map->capacity);
+//    int index = hash % map->capacity;
+    for (int i = 0; i < map->capacity; ++i) {
+        int curr = MODULO(index + i, map->capacity);
+//        int curr = (index + i) % map->capacity;
+        MapEntry *entry = map->backing + curr;
+        if (map_empty_entry(entry)) {
+            if (mark == NULL) {
+                entry->value = stack_pop(); // -> map, key0
+                entry->key = stack_pop(); //  -> [map]
+                entry->hash = hash;
+                map->count++;
+                if (!keep_map) {
+                    stack_pop(); // -> [ ]
+                    stack_push(entry->value); // -> [value]
+                }
+                return;
+            } else {
+                mark->value = stack_pop();
+                mark->key = stack_pop(); // -> [map]
+                mark->hash = hash;
+                if (!keep_map) {
+                    stack_pop();
+                    stack_push(mark->value); // -> [value]
+                }
+                return;
+            }
+        } else if (entry->hash == hash) {
+            // [map, key0, value, ]
+            stack_push(entry->key); // map, key0, value, key1
+            stack_push(stack_peek(2)); // map, k0, v, k1, k0
+            invoke_and_wait(EQUAL, 1, INTER_EQUAL);
+            // map, k0, v, bool
+            Value eq_result = stack_pop(); // map, k0, v
+            assert_value_type(eq_result, VAL_BOOL, "bool");
+            bool eq = as_bool(eq_result);
+            if (eq) {
+                entry->value = stack_pop(); // map, k0
+                stack_pop();  // map
+                if (!keep_map) {
+                    stack_pop();
+                    stack_push(entry->value); // -> [value]
+                }
+                return;
+            }
+        } else if (mark == NULL && map_del_mark(entry)) {
+            mark = entry;
+        }
+    }
+    runtime_error("map cannot find empty spot, this is an implementation error!");
+}
+
+/**
+ * [map, key0, value] -> [map | value]
+ */
+static void map_indexing_set(bool keep_map) {
+    // map, key0, value
+    Map *map = as_map(stack_peek(2));
+
+    if (map_need_resize(map)) {
+        int new_capacity = map->capacity < 8 ? 8 : map->capacity * 2;
+        MapEntry *new_backing = ALLOCATE(MapEntry, new_capacity);
+        for (int i = 0; i < new_capacity; ++i) {
+            new_backing[i].key = absence_value();
+            new_backing[i].value = absence_value();
+        }
+        Map *m2 = new_map();
+        m2->backing = new_backing;
+        m2->capacity = new_capacity;
+        stack_push(ref_value((Object *) m2)); // map, k0, v, m2
+        for (int i = 0; i < map->capacity; ++i) {
+            MapEntry *entry = map->backing + i;
+            if (!is_absence(entry->key)) {
+                stack_push(entry->key);
+                stack_push(entry->value);
+                stack_push(int_value(entry->hash));
+
+                // map, k0, v, m2, k1, v1, hash1
+                map_indexing_set_with_hash(true);
+                // map, k0, v, m2
+//                map_indexing_set(true);
+            }
+        }
+        // map, k0, v, m2
+        FREE_ARRAY(MapEntry, map->backing, map->count);
+        map->backing = new_backing;
+        map->capacity = new_capacity;
+        map->count = m2->count;
+        m2->backing = NULL;
+        m2->capacity = 0;
+        m2->count = 0;
+        stack_pop(); // map, k0, v
+    }
+
+    stack_push(stack_peek(1)); // map, key0, value, key0
+    invoke_and_wait(HASH, 0, INTER_HASH);
+    // map, key0, value, hash
+
+    map_indexing_set_with_hash(keep_map);
+    // map | value
+}
+
 /**
  * 获取target的指定属性，并将之置于栈顶。
  */
 static void get_property(Value target, String *property_name) {
-    if (is_ref_of(target, OBJ_INSTANCE) == false) {
+    if (is_ref_of(target, OBJ_INSTANCE)) {
+        Instance *instance = as_instance(target);
+        Value result = nil_value();
+        bool found = table_get(&instance->fields, property_name, &result);
+        if (found == false) {
+            Method *method = bind_method(instance->class, property_name, target);
+            result = ref_value((Object *) method);
+        }
+        stack_push(result);
+    } else if (is_ref(target)) {
         switch (as_ref(target)->type) {
             case OBJ_ARRAY: {
                 if (property_name == LENGTH) {
@@ -176,11 +369,35 @@ static void get_property(Value target, String *property_name) {
                 stack_push(static_field);
                 break;
             }
+            case OBJ_CLOSURE: {
+                Value property;
+                if (!table_get(&closure_class->methods, property_name, &property)) {
+                    goto OP_GET_PROPERTY_not_found;
+                } else {
+                    stack_push(property);
+                }
+                break;
+            }
+            case OBJ_MAP: {
+                if (property_name == LENGTH) {
+                    Map *map = as_map(target);
+                    stack_push(int_value(map->count));
+                    break;
+                }
+                Value property;
+                if (!table_get(&map_class->methods, property_name, &property)) {
+                    goto OP_GET_PROPERTY_not_found;
+                } else {
+                    stack_push(property);
+                }
+                break;
+            }
             case OBJ_MODULE: {
                 Module *module = as_module(target);
                 Value property;
                 if (!table_conditional_get(&module->globals, property_name, &property, true, false)) {
-                    runtime_error_catch_2("%s does not the have public property: %s", target, ref_value((Object *) property_name));
+                    runtime_error_catch_2("%s does not the have public property: %s", target,
+                                          ref_value((Object *) property_name));
                 } else {
                     stack_push(property);
                 }
@@ -191,14 +408,23 @@ static void get_property(Value target, String *property_name) {
                 runtime_error_catch_2("%s does not have the property: %s", target, ref_value((Object *) property_name));
         }
     } else {
-        Instance *instance = as_instance(target);
-        Value result = nil_value();
-        bool found = table_get(&instance->fields, property_name, &result);
-        if (found == false) {
-            Method *method = bind_method(instance->class, property_name, target);
-            result = ref_value((Object *) method);
+        switch (target.type) {
+            case VAL_INT:
+            case VAL_BOOL:
+            case VAL_FLOAT:
+            case VAL_NIL: {
+                Value property;
+                if (!table_get(&value_class(target)->methods, property_name, &property)) {
+                    goto OP_GET_PROPERTY_not_found;
+                } else {
+                    stack_push(property);
+                }
+                break;
+            }
+            default:
+                IMPLEMENTATION_ERROR("bad");
+                return;
         }
-        stack_push(result);
     }
 }
 
@@ -219,6 +445,26 @@ void assert_value_type(Value value, ValueType type, const char *message) {
         catch(INTERPRET_RUNTIME_ERROR);
     }
 }
+//
+//static void invoke_native_interface(int arg_count, NativeInterface interface) {
+//    Value receiver = stack_peek(arg_count);
+//    if (is_ref_of(receiver, OBJ_NATIVE_OBJECT)) {
+//        invoke_native_object(arg_count, interface, as_native_object(receiver));
+//        return;
+//    }
+//    switch (interface) {
+//        case INTER_EQUAL: {
+//            Value b = stack_pop();
+//            Value a = stack_pop();
+//            stack_push(bool_value(value_equal(a, b)));
+//            return;
+//        }
+//        default:
+//            goto error;
+//    }
+//    error:
+//    runtime_error_catch_1("%s does not support such operation", receiver);
+//}
 
 /**
  * 根据interface，执行native_object的对应行为。如果不匹配，该函数会导致runtime error
@@ -227,6 +473,7 @@ void assert_value_type(Value value, ValueType type, const char *message) {
  * @param native_object
  */
 static void invoke_native_object(int arg_count, NativeInterface interface, NativeObject *native_object) {
+    (void ) arg_count;
     switch (interface) {
         case INTER_ITERATOR:
             switch (native_object->native_type) {
@@ -298,7 +545,7 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
         } else {
             call_value(closure_value, arg_count);;
         }
-    } else {
+    } else if (is_ref(receiver)){
         switch (receiver.as.reference->type) {
             case OBJ_CLASS: {
                 Class *class = as_class(receiver);
@@ -306,7 +553,7 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
                 if (table_get(&class->static_fields, name, &static_field)) {
                     call_value(static_field, arg_count);
                 } else {
-                    goto error_handle;
+                    invoke_from_class(module_class, name, arg_count);
                 }
                 break;
             }
@@ -316,7 +563,7 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
                 if (table_conditional_get(&module->globals, name, &property, true, false)) {
                     call_value(property, arg_count);
                 } else {
-                    goto error_handle;
+                    invoke_from_class(module_class, name, arg_count);
                 }
                 break;
             }
@@ -326,6 +573,12 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
             case OBJ_STRING:
                 invoke_from_class(string_class, name, arg_count);
                 break;
+            case OBJ_CLOSURE:
+                invoke_from_class(closure_class, name, arg_count);
+                break;
+            case OBJ_MAP:
+                invoke_from_class(map_class, name, arg_count);
+                break;
             case OBJ_NATIVE_OBJECT: {
                 NativeObject *native_object = as_native_object(receiver);
                 invoke_native_object(arg_count, interface, native_object);
@@ -334,6 +587,17 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
             default:
             error_handle:
                 runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
+        }
+    } else {
+        switch (receiver.type) {
+            case VAL_INT:
+            case VAL_BOOL:
+            case VAL_FLOAT:
+            case VAL_NIL:
+                invoke_from_class(value_class(receiver), name, arg_count);
+                break;
+            default:
+                IMPLEMENTATION_ERROR("bad");
         }
     }
 }
@@ -734,7 +998,7 @@ static void call_closure(Closure *closure, int arg_count) {
             arg_count = fixed_arg_count + optional_arg_count;
             if (function->var_arg) {
                 stack_push(ref_value((Object *) new_array(0)));
-                arg_count ++;
+                arg_count++;
             }
         } else if (function->var_arg) { // more than expect
             arg_count = fixed_arg_count + optional_arg_count + 1;
@@ -751,10 +1015,12 @@ static void call_closure(Closure *closure, int arg_count) {
                 build_array(-num_absence);
             }
         } else {
-            runtime_error_and_catch("%s expects at most %d arguments, but got %d", function->name->chars, fixed_arg_count + optional_arg_count, arg_count);
+            runtime_error_and_catch("%s expects at most %d arguments, but got %d", function->name->chars,
+                                    fixed_arg_count + optional_arg_count, arg_count);
         }
     } else {
-        runtime_error_and_catch("%s expects at least %d arguments, but got %d", function->name->chars, fixed_arg_count, arg_count);
+        runtime_error_and_catch("%s expects at least %d arguments, but got %d", function->name->chars, fixed_arg_count,
+                                arg_count);
     }
     if (vm.frame_count == FRAME_MAX) {
         runtime_error_and_catch("Stack overflow.");
@@ -844,7 +1110,9 @@ static void init_static_strings() {
     BOOL_CLASS = auto_length_string_copy("Bool");
     NATIVE_CLASS = auto_length_string_copy("Native");
     FUNCTION_CLASS = auto_length_string_copy("Function");
+    CLOSURE_CLASS = auto_length_string_copy("Closure");
     METHOD_CLASS = auto_length_string_copy("Method");
+    MAP_CLASS = auto_length_string_copy("Map");
     MODULE_CLASS = auto_length_string_copy("Module");
     CLASS_CLASS = auto_length_string_copy("Class");
     NIL_CLASS = auto_length_string_copy("Nil");
@@ -885,19 +1153,19 @@ void free_VM() {
     free(vm.gray_stack);
 }
 
-/**
- * 将value置于stack_top处，然后自增stack_top
- * @param value 想要添加的value
- */
-inline void stack_push(Value value) {
-    *vm.stack_top = value;
-    vm.stack_top++;
-}
-
-inline Value stack_pop() {
-    vm.stack_top--;
-    return *(vm.stack_top);
-}
+///**
+// * 将value置于stack_top处，然后自增stack_top
+// * @param value 想要添加的value
+// */
+//inline void stack_push(Value value) {
+//    *vm.stack_top = value;
+//    vm.stack_top++;
+//}
+//
+//inline Value stack_pop() {
+//    vm.stack_top--;
+//    return *(vm.stack_top);
+//}
 
 /**
  * 调用 compile() 将源代码编译成一个function，构造一个closure，设置栈帧，
@@ -1141,11 +1409,6 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             }
             case OP_LOAD_CONSTANT: {
-                Value value = read_constant16();
-                stack_push(value);
-                break;
-            }
-            case OP_CONSTANT2: {
                 Value value = read_constant16();
                 stack_push(value);
                 break;
@@ -1536,41 +1799,27 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             }
             case OP_INDEXING_GET: {
-                // [arr, index, top]
-                Value index_value = stack_pop();
-                if (!is_int(index_value)) {
-                    runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
+                // [arr, index]
+                Value target = stack_peek(1);
+                if (is_ref_of(target, OBJ_ARRAY)) {
+                    array_indexing_get();
+                } else if (is_ref_of(target, OBJ_MAP)) {
+                    map_indexing_get();
+                } else {
+                    runtime_error_catch_1("%s does not support indexing", target);
                 }
-                Value arr_value = stack_pop();
-                if (!is_ref_of(arr_value, OBJ_ARRAY)) {
-                    runtime_error_catch_1("%s is not an array and does not support indexing", arr_value);
-                }
-                Array *array = as_array(arr_value);
-                int index = as_int(index_value);
-                if (index < 0 || index >= array->length) {
-                    runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
-                }
-                stack_push(array->values[index]);
                 break;
             }
             case OP_INDEXING_SET: {
-                // op: [array, index, value, top]
-                Value value = stack_pop();
-                Value index_value = stack_pop();
-                if (!is_int(index_value)) {
-                    runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
+                // op: [array, index, value]
+                Value target = stack_peek(2);
+                if (is_ref_of(target, OBJ_ARRAY)) {
+                    array_indexing_set();
+                } else if (is_ref_of(target, OBJ_MAP)) {
+                    map_indexing_set(false);
+                } else {
+                    runtime_error_catch_1("%s does not support indexing", target);
                 }
-                Value arr_value = stack_pop();
-                if (!is_ref_of(arr_value, OBJ_ARRAY)) {
-                    runtime_error_catch_1("%s is not an array and does not support indexing", arr_value);
-                }
-                Array *array = as_array(arr_value);
-                int index = as_int(index_value);
-                if (index < 0 || index >= array->length) {
-                    runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
-                }
-                array->values[index] = value;
-                stack_push(value);
                 break;
             }
             case OP_MAKE_ARRAY: {
@@ -1613,9 +1862,7 @@ static InterpretResult run_frame_until(int end_when) {
             }
             case OP_SWAP: {
                 int n = read_byte();
-                Value temp = stack_peek(n);
-                vm.stack_top[-1 - n] = stack_peek(0);
-                vm.stack_top[-1] = temp;
+                stack_swap(n);
                 break;
             }
             case OP_RESTORE_MODULE: {
@@ -1656,9 +1903,7 @@ static InterpretResult run_frame_until(int end_when) {
                 // [iter]
                 int offset = read_uint16();
                 stack_push(stack_peek(0)); // [iter, iter]
-                int frame_count = vm.frame_count;
-                invoke_property(HAS_NEXT, 0, INTER_HAS_NEXT);
-                run_frame_until(frame_count); // [iter, bool]
+                invoke_and_wait(HAS_NEXT, 0, INTER_HAS_NEXT); // [iter, bool]
                 if (is_falsy(stack_pop())) {
                     curr_frame->PC += offset;
                     break;
@@ -1667,6 +1912,19 @@ static InterpretResult run_frame_until(int end_when) {
                 stack_push(stack_peek(0));
                 invoke_property(NEXT, 0, INTER_NEXT);
                 // [iter, item]
+                break;
+            }
+            case OP_MAP_ADD_PAIR: {
+                // [map, k0, v0]
+                // [k0, v0, k1, v1, k2, v2 ...] -> [map]
+                map_indexing_set(true);
+//                stack_push(stack_peek(1)); // map, k0, v0, k0
+//                invoke_and_wait(HASH, 0, INTER_HASH);; // map, k0, v0, k0, hash0
+//                map_indexing_set_with_hash(true); // map
+                break;
+            }
+            case OP_NEW_MAP: {
+                stack_push(ref_value((Object *) new_map()));
                 break;
             }
             default: {

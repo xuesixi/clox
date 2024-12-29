@@ -100,6 +100,8 @@ static inline bool match_assign();
 
 static void call(bool can_assign);
 
+static void parse_map(bool can_assign);
+
 static void indexing(bool can_assign);
 
 static inline bool lexeme_equal(Token *a, Token *b);
@@ -256,7 +258,7 @@ static int add_upvalue(Scope *scope, int index, bool is_local);
 ParseRule rules[] = {
         [TOKEN_LEFT_PAREN]    = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
-        [TOKEN_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACE]    = {parse_map, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
         [TOKEN_COMMA]         = {NULL, array_literal, PREC_COMMA},
         [TOKEN_DOT]           = {NULL, dot, PREC_CALL},
@@ -665,7 +667,7 @@ static void function_statement(FunctionType type) {
 
                 default_value: {
                     emit_u8_u8(OP_GET_LOCAL, current_scope->local_count - 1);
-                    int default_value_end = emit_jump(OP_JUMP_IF_NOT_ABSENCE_POP);
+                    int default_value_end = emit_jump(OP_JUMP_IF_NOT_ABSENCE);
                     parse_precedence(PREC_ASSIGNMENT); // right value
                     emit_u8_u8(OP_SET_LOCAL, current_scope->local_count - 1);
                     emit_byte(OP_POP);
@@ -1017,16 +1019,6 @@ static void loop_back(int start) {
     emit_byte(OP_JUMP_BACK);
     int diff = current_chunk()->count - start + 2;
     emit_u16(diff);
-}
-
-/**
- * 将栈顶的值视为一个对象，调用其名为method_name的方法
- */
-static void emit_invoke_no_arg(const char *method_name) {
-    Token token = literal_token(method_name);
-    uint16_t index = identifier_constant(&token);
-    emit_u8_u16(OP_PROPERTY_INVOKE, index);
-    emit_byte(0);
 }
 
 /**
@@ -1858,6 +1850,21 @@ static inline void grouping(bool can_assign) {
     (void) can_assign;
     expression();
     consume(TOKEN_RIGHT_PAREN, "missing expected )");
+}
+
+static void parse_map(bool can_assign) {
+    (void ) can_assign;
+    emit_byte(OP_NEW_MAP);
+    // { 1 : 10, "anda" : 9, 45 : "fmor" }
+    if (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
+        do {
+            parse_precedence(PREC_ASSIGNMENT);
+            consume(TOKEN_COLON, "Expect ':' to separate key-value pair");
+            parse_precedence(PREC_ASSIGNMENT);
+            emit_byte(OP_MAP_ADD_PAIR);
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' to end the map literal");
 }
 
 /**

@@ -28,7 +28,8 @@ extern bool gc_enabled;
 void *re_allocate(void *ptr, size_t old_size, size_t byte_size);
 void free_all_objects();
 void free_object(Object *object);
-void mark_value(Value value);
 void mark_object(Object *object);
+void mark_value(Value value);
+
 
 #endif //CLOX_MEMORY_H

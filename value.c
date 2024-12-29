@@ -63,6 +63,7 @@ void print_value_with_color(Value value) {
                     break;
                 case OBJ_INSTANCE:
                 case OBJ_ARRAY:
+                case OBJ_MAP:
                     start_color(BOLD_CYAN);
                     break;
             }
@@ -208,6 +209,11 @@ static char *ref_to_chars(Value value, int *len) {
         }
         case OBJ_NATIVE_OBJECT: {
             *len = asprintf(&buffer, "<native obj>");
+            break;
+        }
+        case OBJ_MAP: {
+            Map *map = as_map(value);
+            *len = asprintf(&buffer, "<map: %d/%d>", map->count, map->capacity);
             break;
         }
         default:

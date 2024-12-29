@@ -36,15 +36,6 @@ static int byte_instruction(const char *name, const Chunk *chunk, int offset, co
     return offset + 2;
 }
 
-static int constant8_instruction(const char *name, const Chunk *chunk, int offset) {
-    uint8_t index = chunk->code[offset + 1];
-    printf("%-23s %4d : ", name, index);
-    Value value = chunk->constants.values[index];
-    print_value_with_color(value);
-    NEW_LINE();
-    return offset + 2;
-}
-
 static int constant16_instruction(const char *name, const Chunk *chunk, int offset) {
     uint8_t i0 = chunk->code[offset + 1];
     uint8_t i1 = chunk->code[offset + 2];
@@ -107,8 +98,6 @@ int disassemble_instruction(Chunk *chunk, int offset, bool line_break) {
             return simple_instruction("RETURN", offset);
         case OP_LOAD_CONSTANT:
             return constant16_instruction("LOAD_CONSTANT", chunk, offset);
-        case OP_CONSTANT2:
-            return constant16_instruction("CONSTANT2", chunk, offset);
         case OP_NEGATE:
             return simple_instruction("NEGATE", offset);
         case OP_ADD:
@@ -252,6 +241,10 @@ int disassemble_instruction(Chunk *chunk, int offset, bool line_break) {
             return jump_instruction("JUMP_FOR_ITER", chunk, offset, true);
         case OP_GET_ITERATOR:
             return simple_instruction("GET_ITERATOR", offset);
+        case OP_MAP_ADD_PAIR:
+            return simple_instruction("MAP_ADD_PAIR", offset);
+        case OP_NEW_MAP:
+            return simple_instruction("NEW_MAP", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return -1;

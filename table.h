@@ -28,8 +28,8 @@ typedef bool (*EqualityFunction)(void *a, void *b);
 
 void init_table(Table *table);
 void free_table(Table *table);
-Entry *table_find_entry(Table *table, String *key, bool public_only, bool mutable_only);
 bool table_get(Table *table, String *key, Value *value);
+Entry *table_find_entry(Table *table, String *key, bool public_only, bool mutable_only);
 bool table_conditional_get(Table *table, String *key, Value *value, bool public_only, bool mutable_only);
 bool table_has(Table *table, String *key);
 bool table_set(Table *table, String *key, Value value);

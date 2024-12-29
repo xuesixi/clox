@@ -88,16 +88,6 @@ inline bool table_has(Table *table, String *key) {
     return !empty_entry(table_find_entry(table, key, false, false));
 }
 
-/**
- *
- * @param table
- * @param key
- * @param value 如果存在该key，则将对应的值储存在这个参数值
- * @return 是否存在该key
- */
-inline bool table_get(Table *table, String *key, Value *value) {
-    return table_conditional_get(table, key, value, false, false);
-}
 
 bool table_conditional_get(Table *table, String *key, Value *value, bool public_only, bool mutable_only) {
     if (table->count == 0) {
@@ -311,130 +301,10 @@ void free_table(Table *table) {
     init_table(table);
 }
 
-
-//
-//static inline bool map_need_resize(Map *map) {
-//    return map->count + 1 >= map->capacity * 0.75;
-//}
-//
-//static void map_resize(Map *map) {
-//    int old_capacity = map->capacity;
-//    int new_capacity = old_capacity < 11 ? 11 : old_capacity * 2 + 1;
-//    MapEntry *old_backing = map->backing;
-//    MapEntry *new_backing = ALLOCATE(MapEntry, new_capacity);
-//    for (int i = 0; i < new_capacity; i++) {
-//        new_backing[i].key = absence_value();
-//        new_backing[i].value = absence_value();
-//    }
-//
-//    map->capacity = new_capacity;
-//    map->backing = new_backing;
-//    map->count = 0;
-//    for (int i = 0; i < old_capacity; i ++) {
-//        MapEntry *entry = old_backing + i;
-//        if (!is_absence(entry->key)) {
-//            map_set(map, entry->key, entry->value);
-//        }
-//    }
-//    FREE_ARRAY(MapEntry, old_backing, old_capacity);
-//}
-//
-///**
-// * 如果不存在，则返回空entry（key，value均为null）。否则返回对应的entry.
-// *
-// * */
-//static MapEntry *map_find_entry(Map *map, void *key) {
-//    int index = map->hash(key);
-//    for (int i = 0; i < map->capacity; i ++) {
-//        int curr = (index + i) % (map->capacity);
-//        MapEntry *entry = map->backing + curr;
-//        if (map_empty_entry(entry)) {
-//            return entry;
-//        }
-//        if (entry->key != NULL && map->equal(entry->key, key)) {
-//            return entry;
-//        }
-//    }
-//    IMPLEMENTATION_ERROR("map_find_entry() does not find empty entry spot and returns NULL");
-//    return NULL;
-//}
-//
-///**
-// * @return NULL if not found
-// * */
-//void *map_get(Map *map, void *key) {
-//    if (map->count == 0) {
-//        return NULL;
-//    }
-//    MapEntry *entry = map_find_entry(map, key);
-//    if (map_empty_entry(entry)) {
-//        return NULL;
-//    } else {
-//        return entry->value;
-//    }
-//}
-//
-///**
-// *
-// * @param map
-// * @param key
-// * @param value
-// * @return true if modifying existing pair; false if adding new entry
-// */
-//bool map_set(Map *map, void *key, void *value) {
-//    if (map_need_resize(map)) {
-//        map_resize(map);
-//    }
-//
-//    MapEntry *del = NULL;
-//    int index = map->hash(key);
-//    for (int i = 0; i < map->capacity; i ++ ) {
-//        int curr = (index + i) % map->capacity;
-//        MapEntry *entry = map->backing + curr;
-//        if (map_empty_entry(entry)) {
-//            if (del == NULL) {
-//                entry->key = key;
-//                entry->value = value;
-//                map->count ++;
-//            } else {
-//                del->key = key;
-//                del->value = value;
-//            }
-//            return false;
-//        } else if (map_del_mark(entry)){
-//            del = entry;
-//        } else if (map->equal(entry->key, key)) {
-//            entry->value = value;
-//            return true;
-//        }
-//    }
-//    IMPLEMENTATION_ERROR("map_set() does not find empty spot");
-//    return false;
-//}
-//
-//void *map_delete(Map *map, void *key) {
-//    if (map->count == 0) {
-//        return NULL;
-//    }
-//    MapEntry *entry = map_find_entry(map, key);
-//    if (map_empty_entry(entry)) {
-//        return NULL;
-//    } else {
-//        entry->key = NULL;
-//        void *result = entry->value;
-//        entry->value = (void *)10086; // this is considered DEL mark
-//        return result;
-//    }
-//}
-//
-//int int_hash(void *p) {
-//    (void ) p;
-//    IMPLEMENTATION_ERROR("undefined");
-//    return 0;
-////    int num = (int) p;
-////    return num * 2654435761 % (INT32_MAX);
-//}
-//
-//bool int_equal(void *a, void *b) {
-//    return a == b;
-//}
+/**
+ * @param value 如果存在该key，则将对应的值储存在这个参数值
+ * @return 是否存在该key
+ */
+inline bool table_get(Table *table, String *key, Value *value) {
+    return table_conditional_get(table, key, value, false, false);
+}

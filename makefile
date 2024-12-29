@@ -41,4 +41,3 @@ clion_debug: $(OBJ)
 .PHONY: clean
 clean:
 	@rm -f *.o
-	@rm $(TARGET)

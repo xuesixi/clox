@@ -3,12 +3,17 @@
 //
 
 #include "native.h"
+#include "object.h"
 #include "liblox_core.h"
 #include "liblox_iter.h"
 #include "vm.h"
 #include "stdlib.h"
 #include "string.h"
 #include "time.h"
+
+#define FNV_PRIME 16777619
+#define FNV_OFFSET_BASIS 2166136261
+
 
 Class *array_class;
 Class *string_class;
@@ -18,6 +23,8 @@ Class *bool_class;
 Class *native_class;
 Class *class_class;
 Class *function_class;
+Class *closure_class;
+Class *map_class;
 Class *method_class;
 Class *nil_class;
 Class *module_class;
@@ -51,9 +58,11 @@ void load_libraries() {
         Value native_class_value;
         Value class_class_value;
         Value function_class_value;
+        Value closure_class_value;
         Value method_class_value;
         Value module_class_value;
         Value nil_class_value;
+        Value map_class_value;
 
         table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
         array_class = as_class(array_class_value);
@@ -79,6 +88,9 @@ void load_libraries() {
         table_get(&vm.builtin, FUNCTION_CLASS, &function_class_value);
         function_class = as_class(function_class_value);
 
+        table_get(&vm.builtin, CLOSURE_CLASS, &closure_class_value);
+        closure_class= as_class(closure_class_value);
+
         table_get(&vm.builtin, METHOD_CLASS, &method_class_value);
         method_class = as_class(method_class_value);
 
@@ -87,6 +99,9 @@ void load_libraries() {
 
         table_get(&vm.builtin, NIL_CLASS, &nil_class_value);
         nil_class = as_class(nil_class_value);
+
+        table_get(&vm.builtin, MAP_CLASS, &map_class_value);
+        map_class = as_class(map_class_value);
 
     }
     preload_finished = true;
@@ -115,14 +130,18 @@ static Value native_type(int count, Value *value) {
                     return ref_value((Object *)native_class);
                 case OBJ_METHOD:
                     return ref_value((Object *)method_class);
-                case OBJ_CLOSURE:
+                case OBJ_FUNCTION:
                     return ref_value((Object *)function_class);
+                case OBJ_CLOSURE:
+                    return ref_value((Object *)closure_class);
                 case OBJ_MODULE:
                     return ref_value((Object *)module_class);
                 case OBJ_INSTANCE: {
                     Instance *instance = as_instance(*value);
                     return ref_value((Object *)instance->class);
                 }
+                case OBJ_MAP:
+                    return ref_value((Object *)map_class);
                 default:
                     IMPLEMENTATION_ERROR("should not happen");
                     return nil_value();
@@ -451,6 +470,84 @@ static Value native_array_iter(int count, Value *value) {
     return ref_value((Object *) nativeObject);
 }
 
+static Value general_hash(int count, Value *given) {
+    (void ) count;
+    uint32_t hash = FNV_OFFSET_BASIS;
+    Value v = *given;
+    switch(given->type) {
+        case VAL_INT: { // int
+            int value = as_int(v);
+            const unsigned char* bytes = (const unsigned char*)&value;
+            for (size_t i = 0; i < sizeof(int); i++) {
+                hash ^= bytes[i];
+                hash *= FNV_PRIME;
+            }
+            break;
+        }
+        case VAL_FLOAT: { // double
+            double value = as_float(v);
+            const unsigned char* bytes = (const unsigned char*)&value;
+            for (size_t i = 0; i < sizeof(double); i++) {
+                hash ^= bytes[i];
+                hash *= FNV_PRIME;
+            }
+            break;
+        }
+        case VAL_BOOL: { // bool
+            bool value = as_bool(v);
+            hash ^= value ? 1 : 0;
+            hash *= FNV_PRIME;
+            break;
+        }
+        case VAL_NIL: {
+            return int_value(0);
+        }
+        case VAL_REF: { // pointer
+            if (is_ref_of(v, OBJ_STRING)) {
+                String *string = as_string(v);
+                hash = chars_hash(string->chars, string->length);
+            } else {
+                uintptr_t ptr = (uintptr_t) as_ref(v);
+                const unsigned char* bytes = (const unsigned char*)&ptr;
+                for (size_t i = 0; i < sizeof(void*); i++) {
+                    hash ^= bytes[i];
+                    hash *= FNV_PRIME;
+                }
+            }
+            break;
+        }
+        default:
+            IMPLEMENTATION_ERROR("bad");
+    }
+
+    return int_value(hash);
+}
+
+Value native_value_equal(int count, Value *values) {
+    (void ) count;
+    Value a = values[0];
+    Value b = values[1];
+    if (a.type != b.type) {
+        return bool_value(false);
+    }
+    bool result;
+    switch (a.type) {
+        case VAL_BOOL:
+            result = as_bool(a) == as_bool(b);
+        case VAL_INT:
+            result = as_int(a) == as_int(b);
+        case VAL_FLOAT:
+            result =  as_float(a) == as_float(b);
+        case VAL_NIL:
+        case VAL_ABSENCE:
+            result = true;
+        case VAL_REF: {
+            result = as_ref(a) == as_ref(b);
+        }
+    }
+    return bool_value(result);
+}
+
 void init_vm_native() {
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
@@ -465,6 +562,8 @@ void init_vm_native() {
     define_native("type", native_type, 1);
     define_native("native_range", native_range, 3);
     define_native("native_array_iter", native_array_iter, 1);
+    define_native("native_general_hash", general_hash, 1);
+    define_native("native_value_equal", native_value_equal, 2);
 }
 
 void additional_repl_init() {

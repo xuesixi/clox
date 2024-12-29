@@ -33,7 +33,7 @@ void mark_object(Object *object) {
     vm.gray_stack[vm.gray_count++] = object;
 }
 
-void mark_value(Value value) {
+inline void mark_value(Value value) {
     if (value.type == VAL_REF) {
         mark_object(as_ref(value));
     }
@@ -70,10 +70,12 @@ static void mark_roots() {
     mark_object((Object *) BOOL_CLASS);
     mark_object((Object *) NATIVE_CLASS);
     mark_object((Object *) FUNCTION_CLASS);
+    mark_object((Object *) CLOSURE_CLASS);
     mark_object((Object *) METHOD_CLASS);
     mark_object((Object *) MODULE_CLASS);
     mark_object((Object *) CLASS_CLASS);
     mark_object((Object *) NIL_CLASS);
+    mark_object((Object *) MAP_CLASS);
 
 //    // mark open upvalues ? 暂时无法理解。这些值是open的，意味着它们仍然在作用域内，要么是在stack上，要么是在globals中。我认为没必要额外标记
 //    UpValueObject *curr = vm.open_upvalues;
@@ -156,6 +158,13 @@ static void blacken_object(Object *object) {
                 mark_value(nativeObject->values[i]);
             }
             break;
+        }
+        case OBJ_MAP: {
+            Map *map = (Map *) object;
+            for (int i = 0; i < map->capacity; ++i) {
+                mark_value(map->backing[i].key);
+                mark_value(map->backing[i].value);
+            }
         }
     }
 }
@@ -329,7 +338,11 @@ void free_object(Object *object) {
             re_allocate(object, sizeof(NativeObject), 0);
             break;
         }
-        default:
-            return;
+        case OBJ_MAP: {
+            Map *map = (Map *) object;
+            FREE_ARRAY(MapEntry, map->backing, map->capacity);
+            re_allocate(map, sizeof(Map), 0);
+            break;
+        }
     }
 }

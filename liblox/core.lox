@@ -3,39 +3,94 @@ class Obj {
 }
 
 class Int {
-
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Float {
-
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Bool {
-
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Nil {
-
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Function {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
+}
 
+class Closure {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Method {
-
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Native {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 
 }
 
 class Module {
-
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Class {
-
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Array {
@@ -47,12 +102,27 @@ class Array {
     }
 }
 
+class Map {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
+}
+
 class String {
     iterator() {
         return StringIter(this);
     }
     char_at(index) {
         return char_at(this, index);
+    }
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
     }
 }
 
@@ -90,6 +160,6 @@ fun benchmark(task) {
 }
 
 export 
-Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, 
+Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, Closure, Map,
 concat, join, string_join, benchmark
 ;

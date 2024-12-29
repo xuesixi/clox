@@ -32,6 +32,8 @@ typedef enum NativeInterface {
     INTER_HAS_NEXT,
     INTER_NEXT,
     INTER_ITERATOR,
+    INTER_HASH,
+    INTER_EQUAL,
 } NativeInterface;
 
 typedef struct Object{
@@ -154,7 +156,6 @@ typedef struct NativeObject {
 #define as_native_object(v) ((NativeObject *)as_ref(v) )
 #define as_map(v) ((Map *)(as_ref(v)) )
 
-
 String *string_copy(const char *src, int length);
 String *string_allocate(char *chars, int length);
 String *string_concat(Value a, Value b);
@@ -172,16 +173,12 @@ Array *new_array(int length);
 Module *new_module(String *path);
 Map *new_map();
 
-void init_map(Map *map);
-void free_map(Map *map);
-inline bool map_del_mark(MapEntry *entry);
-inline bool map_empty_entry(MapEntry *entry);
-inline bool map_need_resize(Map *map);
-
-//void *map_get(Map *map, void *key);
-//bool map_set(Map *map, Value key, Value value);
-//void *map_delete(Map *map, void *key);
-//MapEntry *map_find_entry(Map *map, uint32_t hash);
 NativeObject *new_native_object(NativeObjectType type, int num_used);
+uint32_t chars_hash(const char *key, int length);
+
+bool map_empty_entry(MapEntry *entry);
+bool map_del_mark(MapEntry *entry);
+bool map_need_resize(Map *map);
+
 
 #endif

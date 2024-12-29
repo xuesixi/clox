@@ -5,12 +5,6 @@
 #include "memory.h"
 #include "vm.h"
 
-#define FNV_PRIME 16777619
-#define FNV_OFFSET_BASIS 2166136261
-
-
-static uint32_t chars_hash(const char *key, int length);
-
 /**
  * 使用指定的 src 产生一个 String。
  * 如果同值的string已存在，那么直接返回那个对象。
@@ -101,7 +95,7 @@ Object *allocate_object(size_t size, ObjectType type) {
     return obj;
 }
 
-static inline uint32_t chars_hash(const char *key, int length) {
+uint32_t chars_hash(const char *key, int length) {
     uint32_t hash = 2166136261u;
     for (int i = 0; i < length; i++) {
         hash ^= (uint8_t) key[i];
@@ -110,49 +104,6 @@ static inline uint32_t chars_hash(const char *key, int length) {
     return hash;
 }
 
-uint32_t general_hash(Value given) {
-    uint32_t hash = FNV_OFFSET_BASIS;
-
-    switch(given.type) {
-        case VAL_INT: { // int
-            int value = as_int(given);
-            const unsigned char* bytes = (const unsigned char*)&value;
-            for (size_t i = 0; i < sizeof(int); i++) {
-                hash ^= bytes[i];
-                hash *= FNV_PRIME;
-            }
-            break;
-        }
-        case VAL_FLOAT: { // double
-            double value = as_float(given);
-            const unsigned char* bytes = (const unsigned char*)&value;
-            for (size_t i = 0; i < sizeof(double); i++) {
-                hash ^= bytes[i];
-                hash *= FNV_PRIME;
-            }
-            break;
-        }
-        case VAL_BOOL: { // bool
-            bool value = as_bool(given);
-            hash ^= value ? 1 : 0;
-            hash *= FNV_PRIME;
-            break;
-        }
-        case VAL_REF: { // pointer
-            uintptr_t ptr = (uintptr_t) as_ref(given);
-            const unsigned char* bytes = (const unsigned char*)&ptr;
-            for (size_t i = 0; i < sizeof(void*); i++) {
-                hash ^= bytes[i];
-                hash *= FNV_PRIME;
-            }
-            break;
-        }
-        default:
-            return 0; // Unknown type
-    }
-
-    return hash;
-}
 
 LoxFunction *new_function(FunctionType type) {
     LoxFunction *function = (LoxFunction *) allocate_object(sizeof(LoxFunction), OBJ_FUNCTION);
@@ -261,28 +212,15 @@ Map *new_map() {
     return map;
 }
 
-void init_map(Map *map) {
-    map->backing = NULL;
-    map->capacity = 0;
-    map->count = 0;
-}
-
-void free_map(Map *map) {
-    FREE_ARRAY(MapEntry, map->backing, map->capacity);
-    map->backing = NULL;
-    map->capacity = 0;
-    map->count = 0;
-}
-
-//MapEntry *map_find_entry(Map *map, uint32_t hash) {
-//    if (map->)
-//}
-
 /**
  * 键为absence，值为absence
  */
 inline bool map_empty_entry(MapEntry *entry) {
     return is_absence(entry->key) && is_absence(entry->value);
+}
+
+inline bool map_need_resize(Map *map) {
+    return map->count + 1 >= map->capacity * 0.75;
 }
 
 /**
@@ -292,35 +230,4 @@ inline bool map_del_mark(MapEntry *entry) {
     return is_absence(entry->key) && is_nil(entry->value);
 }
 
-inline bool map_need_resize(Map *map) {
-    return map->count + 1 >= map->capacity * 0.75;
-}
 
-void map_resize(Map *map) {
-    int old_capacity = map->capacity;
-    int new_capacity = old_capacity < 8 ? 8 : map->capacity * 2;
-#ifdef DEBUG_LOG_GC_ALLOCATE
-    printf("map resize. old capacity: %d, new: %d\n", old_capacity, new_capacity);
-#endif
-
-    MapEntry *old_backing = map->backing;
-    MapEntry *new_backing = ALLOCATE(MapEntry , new_capacity);
-
-    for (int i = 0; i < new_capacity; ++i) {
-        new_backing[i].key = absence_value();
-        new_backing[i].value = absence_value();
-    }
-
-    map->capacity = new_capacity;
-    map->backing =new_backing;
-    map->count = 0;
-
-    for (int i = 0; i < old_capacity; ++i) {
-        MapEntry *entry = old_backing + i;
-        if (!is_absence(entry->key)) {
-            table_add_new(map, entry->key, entry->value);
-        }
-    }
-
-    FREE_ARRAY(Entry, old_backing, old_capacity);
-}
