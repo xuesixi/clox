@@ -264,6 +264,11 @@ static void skip_whitespace() {
                 } else {
                     return;
                 }
+            case '#':
+                while (peek() != '\n' && !is_end()) {
+                    advance();
+                }
+                continue;
             default:
                 return;
         }

@@ -18,30 +18,7 @@
 #include "string.h"
 
 VM vm;
-
-String *INIT = NULL;
-String *LENGTH = NULL;
-String *ITERATOR = NULL;
-String *HAS_NEXT = NULL;
-String *NEXT = NULL;
-String *EQUAL = NULL;
-String *HASH = NULL;
-
 Module *repl_module = NULL;
-
-String *ARRAY_CLASS = NULL;
-String *STRING_CLASS = NULL;
-String *INT_CLASS = NULL;
-String *FLOAT_CLASS = NULL;
-String *BOOL_CLASS = NULL;
-String *NATIVE_CLASS = NULL;
-String *FUNCTION_CLASS = NULL;
-String *MAP_CLASS = NULL;
-String *CLOSURE_CLASS = NULL;
-String *METHOD_CLASS = NULL;
-String *MODULE_CLASS = NULL;
-String *CLASS_CLASS = NULL;
-String *NIL_CLASS = NULL;
 
 jmp_buf error_buf;
 
@@ -612,7 +589,6 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
                 break;
             }
             default:
-            error_handle:
                 runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
         }
     } else {
@@ -1115,36 +1091,6 @@ static void call_value(Value value, int arg_count) {
         }
     }
 }
-
-static String *auto_length_string_copy(const char *name) {
-    int len = strlen(name); // NOLINT
-    return string_copy(name, len);
-}
-
-static void init_static_strings() {
-    INIT = auto_length_string_copy("init");
-    LENGTH = auto_length_string_copy("length");
-    ITERATOR = auto_length_string_copy("iterator");
-    HAS_NEXT = auto_length_string_copy("has_next");
-    NEXT = auto_length_string_copy("next");
-    EQUAL = auto_length_string_copy("equal");
-    HASH = auto_length_string_copy("hash");
-
-    ARRAY_CLASS = auto_length_string_copy("Array");
-    STRING_CLASS = auto_length_string_copy("String");
-    INT_CLASS = auto_length_string_copy("Int");
-    FLOAT_CLASS = auto_length_string_copy("Float");
-    BOOL_CLASS = auto_length_string_copy("Bool");
-    NATIVE_CLASS = auto_length_string_copy("Native");
-    FUNCTION_CLASS = auto_length_string_copy("Function");
-    CLOSURE_CLASS = auto_length_string_copy("Closure");
-    METHOD_CLASS = auto_length_string_copy("Method");
-    MAP_CLASS = auto_length_string_copy("Map");
-    MODULE_CLASS = auto_length_string_copy("Module");
-    CLASS_CLASS = auto_length_string_copy("Class");
-    NIL_CLASS = auto_length_string_copy("Nil");
-}
-
 
 void init_VM() {
     reset_stack();

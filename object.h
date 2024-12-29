@@ -158,6 +158,7 @@ typedef struct NativeObject {
 #define as_map(v) ((Map *)(as_ref(v)) )
 
 String *string_copy(const char *src, int length);
+String *auto_length_string_copy(const char *name);
 String *string_allocate(char *chars, int length);
 String *string_concat(Value a, Value b);
 

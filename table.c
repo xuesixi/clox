@@ -89,6 +89,24 @@ inline bool table_has(Table *table, String *key) {
 }
 
 
+/**
+ * @param value 如果存在该key，则将对应的值储存在这个参数值
+ * @return 是否存在该key
+ */
+bool table_get(Table *table, String *key, Value *value) {
+//    return table_conditional_get(table, key, value, false, false);
+    if (table->count == 0) {
+        return false;
+    }
+    Entry *entry = table_find_entry(table, key, false, false);
+    if (entry == NULL || empty_entry(entry)) {
+        return false;
+    } else {
+        *value = entry->value;
+        return true;
+    }
+}
+
 bool table_conditional_get(Table *table, String *key, Value *value, bool public_only, bool mutable_only) {
     if (table->count == 0) {
         return false;
@@ -299,12 +317,4 @@ void init_table(Table *table) {
 void free_table(Table *table) {
     FREE_ARRAY(Entry, table->backing, table->capacity);
     init_table(table);
-}
-
-/**
- * @param value 如果存在该key，则将对应的值储存在这个参数值
- * @return 是否存在该key
- */
-inline bool table_get(Table *table, String *key, Value *value) {
-    return table_conditional_get(table, key, value, false, false);
 }

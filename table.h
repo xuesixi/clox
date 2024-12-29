@@ -5,9 +5,6 @@
 
 #define MODULO(a, b) ((a) & ((b) - 1))
 
-//#define ENTRY_CONST 0x01
-//#define ENTRY_PUBLIC 0x02
-
 typedef struct String String;
 
 typedef struct Entry {
@@ -23,9 +20,6 @@ typedef struct Table {
     Entry *backing;
 } Table;
 
-typedef int (*HashFunction)(void *key); ;
-typedef bool (*EqualityFunction)(void *a, void *b);
-
 void init_table(Table *table);
 void free_table(Table *table);
 bool table_get(Table *table, String *key, Value *value);
@@ -40,8 +34,5 @@ void table_add_all(Table *from, Table *to, bool public_only);
 String *table_find_string(Table *table, const char *name, int length, uint32_t hash);
 void table_mark(Table *table);
 void table_delete_unreachable(Table *table);
-
-int int_hash(void *p);
-bool int_equal(void *a, void *b);
 
 #endif

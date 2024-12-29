@@ -3,6 +3,7 @@
 //
 
 #include "memory.h"
+#include "native.h"
 #include "compiler.h"
 
 #include "assert.h"

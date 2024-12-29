@@ -188,8 +188,6 @@ static void parse_continue(bool can_assign);
 
 static void parse_break(bool can_assign);
 
-static void label_statement();
-
 static void and(bool can_assign);
 
 static void or(bool can_assign);
@@ -399,21 +397,6 @@ static void parse_precedence(Precedence precedence) {
     }
 }
 
-/**
- * 如果SHOW_LABEL选项被激活，我们会用label_map记录遇到的标签对应的字节码的索引的值。
- * 在debug.c中，如果一个字节码索引有对应的标签，我们会在展示汇编时把标签也打印出来。
- * 这里map_set中的索引有+1，这是为了防止索引0被当成NULL。在debug中也有同样的+1；
- */
-static void label_statement() {
-    IMPLEMENTATION_ERROR("label is not supported now");
-    if (SHOW_LABEL) {
-        Token label = parser.previous;
-        char *text = ALLOCATE(char, label.length + 1);
-        memcpy(text, label.start, label.length);
-        text[label.length] = '\0';
-    }
-}
-
 static void class_member() {
     if (match(TOKEN_STATIC)) {
         consume(TOKEN_IDENTIFIER, "A method needs to start with an identifier");
@@ -603,8 +586,6 @@ static void declaration() {
         var_declaration(is_export);
     } else if (match(TOKEN_CONST)) {
         const_declaration(is_export);
-    } else if (match(TOKEN_LABEL)) {
-        label_statement();
     } else if (match(TOKEN_FUN)) {
         fun_declaration(is_export);
     } else if (match(TOKEN_CLASS)) {

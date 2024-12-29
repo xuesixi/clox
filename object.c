@@ -34,6 +34,11 @@ String *string_copy(const char *src, int length) {
     return str;
 }
 
+String *auto_length_string_copy(const char *name) {
+    int len = strlen(name); // NOLINT
+    return string_copy(name, len);
+}
+
 /**
  * 如果同值的String不存在，使用给定的 char* 来产生一个 String。
  * 如果同值的String已经存在，那么不产生新的，而是直接返回旧有的，并free给定的chars

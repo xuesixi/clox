@@ -8,14 +8,15 @@ It has a compiler to compile scripts into bytecode, and a stack-based virtual ma
 
 It currently requires GNU/readline.
 
-* `$ make clox`: produce the executable "clox". You can also do `$ cc *.c -o clox -l readline`
+* `$ make`: produce the executable "clox". You can also do `$ cc *.c -o clox -l readline`
+* `$ make opt`: produced clox with O3 optimization.
 
 ## usage
 * `$ clox`: run REPL
 * `$ clox path/to/script`: run a lox script 
 
 Other options
-* `-s`: show the compiled bytecode 
+* `-s`: show the compiled bytecode before execution
 * `-d`: trace the execution process
 * `-c path/to/output`: compile the script to bytecode and write to the specified output path.
     * e.g. `$ clox -c hello.byte hello.lox`
