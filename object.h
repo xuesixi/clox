@@ -25,6 +25,7 @@ typedef enum {
 typedef enum NativeObjectType {
     NativeRangeIter,
     NativeArrayIter,
+    NativeMapIter
 } NativeObjectType;
 
 typedef enum NativeInterface {

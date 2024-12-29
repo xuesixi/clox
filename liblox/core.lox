@@ -103,6 +103,9 @@ class Array {
 }
 
 class Map {
+    iterator() {
+        return native_map_iter(this);
+    }
     hash() {
         return native_general_hash(this);
     }

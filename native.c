@@ -548,6 +548,16 @@ Value native_value_equal(int count, Value *values) {
     return bool_value(result);
 }
 
+Value native_map_iter(int count, Value *value) {
+    (void ) count;
+    assert_ref_type(*value, OBJ_MAP, "map");
+    NativeObject *nativeObject = new_native_object(NativeMapIter, 2);
+    // curr, map
+    nativeObject->values[0] = int_value(0);
+    nativeObject->values[1] = *value;
+    return ref_value((Object*) nativeObject);
+}
+
 void init_vm_native() {
     define_native("clock", native_clock, 0);
     define_native("int", native_int, 1);
@@ -562,6 +572,7 @@ void init_vm_native() {
     define_native("type", native_type, 1);
     define_native("native_range", native_range, 3);
     define_native("native_array_iter", native_array_iter, 1);
+    define_native("native_map_iter", native_map_iter, 1);
     define_native("native_general_hash", general_hash, 1);
     define_native("native_value_equal", native_value_equal, 2);
 }

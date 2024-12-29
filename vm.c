@@ -495,8 +495,25 @@ static void invoke_native_object(int arg_count, NativeInterface interface, Nativ
                     return;
                 }
                 case NativeArrayIter: {
+                    // curr, array
                     stack_pop();
                     bool has_next = as_int(native_object->values[0]) < as_array(native_object->values[1])->length;
+                    stack_push(bool_value(has_next));
+                    return;
+                }
+                case NativeMapIter: {
+                    // curr, map
+                    stack_pop();
+                    Map *map = as_map(native_object->values[1]);
+                    int curr = as_int(native_object->values[0]);
+                    bool has_next = false;
+                    for (int i = curr; i < map->capacity; ++i) {
+                        if (!is_absence(map->backing[i].key)) {
+                            has_next = true;
+                            native_object->values[0] = int_value(i);
+                            break;
+                        }
+                    }
                     stack_push(bool_value(has_next));
                     return;
                 }
@@ -516,6 +533,16 @@ static void invoke_native_object(int arg_count, NativeInterface interface, Nativ
                     stack_pop();
                     Value result = as_array(native_object->values[1])->values[as_int(native_object->values[0])++];
                     stack_push(result);
+                    return;
+                }
+                case NativeMapIter: {
+                    stack_pop();
+                    MapEntry entry = as_map(native_object->values[1])->backing[as_int(native_object->values[0])];
+                    as_int(native_object->values[0])++;
+                    Array *tuple = new_array(2);
+                    tuple->values[0] = entry.key;
+                    tuple->values[1] = entry.value;
+                    stack_push(ref_value((Object *)tuple));
                     return;
                 }
                 default:
