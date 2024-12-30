@@ -1,47 +1,54 @@
 
 # clox
-clox is a interpreter of the lox programming language. 
+I read the book [Crafting Interpreters](https://craftinginterpreters.com) and make an interpreter for the lox programming language. It has a compiler to compile scripts into bytecode, and a stack-based virtual machine to run the bytecode.
 
-It has a compiler to compile scripts into bytecode, and a stack-based virtual machine to run the bytecode.
+ I include some features that are not in lox standard but I think interesting. 
+
+Lox is a dynamic-typed, gc language, similar to javascript and python. 
 
 ## build
 
 It currently requires GNU/readline.
 
-* `$ make`: produce the executable "clox". You can also do `$ cc *.c -o clox -l readline`
-* `$ make opt`: produced clox with O3 optimization.
+* `$ make clox`: produce the executable "clox". You can also do `$ cc *.c -o clox -l readline`
 
 ## usage
 * `$ clox`: run REPL
 * `$ clox path/to/script`: run a lox script 
 
 Other options
-* `-s`: show the compiled bytecode before execution
-* `-d`: trace the execution process
-* `-c path/to/output`: compile the script to bytecode and write to the specified output path.
+* `-s`: show the compiled bytecode 
+* ***`-d`: trace the execution process***
+* ***`-c path/to/output`: compile the script to bytecode and write to the specified output path.***
     * e.g. `$ clox -c hello.byte hello.lox`
 
-* `-b`: treat the provided file as bytecode
+* ***`-b`: treat the provided file as bytecode***
     * e.g. `$ clox -b hello.byte`
 
+# The Lox Programming Language 
+(with many personal extensions)
 
-# the lox programming language
-
-## style
+## basic
 
 * Most statements are terminated by a `;`
 * As in c/java/javascript, structural statements do not need `;`
-* `//`  a single line comment
-* `/* comment */` is also supported
+*  `//` can be used to start a single line comment
+*  ***`# ` can also be used to start a single line comment***
+* ***`/* comment */` is also supported***
 
 ## type
-Lox has the following built-in types
-* `int` 
-* `float`
-* `bool`
+Primitive types: 
+* ***`int` : 32 bits integer***
+* `float`: 64 bits float point number
+* `bool`: true/false
 * `nil`
+
+Reference types:
+
 * `string`
-* `function`
+* `object`
+* ***`array`***
+* ***`map`***
 
 ## arithmetic
 
@@ -50,12 +57,14 @@ float and int support arithmetic operations.
 * `-`: subtraction
 * `*`: multiplication
 * `/`: division. As in c, if both operands are int, it is a integer division.
-* `%`: modulo. Can only be used between two int
-* `**`: power. The result is always a float
+* ***`%`: modulo. Can only be used between two int***
+* ***`**`: power. The result is always a float***
+
+***`+=, -=, *=, /=, %=`  are also supported.***
 
 ## variable
 * `var` to declare a variable. Lox is dynamic typed. A variable can hold values of different types. If not initialized, it has the default value of `nil`
-* `const` to declare a constant variable which must be initialized and cannot be mutated.
+* ***`const` to declare a constant variable which must be initialized and cannot be mutated.***
 
 ```LOX
 var name = "anda";
@@ -63,13 +72,11 @@ name = 10;
 ```
 
 ## scope
-`{}` creates new scope. Variables in a inner scope can shadow variables in out scopes with the same name. No varibales can have the same name in one scope. 
+`{}` creates a new scope. Variables in the inner scope can shadow variables in outer scopes with the same name. No varibales can have the same name in one scope. 
 
 The global scope is different. If a variable cannot be resolved at compiled time, it is assumed to be global. If such a variable does not exist at runtime, a runtime error occurs. 
 
-Global variables are allowed to have the same name. The latest declaration will override old ones.
-
-## `print`
+## print
 Lox provides a built-in keyword `print` to output to stdout. A new line will be appended to the end automatically..
 
 ## condition and logical operators
@@ -78,10 +85,50 @@ Lox provides a built-in keyword `print` to output to stdout. A new line will be 
 * `or`: return the first true value. If no true operands, return the last false value.
 
 ## control flow
-Lox support `if/else/while/for` as in c/java/javascript
+Lox support `if/else/while/for` as in c/java/javascript。***continue, break, switch, and for in are supported.***
+
+### switch
+
+Each case is automatically "break". Only **literals of int, float, bool, nil, string** can be used as cases. 
+
+```lox
+var num = 10;
+switch (num) {
+	case 1:
+    	print 1;
+    case 2: { // you need {} if you define, import, or export inside a case
+    	var money = 40;
+    	print money; 
+    }  	
+    default:
+    	print 998;
+}
+```
+
+### for in
+It requires the value after `in` to be iterable.
+
+* Iterable: has the `iterator` property: `iterator(): iterator` and map are iterable. 
+* Iterator: an object with `has_next` and `next` callable properties. 
+    * `has_next(): bool`
+    * `next(): any`
+
+```lox
+var arr = 1, 2, 3;
+for i in arr {
+	print i;
+}
+
+for i in range(10) { // range is a optimized function
+	print i;
+}
+```
 
 ## function
-Use the keyword `fun` to declare a function. Functions are first-class values in lox. Closure is supported. 
+Use the keyword `fun` to declare a function. Functions are first-class values in lox. 
+
+Functions can be nested, You can define functions inside functions. Closure is supported. 
+
 If a function does not explicitly return anything, it returns `nil`
 
 ```lox
@@ -95,7 +142,7 @@ fun adder(num1) {
 
 ### anonymous function
 
-The `fun` keyword can also be used to define anonymous functions by simply omitting the function name. `$` does the same thing.
+***The `fun` keyword can also be used to define anonymous functions by simply omitting the function name. `$` does the same thing.***
 
 Anonymous functions are expressions rather than statements.
 
@@ -111,7 +158,7 @@ var hello = $(name) {
 
 ### optional parameter
 
-When defining a function, we can give parameters default values. At runtime, if the coressponding argument is absent, the value will be computed by evaluating the expression.
+***When defining a function, we can give parameters default values. At runtime, if the coressponding argument is absent, the value will be computed by evaluating the expression.***
 
 ```lox
 fun add(a, b = 2 * a + 1) {
@@ -124,7 +171,7 @@ All optionals parameters must go after any definite parameters.
 
 ### var arg
 
-Adding `...` to the **last** parameter allows passing variable arguments. It is treated as an array at runtime.
+***Adding `...` to the last parameter allows passing variable arguments. It is treated as an array at runtime.***
 
 ```lox
 fun hey(greeting = "good day", names...) {
@@ -134,18 +181,171 @@ fun hey(greeting = "good day", names...) {
 }
 ```
 
+## class
+
+use the `class` keyword to define a class. Classes are also first-class values. Class definitions are also be nested inside functions. 
+
+```LOX
+class Dog: Animal {
+
+	static dog_count = 0;
+
+    static show_count() {
+        print f("the count is #", Dog.dog_count);
+    }
+
+	init(name, age) {
+		this.name = name;
+		this.age = age;
+		Dog.dog_count += 1;
+	}
+
+	eat(food) {
+		print f("the dog # is eating #", this.name, food);
+	}
+	
+	run() {
+		super.run();
+		print f("the dog # is also running!", this.name);
+	}
+}
+
+var dog = Dog("anda", 4);
+dog.eat("moria"); 
+Dog.show_count();
+
+```
+
+### method 
+
+Inside a function, you can define methods (you don't need `fun` here). `this` is supported and bounded to an object. It should work as you may expect. 
+
+### init
+
+`init` is a special method which behaves like a constructor. When creating an instance, we don't need the `new` keyword. 
+
+### static
+
+***Inside a function, you can use`static` to define static functions or variables. They belong to the class rather than a specific instance.***
+
+### inheritance
+
+`class Dog: Animal {}`  suggests that Animal is the superclass of Dog. 
+
+A subclass method can use `super.` to access a method of the superclass (this is only needed when a method shadows a 
+
+same-name method of its superclass)
+
+## data structure
+
+***Clox provides two built-in data structures: array and map.***
+
+### array
+
+***An array has a fixed length and cannot grow.***
+
+* `[n]` creates an array of length n. `[x][y][z]` creates a 3-d array with dimensions: x, y, z respectively. 
+* `,` can be used to create array literal, for example `x, y, z` creates an array of length 3, containing items x, y, and z
+* Arrays have only one field: `length`, but have some other methods. 
+* Arrays are iterable.
+
+```lox
+var two_d = [3][4];
+
+two_d[0][1] = "hello world!";
+
+var arr = 1, 3, 9, 21, 73;
+
+print arr.length; // 5
+
+for i in arr {
+	print i;
+}
+```
+
+### map
+
+***A map stores key-value pairs.***
+
+* A map has a`length` field.
+* In context where an expression is expected, `{}` creates a map. We can initialize the map with `key : value` pairs separated by `,`.
+* If the key does not exist in the map, `map[key]` returns `nil`.
+* Map is also iterable. The iterator returns the key-value pair array (of length 2) each time. Map is unordered. 
+
+```lox
+var m = {
+	"name": "anda",
+	1: 10,
+	2: 99,
+	true: 43,
+	nil: Dog("mohu", 4)
+};
+
+var name = m["name"]; // map get
+m[true] += 3; // map set
+
+for entry in m {
+	print f("key: #, value: #", entry[0], entry[1]);
+}
+```
+
+Only values have callable properties `hash` and `equal` can be used as keys in maps.
+
+* `hash(): int`
+* `equal(another_value): bool`
+
+ The map stores hash values of keys internally and expect they never change. 
+
+The builtin equality test functions for `int, float, bool, nil, string` are based on "value." Other builtin types like function, module, class, array, and map are based on reference. 
+
+If you want a user-defined class to be used as the key, you have to implement its `hash` and `equal` manually. A user-defined class **does not** have default `hash` and `equal` implementations.
+
+## module
+
+***A file is considered a module.***
+
+### export
+
+***You can use export before `var`, `const`, `fun`, `class`, if so, the defined values are exported. You can also use `export `statement to export multiple values at a time.*** 
+
+```lox
+export var num = 10;
+
+fun hey(name) {
+	print "good day: " + name;
+}
+class Animal {}
+var time = 998;
+
+export hey, Animal, time; // export multiple members at a time
+```
+
+### import
+
+***`import` loads another module. Only members exported by `export` can be imported into another module.***
+
+* Import a whole module`import "path/to/animal.lox" as animal;`. If you import the whole module, it creates a module variable with the name specified by `as`. You can then access it from the module name, e.g. `animal.Dog`	
+* Import specific members. `import "path/to/animal.lox":Dog, Cat;` In such case, you can use `Dog`, `Cat` directly.
+* Rename. `import "path/to/animal.lox": Dog as ModuleDog, Cat;` You can use `as` to rename one or more members to prevent naming conflicts. 
+* The path is relative to the directory of current module (at compile time). 
 ## native functions
 
 Clox has some built-in functions written in C.
 
-* `clock()`: return the time (in seconds) since the program starts
-* `int(input)`: convert string or float to int
-* `float(input)`: convert int or string to float
-* `rand(low, high)`: return a random int in [low, high]. Both arguments need to be int. 
-* `f(format, values...)`: return a formated string according to the specify format. `#` is used as the placeholder. 
+* `clock(): float`: return the time (in seconds) since the program starts
+* `int(input: string|float): int`: convert string or float to int
+* `float(input: string|int): float`: convert int or string to float
+* `rand(low: int, high: int): int`: return a random int in [low, high]. Both arguments need to be int. 
+* `f(format: string, values...): string`: return a formated string according to the specify format. `#` is used as the placeholder. 
     * For example, ` str = f("the name is #, age is #", "anda", 22)`
 
-* `read(prompt)`: read a line of string from the keyboard (excluding the newline). If `prompt` is provided, it will be printed out first.
+* `read(prompt: string?): string`: read a line of string from the keyboard (excluding the newline). If `prompt` is provided, it will be printed out first.
+
+* `type(value): class`: return the type (a class object) of the input
+
+* `char_at(value: string, index: int): string`: return a char at a specific index (as a string)
+
+* Some other functions with names starting with `native_`. The standard library provides some wrapper functions over them. For example, `range` is a wrapper over `native_range` that supports optional parameters and is more convenient to use. 
 
 # REPL
 
@@ -161,172 +361,4 @@ If you run `$ clox` without providing the path to a script, you will be in the R
 
 * The output of real `print` statements will be in green color.
 
-Use `ctrl+D` or `ctrl+C` to quit REPL.
-
-# Virtual Machine
-
-the clox virtual machine is stack-based, which means most of its instructions operate on the stack. 
-
-One bytecode is one byte. 
-
-* `constants` is an array storing constants (similar to immediate value) used in a program. It is filled in during the compile time.
-* `globals`: is a map storing global variables
-* `stack`: the "main" stack
-* the format `OP, index/offset` means that the instruction will use the next byte as its extra operand.
-* Similarly, `OP, index16/offset16` means that the instruction will use the next two bytes (which is 16 bits) as its extra operand.
-* If no format is specified, the instruction consists of a single opcode.
-* `push()`: add a value into the top of the stack
-* `pop()`: remove the value at the top of the stack
-* `peek()`: look at the value at the top of the stack (without removing it)
-
-## instructions
-
-#### OP_RETURN
-
-#### OP_POP 
-```
-pop()
-```
-#### OP_CONSTANT, index: 
-```
-value = constants[index]
-push(value)
-```
-#### OP_CONSTANT2, index16: 
-```
-value = constants[index16]
-push(value)
-```
-
-#### OP_NEGATE 
-```
-A = pop() 
-push(-A)
-```
-#### OP_ADD 
-```
-B = pop()
-A = pop() 
-push(A + B)
-```
-#### OP_SUBTRACT 
-```
-B = pop() 
-A = pop()
-push(A - B)
-```
-#### OP_MULTIPLY
-```
-B = pop()
-A = pop() 
-push(A * B)
-```
-#### OP_DIVIDE 
-```
-B = pop() 
-A = pop() 
-push(A / B)
-```
-#### OP_MOD 
-```
-B = pop()
-A = pop() 
-push(A mod B)
-```
-#### OP_NIL 
-```
-push(nil)
-```
-#### OP_TRUE 
-```
-push(true)
-```
-#### OP_FALSE 
-```
-push(false)
-```
-#### OP_NOT 
-```
-A = pop(); 
-push(!A);
-```
-#### OP_LESS 
-```
-B = pop()
-A = pop() 
-push(A < B)
-```
-#### OP_GREATER 
-```
-B = pop()
-A = pop() 
-push(A > B)
-```
-#### OP_EQUAL 
-```
-B = pop()
-A = pop() 
-push(A == B)
-```
-#### OP_PRINT 
-```
-A = pop()
-print(A)
-```
-#### OP_DEFINE_GLOBAL, index: 
-```
-name = constants[index]
-value = pop()
-globals.set(name, value)
-```
-
-#### OP_DEFINE_GLOBAL_CONST, index: 
-```
-name = constants[index]
-value = pop()
-globals.set(name, value)
-global_constant.add(name)
-```
-#### OP_GET_GLOBAL, index 
-```
-name = constants[index]
-value = globals.get(name)
-push(value)
-```
-#### OP_SET_GLOBAL, index 
-```
-name = constants[index]
-value = pop()
-globals.set(name, value)
-```
-#### OP_GET_LOCAL, index 
-```
-value = stack[index]
-push(value)
-```
-#### OP_SET_LOCAL, index 
-```
-value = peek()
-stack[index] = value
-```
-#### OP_JUMP_IF_FALSE, offset16 
-```
-if peek() is false:
-	pc += offset16
-```
-#### OP_JUMP_IF_TRUE, offset16 
-```
-if peek() is true:
-	pc += offset16
-```
-#### OP_JUMP, offset16 
-```
-pc += offset16
-```
-#### OP_JUMP_BACK, offset16 
-```
-pc -= offset16
-```
-
-
-
+Use `ctrl+D` , `ctrl+C` , or `exit()`to quit REPL.
