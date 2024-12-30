@@ -1,0 +1,101 @@
+// entry: (key, value, hash)
+// empty entry: both key and value are nil
+// del mark: key is nil, value is not nil
+
+export class HashMap {
+    init() {
+        this.size = 0;
+        this.capacity = 0;
+        this.backing = [0];
+    }
+    get(key) {
+        if (this.size == 0) {
+            return nil;
+        }
+        var h = key.hash();
+        var cap = this.capacity;
+        var index = h % cap;
+        for i in range(cap) {
+            var curr = (index + i) % cap;
+            var entry = this.backing[curr];
+            var e_key = entry[0];
+            var e_value = entry[1];
+            var e_hash = entry[2];
+            if (e_key == nil and e_value == nil) {
+                return nil;
+            } else if (e_hash == h and e_key.equal(key)) {
+                return e_value;
+            } 
+        }
+        return nil;
+    }
+    set(key, value, h = key.hash()) {
+        this.check_resize();
+        var cap = this.capacity;
+        var index = h % cap;
+        var del_mark = nil;
+        for i in range(cap) {
+            var curr = (index + i) % cap;
+            var entry = this.backing[curr];
+            var e_key = entry[0];
+            var e_value = entry[1];
+            var e_hash = entry[2];
+            if (e_key == nil and e_value == nil) {
+                if (del_mark == nil) {
+                    entry[0] = key;
+                    entry[1] = value;
+                    entry[2] = h;
+                    this.size += 1;
+                } else {
+                    del_mark[0] = key;
+                    del_mark[1] = value;
+                    del_mark[2] = h;
+                }
+                return;
+            } else if (e_hash == h and e_key.equal(key)) {
+                entry[1] = value;
+                return;
+            } else if (del_mark == nil and e_key == nil) {
+                del_mark = entry;
+            }
+        }
+    }
+    delete(key) {
+        var cap = this.capacity;
+        var h = key.hash();
+        var index = h % cap;
+        for i in range(cap) {
+            var entry = this.backing[(index + i) % cap];
+            var e_key = entry[0];
+            var e_value = entry[1];
+            var e_hash = entry[2];
+            if (e_key == nil and e_value == nil) {
+                return;
+            } else if (e_hash == h and e_key.equal(key)) {
+                entry[0] = nil;
+                entry[1] = 1; // del mark
+                return;
+            }
+        }
+    }
+    check_resize() {
+        if (this.size  < this.capacity * 0.75 ) {
+            return;
+        }
+        var old_backing = this.backing;
+        var new_capacity;
+        if (this.capacity < 8) {
+            new_capacity = 8;
+        } else {
+            new_capacity = this.capacity * 2;
+        }
+        this.backing = [new_capacity][3]; // 2d array
+        this.capacity = new_capacity;
+        this.size = 0;
+        for entry in old_backing {
+            if (entry[0] != nil) {
+                this.set(entry[0], entry[1], entry[2]);
+            }
+        }
+    }
+}
