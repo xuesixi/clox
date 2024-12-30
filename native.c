@@ -28,6 +28,7 @@ Class *map_class;
 Class *method_class;
 Class *nil_class;
 Class *module_class;
+Class *native_object_class;
 
 String *INIT = NULL;
 String *LENGTH = NULL;
@@ -50,6 +51,7 @@ String *METHOD_CLASS = NULL;
 String *MODULE_CLASS = NULL;
 String *CLASS_CLASS = NULL;
 String *NIL_CLASS = NULL;
+String *NATIVE_OBJECT_CLASS = NULL;
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
@@ -85,6 +87,7 @@ void load_libraries() {
         Value module_class_value;
         Value nil_class_value;
         Value map_class_value;
+        Value native_object_class_value;
 
         table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
         array_class = as_class(array_class_value);
@@ -125,54 +128,16 @@ void load_libraries() {
         table_get(&vm.builtin, MAP_CLASS, &map_class_value);
         map_class = as_class(map_class_value);
 
+        table_get(&vm.builtin, NATIVE_OBJECT_CLASS, &native_object_class_value);
+        native_class = as_class(native_object_class_value);
+
     }
     preload_finished = true;
 }
 
 static Value native_type(int count, Value *value) {
     (void ) count;
-    switch (value->type) {
-        case VAL_NIL:
-            return ref_value((Object *)nil_class);
-        case VAL_INT:
-            return ref_value((Object *)int_class);
-        case VAL_FLOAT:
-            return ref_value((Object *)float_class);
-        case VAL_BOOL:
-            return ref_value((Object *)bool_class);
-        case VAL_REF: {
-            switch (as_ref(*value)->type) {
-                case OBJ_STRING:
-                    return ref_value((Object *)string_class);
-                case OBJ_ARRAY:
-                    return ref_value((Object *)array_class);
-                case OBJ_CLASS:
-                    return ref_value((Object *)class_class);
-                case OBJ_NATIVE:
-                    return ref_value((Object *)native_class);
-                case OBJ_METHOD:
-                    return ref_value((Object *)method_class);
-                case OBJ_FUNCTION:
-                    return ref_value((Object *)function_class);
-                case OBJ_CLOSURE:
-                    return ref_value((Object *)closure_class);
-                case OBJ_MODULE:
-                    return ref_value((Object *)module_class);
-                case OBJ_INSTANCE: {
-                    Instance *instance = as_instance(*value);
-                    return ref_value((Object *)instance->class);
-                }
-                case OBJ_MAP:
-                    return ref_value((Object *)map_class);
-                default:
-                    IMPLEMENTATION_ERROR("should not happen");
-                    return nil_value();
-            }
-        }
-        case VAL_ABSENCE:
-            IMPLEMENTATION_ERROR("should not happen");
-            return nil_value();
-    }
+    return ref_value((Object *)value_class(*value));
 }
 
 /**
@@ -631,5 +596,6 @@ void init_static_strings() {
     MODULE_CLASS = auto_length_string_copy("Module");
     CLASS_CLASS = auto_length_string_copy("Class");
     NIL_CLASS = auto_length_string_copy("Nil");
+    NATIVE_OBJECT_CLASS = auto_length_string_copy("NativeObject");
 }
 

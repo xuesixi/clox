@@ -20,6 +20,7 @@ extern Class *map_class;
 extern Class *method_class;
 extern Class *nil_class;
 extern Class *module_class;
+extern Class *native_object_class;
 
 extern String *ARRAY_CLASS;
 extern String *STRING_CLASS;
@@ -34,6 +35,7 @@ extern String *METHOD_CLASS;
 extern String *MODULE_CLASS;
 extern String *CLASS_CLASS;
 extern String *NIL_CLASS;
+extern String *NATIVE_OBJECT_CLASS;
 
 extern String *INIT;
 extern String *LENGTH;

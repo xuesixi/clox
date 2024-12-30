@@ -135,6 +135,15 @@ class String {
     }
 }
 
+class NativeObject {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
+}
+
 class StringIter {
     init(str) {
         this.str = str;

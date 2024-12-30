@@ -94,8 +94,15 @@ static TokenType identifier_type() {
                             return TOKEN_IDENTIFIER;
                         }
                     }
-                    case 'a':
-                        return check_keyword(2, 2, "se", TOKEN_CASE);
+                    case 'a': {
+                        if (is_keyword(2, 3, "tch")) {
+                            return TOKEN_CATCH;
+                        } else if (is_keyword(2, 2, "se")) {
+                            return TOKEN_CASE;
+                        } else {
+                            return TOKEN_IDENTIFIER;
+                        }
+                    }
                 }
             }
             break;
@@ -162,8 +169,15 @@ static TokenType identifier_type() {
                 switch (scanner.start[1]) {
                     case 'h':
                         return check_keyword(2, 2, "is", TOKEN_THIS);
-                    case 'r':
-                        return check_keyword(2, 2, "ue", TOKEN_TRUE);
+                    case 'r': {
+                        if (is_keyword(2, 1, "y")) {
+                            return TOKEN_TRY;
+                        } else if (is_keyword(2, 2, "ue")) {
+                            return TOKEN_TRUE;
+                        } else {
+                            return TOKEN_IDENTIFIER;
+                        }
+                    }
                 }
             }
             break;

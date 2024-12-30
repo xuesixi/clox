@@ -76,6 +76,8 @@ typedef enum OpCode{
     OP_GET_ITERATOR, // op: [iterable] -> [iterator]
     OP_MAP_ADD_PAIR, // op, [map, k0, v0] -> [map]
     OP_NEW_MAP, // op: [] -> [map]
+    OP_SET_TRY,
+    OP_SKIP_CATCH,
 } OpCode;
 
 typedef struct Chunk{

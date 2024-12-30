@@ -8,20 +8,10 @@
 #include "table.h"
 #include "object.h"
 
-typedef enum GOTO_MARK {
-    NO_MARK,
-    MARK_EQUAL,
-    MARK_KEY_HASHING_GET,
-    MARK_KEY_HASHING_SET_0,
-    MARK_KEY_HASHING_SET_1,
-    MARK_MAP_GET,
-} GOTO_MARK;
-
 typedef struct CallFrame {
     Closure *closure;
     uint8_t *PC; // program counter
     Value *FP; // frame pointer. The start of the frame
-    GOTO_MARK mark;
 } CallFrame;
 
 typedef struct VM{
@@ -75,6 +65,7 @@ void runtime_error_catch_str_v(const char *format, const char *message, Value va
 void runtime_error_catch_2(const char *format, Value v1, Value v2);
 void catch(InterpretResult result);
 void runtime_error_and_catch(const char *format, ...);
+Class *value_class(Value value);
 
 void stack_push(Value value);
 Value stack_pop();

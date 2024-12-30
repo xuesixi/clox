@@ -1781,6 +1781,41 @@ static void super_expression(bool can_assign) {
     }
 }
 
+static void try_statement() {
+    // try doSomeThing();
+    /**
+     * try {
+     *      ...
+     * } catch error {
+     *      ...
+     * }
+     */
+    int end_try = emit_jump(OP_SET_TRY);
+
+    declaration();
+    consume(TOKEN_CATCH, "Expect 'catch' after a try block");
+    int end_catch = emit_jump(OP_SKIP_CATCH);
+
+    patch_jump(end_try);
+
+    begin_scope();
+    parse_identifier_declaration(false);
+    consume(TOKEN_LEFT_BRACE, "Expect '{' to start a catch block");
+    while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
+        declaration();
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' to end a catch block");
+    end_scope();
+
+    patch_jump(end_catch);
+
+//    parse_identifier_declaration(false);
+//    if (match(TOKEN_COLON)) {
+//        consume(TOKEN_IDENTIFIER, "Expect class name for catch");
+//        uint16_t type_name_index = identifier_constant(&parser.previous);
+//    }
+}
+
 static void dimension_array(bool can_assign) {
     (void) can_assign;
     expression();

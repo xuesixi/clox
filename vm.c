@@ -15,7 +15,6 @@
 
 #include "stdarg.h"
 #include "setjmp.h"
-#include "string.h"
 
 VM vm;
 Module *repl_module = NULL;
@@ -75,7 +74,7 @@ static inline int positive_mod(int a, int b) {
     return result < 0 ? result + b : result;
 }
 
-static Class *value_class(Value value) {
+Class *value_class(Value value) {
     switch (value.type) {
         case VAL_INT:
             return int_class;
@@ -85,6 +84,36 @@ static Class *value_class(Value value) {
             return bool_class;
         case VAL_NIL:
             return nil_class;
+        case VAL_REF: {
+            switch (as_ref(value)->type) {
+                case OBJ_STRING:
+                    return string_class;
+                case OBJ_FUNCTION:
+                    return function_class;
+                case OBJ_CLOSURE:
+                    return closure_class;
+                case OBJ_CLASS:
+                    return class_class;
+                case OBJ_MAP:
+                    return map_class;
+                case OBJ_ARRAY:
+                    return array_class;
+                case OBJ_NATIVE:
+                    return native_class;
+                case OBJ_MODULE:
+                    return module_class;
+                case OBJ_METHOD:
+                    return method_class;
+                case OBJ_INSTANCE:
+                    return as_instance(value)->class;
+                case OBJ_NATIVE_OBJECT:
+                    return native_object_class;
+                case OBJ_UPVALUE:
+                    return NULL;
+                    IMPLEMENTATION_ERROR("bad");
+            }
+            break;
+        }
         default:
             IMPLEMENTATION_ERROR("bad");
             return NULL;
@@ -1901,9 +1930,6 @@ static InterpretResult run_frame_until(int end_when) {
                 // [map, k0, v0]
                 // [k0, v0, k1, v1, k2, v2 ...] -> [map]
                 map_indexing_set(true);
-//                stack_push(stack_peek(1)); // map, k0, v0, k0
-//                invoke_and_wait(HASH, 0, INTER_HASH);; // map, k0, v0, k0, hash0
-//                map_indexing_set_with_hash(true); // map
                 break;
             }
             case OP_NEW_MAP: {
