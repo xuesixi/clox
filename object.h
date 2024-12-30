@@ -171,7 +171,7 @@ UpValue *new_upvalue(Value *position);
 Class *new_class(String *name);
 Instance *new_instance(Class *class);
 Method *new_method(Closure *closure, Value value);
-Array *new_array(int length);
+Array *new_array(int length, bool init_with_nil);
 Module *new_module(String *path);
 Map *new_map();
 

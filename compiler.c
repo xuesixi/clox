@@ -907,7 +907,6 @@ static void statement() {
             for_statement();
         } else {
             new_iteration_statement();
-//            iteration_statement();
         }
     } else if (match(TOKEN_SWITCH)) {
         switch_statement();

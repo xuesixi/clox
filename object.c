@@ -180,12 +180,15 @@ Method *new_method(Closure *closure, Value value) {
     return method;
 }
 
-Array *new_array(int length) {
+Array *new_array(int length, bool init_with_nil) {
     Value *values = ALLOCATE(Value, length);
 //    memset(values, 0, sizeof(Value) * length);
     Array *array = (Array *) allocate_object(sizeof(Array), OBJ_ARRAY);
     array->length = length;
     array->values = values;
+    if (init_with_nil) {
+        memset(array->values, 0, sizeof(Value) * length);
+    }
     return array;
 }
 

@@ -100,6 +100,12 @@ class Array {
     join(delimiter = ", ", prefix = "[", suffix = "]") {
         return native_value_join(delimiter, prefix, suffix, this);
     }
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
 }
 
 class Map {

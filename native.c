@@ -556,15 +556,20 @@ Value native_value_equal(int count, Value *values) {
     switch (a.type) {
         case VAL_BOOL:
             result = as_bool(a) == as_bool(b);
+            break;
         case VAL_INT:
             result = as_int(a) == as_int(b);
+            break;
         case VAL_FLOAT:
             result =  as_float(a) == as_float(b);
+            break;
         case VAL_NIL:
         case VAL_ABSENCE:
             result = true;
+            break;
         case VAL_REF: {
             result = as_ref(a) == as_ref(b);
+            break;
         }
     }
     return bool_value(result);
@@ -586,12 +591,12 @@ void init_vm_native() {
     define_native("float", native_float, 1);
     define_native("rand", native_rand, 2);
     define_native("f", native_format, -1);
-    define_native("native_string_combine_array", native_string_combine_array, 1);
-    define_native("native_value_join", native_value_join, 4);
-    define_native("native_string_join", native_string_join, 4);
     define_native("read", native_read, -1);
     define_native("char_at", native_char_at, 2);
     define_native("type", native_type, 1);
+    define_native("native_string_combine_array", native_string_combine_array, 1);
+    define_native("native_value_join", native_value_join, 4);
+    define_native("native_string_join", native_string_join, 4);
     define_native("native_range", native_range, 3);
     define_native("native_array_iter", native_array_iter, 1);
     define_native("native_map_iter", native_map_iter, 1);

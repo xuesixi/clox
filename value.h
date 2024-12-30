@@ -7,8 +7,6 @@
 
 #include "common.h"
 
-
-
 typedef struct Object Object;
 
 typedef enum {

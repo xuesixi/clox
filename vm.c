@@ -70,6 +70,11 @@ static inline void stack_set(int n, Value value) {
     vm.stack_top[-1 - n] = value;
 }
 
+static inline int positive_mod(int a, int b) {
+    int result = a % b;
+    return result < 0 ? result + b : result;
+}
+
 static Class *value_class(Value value) {
     switch (value.type) {
         case VAL_INT:
@@ -516,7 +521,7 @@ static void invoke_native_object(int arg_count, NativeInterface interface, Nativ
                     stack_pop();
                     MapEntry entry = as_map(native_object->values[1])->backing[as_int(native_object->values[0])];
                     as_int(native_object->values[0])++;
-                    Array *tuple = new_array(2);
+                    Array *tuple = new_array(2, false);
                     tuple->values[0] = entry.key;
                     tuple->values[1] = entry.value;
                     stack_push(ref_value((Object *)tuple));
@@ -543,11 +548,11 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
     if (is_ref_of(receiver, OBJ_INSTANCE)) {
         Instance *instance = as_instance(receiver);
         Value closure_value;
-        if (!table_get(&instance->fields, name, &closure_value)) {
+        if (table_get(&instance->fields, name, &closure_value)) {
+            call_value(closure_value, arg_count);
+        } else {
             Class *class = instance->class;
             invoke_from_class(class, name, arg_count);
-        } else {
-            call_value(closure_value, arg_count);;
         }
     } else if (is_ref(receiver)){
         switch (receiver.as.reference->type) {
@@ -612,13 +617,18 @@ static Value multi_dimension_array(int dimension, Value *lens) {
         runtime_error_catch_1("%s cannot be used as the array length", len_value);
     }
     int len = as_int(*lens);
-    Array *arr = new_array(len);
+    Array *arr;
     if (dimension == 1) {
+        arr = new_array(len, true);
         return ref_value((Object *) arr);
+    } else {
+        arr = new_array(len, true);
     }
+    stack_push(ref_value((Object *) arr));
     for (int i = 0; i < len; ++i) {
         arr->values[i] = multi_dimension_array(dimension - 1, lens + 1);
     }
+    stack_pop();
     return ref_value((Object *) arr);
 
 }
@@ -641,7 +651,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(int_value(a_v / b_v));
                 break;
             case '%':
-                stack_push(int_value(a_v % b_v));
+                stack_push(int_value(positive_mod(a_v, b_v)));
                 break;
             case '>':
                 stack_push(bool_value(a_v > b_v));
@@ -981,7 +991,7 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
     Value closure_value;
     if (!table_get(&class->methods, name, &closure_value)) {
         Value receiver = stack_peek(arg_count);
-        runtime_error_catch_2("%s does not have the property or method %s", receiver, ref_value((Object *) name));
+        runtime_error_catch_2("%s does not have the property or method: %s", receiver, ref_value((Object *) name));
     }
     call_closure(as_closure(closure_value), arg_count);
 }
@@ -1000,7 +1010,7 @@ static void call_closure(Closure *closure, int arg_count) {
             }
             arg_count = fixed_arg_count + optional_arg_count;
             if (function->var_arg) {
-                stack_push(ref_value((Object *) new_array(0)));
+                stack_push(ref_value((Object *) new_array(0, false)));
                 arg_count++;
             }
         } else if (function->var_arg) { // more than expect
@@ -1325,7 +1335,7 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
  * @param length
  */
 static void build_array(int length) {
-    Array *array = new_array(length);
+    Array *array = new_array(length, false);
     for (int i = length - 1; i >= 0; i--) {
         array->values[i] = stack_pop();
     }
