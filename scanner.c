@@ -167,8 +167,15 @@ static TokenType identifier_type() {
         case 't':
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
-                    case 'h':
-                        return check_keyword(2, 2, "is", TOKEN_THIS);
+                    case 'h': {
+                        if (is_keyword(2, 2, "is")) {
+                            return TOKEN_THIS;
+                        } else if (is_keyword(2, 3, "row")) {
+                            return TOKEN_THROW;
+                        } else {
+                            return TOKEN_IDENTIFIER;
+                        }
+                    }
                     case 'r': {
                         if (is_keyword(2, 1, "y")) {
                             return TOKEN_TRY;

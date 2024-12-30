@@ -92,7 +92,7 @@ typedef struct Closure {
     Object object;
     LoxFunction *function;
     UpValue **upvalues; // array of pointers to UpValueObject，之所以有额外一层pointer，是因为多个closure可以共享同一个UpValueObject本体。
-    Module *module;
+    Module *module_of_define;
     int upvalue_count;
 } Closure;
 

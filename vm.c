@@ -70,6 +70,15 @@ static void invoke_native_object(int arg_count, NativeInterface interface, Nativ
 //static inline void new_try_save_point(int offset) {
 //}
 
+/**
+ * 根据vm.frame_count来更新curr_frame, 然后根据curr_frame来更新curr_const_pool以及curr_closure_global
+ */
+static inline void sync_frame_cache() {
+    curr_frame = vm.frames + vm.frame_count - 1;
+    curr_const_pool = curr_frame->closure->function->chunk.constants.values;
+    curr_closure_global = &curr_frame->closure->module_of_define->globals;
+}
+
 static inline void stack_set(int n, Value value) {
     vm.stack_top[-1 - n] = value;
 }
@@ -839,14 +848,16 @@ void throw_value(Value value) {
         longjmp(error_buf, INTERPRET_RUNTIME_ERROR);
         return;
     }
+
     close_upvalue(last_save->stack_top);
     vm.frame_count = last_save->frame_count;
     vm.stack_top = last_save->stack_top;
-    curr_frame = vm.frames + vm.frame_count - 1;
+    sync_frame_cache();
     curr_frame->PC = last_save->PC;
-    curr_closure_global = & curr_frame->closure->module->globals;
-    curr_const_pool = curr_frame->closure->function->chunk.constants.values;
     stack_push(value);
+
+    vm.last_save = last_save->next; // clean
+    free(last_save);
 }
 
 
@@ -1095,8 +1106,7 @@ static void call_closure(Closure *closure, int arg_count) {
     frame->FP = vm.stack_top - arg_count - 1;
     frame->PC = function->chunk.code;
     frame->closure = closure;
-    curr_closure_global = &closure->module->globals;
-    curr_const_pool = closure->function->chunk.constants.values;
+    sync_frame_cache();
 }
 
 /**
@@ -1165,7 +1175,6 @@ void init_VM() {
     vm.last_save = NULL;
     srand(time(NULL)); // NOLINT(*-msc51-cpp)
 
-    vm.current_module = NULL;
     init_table(&vm.builtin);
     init_table(&vm.string_table);
     init_static_strings();
@@ -1230,9 +1239,6 @@ InterpretResult interpret(const char *src, const char *path) {
 }
 
 static void import(const char *src, String *path) {
-
-    stack_push(ref_value((Object *) vm.current_module));
-    // [old_module, top]
 
     LoxFunction *function = compile(src);
 
@@ -1344,14 +1350,6 @@ InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const 
  */
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl) {
 
-//    if (preload_started || COMPILE_ONLY) {
-//
-//    } else {
-//        preload_started = true;
-//        load_libraries();
-//        preload_finished = true;
-//    }
-
     DISABLE_GC;
 
     vm.frame_count++;
@@ -1372,10 +1370,9 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
         module = new_module(path_string);
     }
 
-    closure->module = module;
-    vm.current_module = module;
-    curr_closure_global = &closure->module->globals;
-    curr_const_pool = closure->function->chunk.constants.values;
+    closure->module_of_define = module;
+    curr_frame->module = module;
+    sync_frame_cache();
 
     stack_push(ref_value((Object *) closure));
 
@@ -1429,13 +1426,14 @@ static InterpretResult run_frame_until(int end_when) {
                 vm.stack_top = curr_frame->FP;
                 close_upvalue(vm.stack_top);
                 vm.frame_count--;
-                curr_frame = vm.frames + vm.frame_count - 1;
+//                curr_frame = vm.frames + vm.frame_count - 1;
                 if (vm.frame_count == TRACE_SKIP) {
                     TRACE_SKIP = -1; // no skip. Step by step
                 }
                 if (vm.frame_count != 0) {
-                    curr_const_pool = curr_frame->closure->function->chunk.constants.values;
-                    curr_closure_global = &curr_frame->closure->module->globals;
+                    sync_frame_cache();
+//                    curr_const_pool = curr_frame->closure->function->chunk.constants.values;
+//                    curr_closure_global = &curr_frame->closure->module_of_define->globals;
                     stack_push(result);
                 }
                 if (vm.frame_count == end_when) {
@@ -1680,7 +1678,7 @@ static InterpretResult run_frame_until(int end_when) {
                  */
                 Value f = read_constant16();
                 Closure *closure = new_closure(as_function(f));
-                closure->module = vm.current_module;
+                closure->module_of_define = curr_frame->module;
                 stack_push(ref_value((Object *) closure));
                 for (int i = 0; i < closure->upvalue_count; ++i) {
                     bool is_local = read_byte();
@@ -1878,7 +1876,7 @@ static InterpretResult run_frame_until(int end_when) {
             case OP_IMPORT: {
                 String *relative = as_string(stack_pop());
                 char *relative_path;
-                asprintf(&relative_path, "%s/../%s", vm.current_module->path->chars, relative->chars);
+                asprintf(&relative_path, "%s/../%s", curr_frame->module->path->chars, relative->chars);
                 char *resolved_path = resolve_path(relative_path);
                 char *src = read_file(resolved_path);
                 if (src == NULL) {
@@ -1901,18 +1899,15 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             }
             case OP_RESTORE_MODULE: {
-                // [old_module, nil] -> [new_module]
+                // [nil] -> [new_module]
                 stack_pop();
-                Module *old_module = as_module(stack_pop());
-                stack_push(ref_value((Object *) vm.current_module));
-                vm.current_module = old_module;
-                curr_closure_global = &curr_frame->closure->module->globals;
-//                curr_const_pool = curr_frame->closure->function->chunk.constants.values;
+                Module *last_module = curr_frame[1].module;
+                stack_push(ref_value((Object *) last_module));
                 break;
             }
             case OP_EXPORT: {
                 String *name = read_constant_string();
-                Entry *entry = table_find_entry(&vm.current_module->globals, name, false, false);
+                Entry *entry = table_find_entry(&curr_frame->module->globals, name, false, false);
                 if (entry->key == NULL && is_bool(entry->value)) {
                     runtime_error_and_catch("No such global variable: %s", name->chars);
                 } else {
@@ -1975,6 +1970,11 @@ static InterpretResult run_frame_until(int end_when) {
                 vm.last_save = vm.last_save->next;
                 free(last_save);
                 curr_frame->PC += offset;
+                break;
+            }
+            case OP_THROW: {
+                Value value = stack_pop();
+                throw_value(value);
                 break;
             }
             default: {

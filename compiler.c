@@ -162,6 +162,10 @@ static void parse_precedence(Precedence precedence);
 
 static void expression();
 
+static void throw_statement();
+
+static void try_statement();
+
 static void arithmetic_equal(OpCode set_op, OpCode get_op, int index, int copy);
 
 static void dimension_array(bool can_assign);
@@ -432,10 +436,9 @@ static void class_member() {
 static void import_statement() {
     consume(TOKEN_STRING, "Expect module path");
     string(false);
-//    Token path = parser.previous;
     if (match(TOKEN_COLON)) {
-        // [old_module, nil, top]
-        // [new_module, top]
+        // [nil]
+        // [new_module]
         emit_byte(OP_IMPORT);
         emit_byte(OP_RESTORE_MODULE);
         do {
@@ -448,23 +451,23 @@ static void import_statement() {
                 as_name = declare_identifier_token(&parser.previous);
             }
             emit_byte(OP_COPY);
-            // [new_mod, new_mod, top]
+            // [new_mod, new_mod]
             emit_u8_u16(OP_GET_PROPERTY, property_name);
-            // [new_mod, property, top]
+            // [new_mod, property]
             if (current_scope->depth == 0) {
                 emit_u8_u16(OP_DEF_GLOBAL, as_name);
-                // [new_mod, top]
+                // [new_mod]
             } else {
                 emit_u8_u8(OP_SWAP, 1);
                 mark_initialized();
-                // [property, new_mod, top]
+                // [property, new_mod]
             }
         } while (!check(TOKEN_EOF) && match(TOKEN_COMMA));
         consume(TOKEN_SEMICOLON, "Expect ; to end the import statement");
         emit_byte(OP_POP);
     } else {
-        // [old_module, nil, top]
-        // [new_module, top]
+        // [nil]
+        // [new_module]
         consume(TOKEN_AS, "You must use 'as' to specify the module name");
 
         int name_index = parse_identifier_declaration(false);
@@ -912,6 +915,10 @@ static void statement() {
         switch_statement();
     } else if (match(TOKEN_RETURN)) {
         return_statement();
+    } else if (match(TOKEN_TRY)){
+        try_statement();
+    } else if (match(TOKEN_THROW)){
+        throw_statement();
     } else {
         expression_statement();
     }
@@ -1781,6 +1788,12 @@ static void super_expression(bool can_assign) {
     }
 }
 
+static void throw_statement() {
+    expression();
+    emit_byte(OP_THROW);
+    consume(TOKEN_SEMICOLON, "Expect ';' to end the throw statement");
+}
+
 static void try_statement() {
     // try doSomeThing();
     /**
@@ -1810,6 +1823,7 @@ static void try_statement() {
 
     begin_scope();
     parse_identifier_declaration(false);
+    mark_initialized();
     consume(TOKEN_LEFT_BRACE, "Expect '{' to start a catch block");
     while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
         declaration();

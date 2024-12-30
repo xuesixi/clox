@@ -155,7 +155,7 @@ static char *ref_to_chars(Value value, int *len) {
             LoxFunction *fun = as_closure(value)->function;
             Closure *closure = as_closure(value);
             if (fun->type == TYPE_MAIN) {
-                *len = asprintf(&buffer, "<main: %s>", get_filename(closure->module->path->chars));
+                *len = asprintf(&buffer, "<main: %s>", get_filename(closure->module_of_define->path->chars));
             } else if (fun->type == TYPE_LAMBDA) {
                 *len = asprintf(&buffer, "<lambda>");
             } else {

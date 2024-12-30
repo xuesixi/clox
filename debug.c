@@ -216,7 +216,6 @@ int disassemble_instruction(Chunk *chunk, int offset, bool line_break) {
             return simple_instruction("INDEXING_SET", offset);
         case OP_MAKE_STATIC_FIELD:
             return constant16_instruction("MAKE_STATIC_FIELD", chunk, offset);
-            return simple_instruction("MAKE_STATIC_FIELD", offset);
         case OP_IMPORT:
             return simple_instruction("IMPORT", offset);
         case OP_RESTORE_MODULE:
@@ -245,6 +244,12 @@ int disassemble_instruction(Chunk *chunk, int offset, bool line_break) {
             return simple_instruction("MAP_ADD_PAIR", offset);
         case OP_NEW_MAP:
             return simple_instruction("NEW_MAP", offset);
+        case OP_SET_TRY:
+            return jump_instruction("SET_TRY", chunk, offset, true);
+        case OP_SKIP_CATCH:
+            return jump_instruction("SKIP_CATCH", chunk, offset, true);
+        case OP_THROW:
+            return simple_instruction("THROW", offset);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return -1;

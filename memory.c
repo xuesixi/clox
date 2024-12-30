@@ -116,7 +116,7 @@ static void blacken_object(Object *object) {
         case OBJ_CLOSURE: {
             Closure *closure = (Closure *) object;
             mark_object((Object *) closure->function);
-            mark_object((Object *) closure->module);
+            mark_object((Object *) closure->module_of_define);
             for (int i = 0; i < closure->upvalue_count; ++i) {
                 mark_object((Object *) closure->upvalues[i]);
             }

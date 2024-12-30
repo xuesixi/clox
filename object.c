@@ -135,7 +135,7 @@ Closure *new_closure(LoxFunction *function) {
 
     closure->upvalue_count = function->upvalue_count;
     closure->upvalues = upvalues;
-    closure->module = NULL;
+    closure->module_of_define = NULL;
 
     stack_pop();
 

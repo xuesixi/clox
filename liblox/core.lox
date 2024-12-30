@@ -177,7 +177,20 @@ fun benchmark(task) {
     print f("takes time: #", clock() - start);
 }
 
+class Error {
+    init(message, value = nil) {
+        this.message = message;
+        this.value = value;
+    }
+}
+
+class TypeError: Error {} // inappropriate type
+class IndexError: Error {} // index out of bound
+class ArgError: Error {} // arg number does work match param number
+class NameError: Error {} // no such variable
+class PeopertyError: Error {} // no such property
+
 export 
 Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, Closure, Map,
-concat, join, string_join, benchmark
+concat, join, string_join, benchmark, Error
 ;
