@@ -1789,13 +1789,23 @@ static void try_statement() {
      * } catch error {
      *      ...
      * }
+     *
+     * set_try:
+     *      ... (try body)
+     *      skip to -> end_catch
+     *
+     * end_try
+     *      ... (catch body)
+     *
+     * end_catch
+     *
      */
     int end_try = emit_jump(OP_SET_TRY);
 
     declaration();
     consume(TOKEN_CATCH, "Expect 'catch' after a try block");
-    int end_catch = emit_jump(OP_SKIP_CATCH);
 
+    int end_catch = emit_jump(OP_SKIP_CATCH);
     patch_jump(end_try);
 
     begin_scope();

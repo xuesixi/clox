@@ -63,7 +63,12 @@ static void warmup(LoxFunction *function, const char *path_chars, String *path_s
 
 static Method *bind_method(Class *class, String *name, Value receiver);
 
+static void close_upvalue(Value *position);
+
 static void invoke_native_object(int arg_count, NativeInterface interface, NativeObject *native_object);
+
+//static inline void new_try_save_point(int offset) {
+//}
 
 static inline void stack_set(int n, Value value) {
     vm.stack_top[-1 - n] = value;
@@ -828,6 +833,23 @@ static inline Value stack_peek(int distance) {
     return vm.stack_top[-1 - distance];
 }
 
+void throw_value(Value value) {
+    TrySavePoint *last_save = vm.last_save;
+    if (last_save == NULL) {
+        longjmp(error_buf, INTERPRET_RUNTIME_ERROR);
+        return;
+    }
+    close_upvalue(last_save->stack_top);
+    vm.frame_count = last_save->frame_count;
+    vm.stack_top = last_save->stack_top;
+    curr_frame = vm.frames + vm.frame_count - 1;
+    curr_frame->PC = last_save->PC;
+    curr_closure_global = & curr_frame->closure->module->globals;
+    curr_const_pool = curr_frame->closure->function->chunk.constants.values;
+    stack_push(value);
+}
+
+
 /**
  * 输出错误消息（会自动添加换行符）
  * 打印调用栈消息。清空栈。
@@ -1140,6 +1162,7 @@ void init_VM() {
     vm.gray_stack = NULL;
     vm.allocated_size = 0;
     vm.next_gc = INITIAL_GC_SIZE;
+    vm.last_save = NULL;
     srand(time(NULL)); // NOLINT(*-msc51-cpp)
 
     vm.current_module = NULL;
@@ -1878,7 +1901,7 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             }
             case OP_RESTORE_MODULE: {
-                // [old_module, nil, top] -> [new_module, top]
+                // [old_module, nil] -> [new_module]
                 stack_pop();
                 Module *old_module = as_module(stack_pop());
                 stack_push(ref_value((Object *) vm.current_module));
@@ -1934,6 +1957,24 @@ static InterpretResult run_frame_until(int end_when) {
             }
             case OP_NEW_MAP: {
                 stack_push(ref_value((Object *) new_map()));
+                break;
+            }
+            case OP_SET_TRY: {
+                int offset = read_uint16();
+                TrySavePoint *save_point = malloc(sizeof(TrySavePoint));
+                save_point->frame_count = vm.frame_count;
+                save_point->PC = curr_frame->PC + offset;
+                save_point->stack_top = vm.stack_top;
+                save_point->next = vm.last_save;
+                vm.last_save = save_point;
+                break;
+            }
+            case OP_SKIP_CATCH: {
+                int offset = read_uint16();
+                TrySavePoint *last_save = vm.last_save;
+                vm.last_save = vm.last_save->next;
+                free(last_save);
+                curr_frame->PC += offset;
                 break;
             }
             default: {

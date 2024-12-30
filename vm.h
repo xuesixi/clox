@@ -14,6 +14,13 @@ typedef struct CallFrame {
     Value *FP; // frame pointer. The start of the frame
 } CallFrame;
 
+typedef struct TrySavePoint {
+    int frame_count;
+    uint8_t *PC;
+    Value *stack_top;
+    struct TrySavePoint *next;
+} TrySavePoint;
+
 typedef struct VM{
     CallFrame frames[FRAME_MAX];
     int frame_count;
@@ -29,6 +36,7 @@ typedef struct VM{
     Object **gray_stack;
     size_t allocated_size;
     size_t next_gc;
+    TrySavePoint *last_save;
 } VM ;
 
 extern Module *repl_module;
