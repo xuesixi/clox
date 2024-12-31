@@ -366,6 +366,8 @@ Token scan_token() {
     switch (c) {
         case '(':
             return make_token(TOKEN_LEFT_PAREN);
+        case '|':
+            return make_token(TOKEN_PIPE);
         case ')':
             return make_token(TOKEN_RIGHT_PAREN);
         case '{':

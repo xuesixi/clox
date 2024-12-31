@@ -1870,9 +1870,10 @@ static void try_statement() {
                     error_at_previous("Cannot have more thant 256 type matches for one catch clause");
                     return;
                 }
-                parse_precedence(PREC_ASSIGNMENT);
+                consume(TOKEN_IDENTIFIER, "Expect type or class name here");
+                named_variable(&parser.previous, false);
                 type_counts ++;
-            } while (match(TOKEN_COMMA));
+            } while (match(TOKEN_PIPE));
 
             // [err, type1, type2, ...]
             emit_u8_u8(OP_TEST_VALUE_OF, type_counts);
