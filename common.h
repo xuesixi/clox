@@ -22,6 +22,8 @@
 
 #define FRAME_MAX 64
 #define STACK_MAX (FRAME_MAX * UINT8_MAX)
+#define STR(x) #x
+#define XSTR(x) STR(x)
 
 extern bool SHOW_COMPILE_RESULT;
 extern bool TRACE_EXECUTION;

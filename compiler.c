@@ -1795,49 +1795,118 @@ static void throw_statement() {
 }
 
 static void try_statement() {
-    // try doSomeThing();
     /**
      * try {
      *      ...
-     * } catch error {
+     * } catch err: Type1 {
+     *      ...
+     * } catch err: Type2 , Type 3 {
      *      ...
      * }
      *
      * set_try:
-     *      ... (try body)
-     *      skip to -> end_catch
+     *      ... (try body, if error thrown, jump -> catch 1)
+     *      jump -> end_catch
      *
-     * end_try
+     * catch 1:
+     *      if error type does not match, jump -> catch 2
      *      ... (catch body)
+     *      jump -> end_catch
+     *
+     * catch 2:
+     *      if error type does not match, jump -> throw out
+     *      ... catch body
+     *      jump -> end_catch
+     *
+     * throw out:
+     *      throw value;
      *
      * end_catch
      *
      */
+
+#define CATCH_CLAUSE_LIMIT 64
+    static int end_catch_jumps[CATCH_CLAUSE_LIMIT + 1];
+    int patch_size = 0;
     int end_try = emit_jump(OP_SET_TRY);
 
     declaration();
+
+    end_catch_jumps[patch_size++] = emit_jump(OP_SKIP_CATCH); // if no error in try, skip all catch clauses
+
+    patch_jump(end_try); // jump to here if an error is thrown inside try
+
     consume(TOKEN_CATCH, "Expect 'catch' after a try block");
 
-    int end_catch = emit_jump(OP_SKIP_CATCH);
-    patch_jump(end_try);
+    int bridge = -1;
 
-    begin_scope();
-    parse_identifier_declaration(false);
-    mark_initialized();
-    consume(TOKEN_LEFT_BRACE, "Expect '{' to start a catch block");
-    while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
-        declaration();
+    bool unconditional_catch = false; // the flag is set when an unconditional catch exists
+
+    // [err]
+    do { // parse all catch clauses
+
+        if (unconditional_catch) {
+            error_at_previous("You cannot have other catch clauses after one unconditional catch");
+            return;
+        }
+
+        if (bridge != -1) { // if the previous type match fails, it should jump to here
+            patch_jump(bridge);
+        }
+
+        if (patch_size >= CATCH_CLAUSE_LIMIT + 1) {
+            error_at_previous("Cannot have more than " XSTR(CATCH_CLAUSE_LIMIT) " catch clauses for one try statement!");
+            return;
+        }
+
+        begin_scope();
+        parse_identifier_declaration(false); // the error value
+        mark_initialized();
+
+        if (match(TOKEN_COLON)) { // parse all type matches for this catch clause
+            int type_counts = 0;
+            do {
+                if (type_counts >= UINT8_MAX) {
+                    error_at_previous("Cannot have more thant 256 type matches for one catch clause");
+                    return;
+                }
+                parse_precedence(PREC_ASSIGNMENT);
+                type_counts ++;
+            } while (match(TOKEN_COMMA));
+
+            // [err, type1, type2, ...]
+            emit_u8_u8(OP_TEST_VALUE_OF, type_counts);
+
+            // [err, bool]
+            bridge = emit_jump(OP_POP_JUMP_IF_FALSE); // jump to next catch
+        } else {
+            unconditional_catch = true;
+        }
+
+        // [err]
+        consume(TOKEN_LEFT_BRACE, "Expect '{' to start a catch block");
+        while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
+            declaration();
+        }
+        consume(TOKEN_RIGHT_BRACE, "Expect '}' to end a catch block");
+        end_scope();
+
+        end_catch_jumps[patch_size++] = emit_jump(OP_JUMP);
+
+    } while (match(TOKEN_CATCH));
+
+    // throw_out
+    if (!unconditional_catch) { // if there is no unconditional catch, the last failed type match will jump to here
+        patch_jump(bridge);
+        emit_byte(OP_THROW);
     }
-    consume(TOKEN_RIGHT_BRACE, "Expect '}' to end a catch block");
-    end_scope();
 
-    patch_jump(end_catch);
+    // end_try:
+    for (int i = 0; i < patch_size; ++i) {
+        patch_jump(end_catch_jumps[i]);
+    }
 
-//    parse_identifier_declaration(false);
-//    if (match(TOKEN_COLON)) {
-//        consume(TOKEN_IDENTIFIER, "Expect class name for catch");
-//        uint16_t type_name_index = identifier_constant(&parser.previous);
-//    }
+#undef CATCH_CLAUSE_LIMIT
 }
 
 static void dimension_array(bool can_assign) {

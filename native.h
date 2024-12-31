@@ -62,6 +62,7 @@ void additional_repl_init();
 void load_libraries();
 void init_static_strings();
 bool is_subclass(Class *one, Class *two);
+bool multi_value_of(int count, Value *values);
 Value native_backtrace(int count, Value *value);
 void new_error(ErrorType type, const char *message);
 void throw_new_runtime_error(ErrorType type, const char *format, ...);

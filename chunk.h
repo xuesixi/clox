@@ -79,6 +79,7 @@ typedef enum OpCode{
     OP_SET_TRY, // op, offset16
     OP_SKIP_CATCH, // op, offset16
     OP_THROW, // op, [value] -> ...
+    OP_TEST_VALUE_OF, // op, n: [value, type1, type2, ... type_n ] -> [value, bool]
 } OpCode;
 
 typedef struct Chunk{

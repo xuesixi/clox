@@ -73,18 +73,45 @@ static Value native_subclass_of(int count, Value *values) {
     return bool_value(res);
 }
 
+/**
+ *
+ * @param count class的数量。
+ * @param values values[0] 为判断的目标，其后的所有values都是class
+ * @return 如果values[0]属于后面任何一个class的值，返回true，否则false
+ */
+bool multi_value_of(int count, Value *values) {
+    Value v = values[0];
+    Class *class = value_class(v);
+    bool result = false;
+    for (int i = 1; i <= count; ++i) {
+        Value arg_class = values[i];
+        assert_ref_type(arg_class, OBJ_CLASS, "class");
+        if (is_ref_of(v, OBJ_INSTANCE)) {
+            result = is_subclass(class, as_class(arg_class));
+        } else {
+            result = class == as_class(arg_class);
+        }
+        if (result) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static Value native_value_of(int count, Value *values) {
     (void ) count;
-    Value v = values[0];
-    Value arg_class = values[1];
-    assert_ref_type(arg_class, OBJ_CLASS, "class");
-    bool result;
-    Class *class = value_class(v);
-    if (is_ref_of(v, OBJ_INSTANCE)) {
-        result = is_subclass(class, as_class(arg_class));
-    } else {
-        result = class == as_class(arg_class);
-    }
+//    Value v = values[0];
+//    Value arg_class = values[1];
+//    assert_ref_type(arg_class, OBJ_CLASS, "class");
+//    bool result;
+//    Class *class = value_class(v);
+//    if (is_ref_of(v, OBJ_INSTANCE)) {
+//        result = is_subclass(class, as_class(arg_class));
+//    } else {
+//        result = class == as_class(arg_class);
+//    }
+//    return bool_value(result);
+    bool result = multi_value_of(1, values);
     return bool_value(result);
 }
 

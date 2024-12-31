@@ -212,9 +212,9 @@ class NameError: Error {
 } 
 
 // no such property
-class PeopertyError: Error {
+class PropertyError: Error {
     init(message) {
-        this.message = ("PeopertyError: " + message);
+        this.message = ("PropertyError: " + message);
     }
 } 
 
@@ -247,5 +247,5 @@ class IOError: Error {
 export 
 Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, Closure, Map,
 concat, join, string_join, benchmark, 
-Error, TypeError, IndexError, ArgError, NameError, PeopertyError, ValueError, FatalError, CompileError, IOError
+Error, TypeError, IndexError, ArgError, NameError, PropertyError, ValueError, FatalError, CompileError, IOError
 ;

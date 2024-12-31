@@ -1949,6 +1949,14 @@ static InterpretResult run_frame_until(int end_when) {
                 throw_value(value);
                 break;
             }
+            case OP_TEST_VALUE_OF: {
+                int amount = read_byte();
+                // [value, t1, t2, (top)] -> [value, bool]
+                bool yes = multi_value_of(amount, vm.stack_top - amount - 1);
+                vm.stack_top -= amount;
+                stack_push(bool_value(yes));
+                break;
+            }
             default: {
                 IMPLEMENTATION_ERROR("unrecognized instruction");
                 break;
