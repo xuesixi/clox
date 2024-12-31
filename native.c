@@ -63,7 +63,7 @@ bool is_subclass(Class *one, Class *two) {
     return is_subclass(one->super_class, two);
 }
 
-static Value native_is_subclass(int count, Value *values) {
+static Value native_subclass_of(int count, Value *values) {
     (void ) count;
     Value v0 = values[0];
     Value v1 = values[1];
@@ -73,7 +73,7 @@ static Value native_is_subclass(int count, Value *values) {
     return bool_value(res);
 }
 
-static Value native_instanceof(int count, Value *values) {
+static Value native_value_of(int count, Value *values) {
     (void ) count;
     Value v = values[0];
     Value arg_class = values[1];
@@ -694,8 +694,8 @@ void init_vm_native() {
     define_native("native_general_hash", general_hash, 1);
     define_native("native_value_equal", native_value_equal, 2);
     define_native("backtrace", native_backtrace, 0);
-    define_native("instanceof", native_instanceof, 2);
-    define_native("is_subclass", native_is_subclass, 2);
+    define_native("value_of", native_value_of, 2);
+    define_native("subclass_of", native_subclass_of, 2);
 }
 
 void additional_repl_init() {

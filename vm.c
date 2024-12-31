@@ -1265,11 +1265,11 @@ InterpretResult read_run_bytecode(const char *path) {
     warmup(function, path, NULL, false);
 
     InterpretResult error;
-    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
-        return error;
+    error = setjmp(error_buf);
+    if (error == INTERPRET_0 || error == INTERPRET_ERROR_CAUGHT) {
+        error = run_frame_until(0);
     }
-
-    return run_frame_until(0);
+    return error;
 }
 
 InterpretResult disassemble_byte_code(const char *path) {
@@ -1303,19 +1303,6 @@ InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const 
     ENABLE_GC;
 
     warmup(function, path, NULL, false);
-
-//    InterpretResult error;
-//    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
-//        return error;
-//    }
-//
-//    InterpretResult result = run_frame_until(0);
-//    if (result == INTERPRET_EXECUTE_OK) {
-//    } else {
-//        IMPLEMENTATION_ERROR("Error when loading lib");
-//    }
-//
-//    return result;
 
     InterpretResult error;
 
@@ -1391,10 +1378,6 @@ static InterpretResult run_frame_until(int end_when) {
     if (vm.frame_count == end_when) {
         return INTERPRET_EXECUTE_OK;
     }
-//    InterpretResult error;
-//    if ( (error = setjmp(error_buf)) != INTERPRET_OK) {
-//        return error;
-//    }
 
     while (true) {
 
