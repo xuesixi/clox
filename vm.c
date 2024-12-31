@@ -31,6 +31,8 @@ static inline uint16_t read_uint16();
 
 static inline bool is_falsy(Value value);
 
+static void throw_value(Value value);
+
 static inline void reset_stack();
 
 static InterpretResult run_frame_until(int end_when);
@@ -169,9 +171,11 @@ static void array_indexing_get() {
     Array *array = as_array(arr_value);
     int index = as_int(index_value);
     if (index < 0 || index >= array->length) {
-        throw_new_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [0, %d]", index, array->length - 1);
+        throw_user_level_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [0, %d]", index,
+                                       array->length - 1);
+    } else {
+        stack_push(array->values[index]);
     }
-    stack_push(array->values[index]);
 }
 
 static void array_indexing_set() {
@@ -183,12 +187,18 @@ static void array_indexing_set() {
     Array *array = as_array(arr_value);
     int index = as_int(index_value);
     if (index < 0 || index >= array->length) {
-        throw_new_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [0, %d]", index, array->length - 1);
+        throw_user_level_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [0, %d]", index,
+                                       array->length - 1);
+    } else {
+        array->values[index] = value;
+        stack_push(value);
     }
-    array->values[index] = value;
-    stack_push(value);
 }
 
+/**
+ * [map, key] -> [value]。
+ * 如果没有找到，将使用throw_value()抛出IndexError（用户级别）。
+ */
 static void map_indexing_get() {
     // [map, key0]
     Map *map = as_map(stack_peek(1));
@@ -198,15 +208,13 @@ static void map_indexing_get() {
     assert_value_type(hash_result, VAL_INT, "int");
     int hash = as_int(hash_result); // [map, key0, hash]
     int index = MODULO(hash, map->capacity);
-//    int index = hash % map->capacity;
     for (int i = 0; i < map->capacity; ++i) { ;
         int curr = MODULO(index + i, map->capacity);
-//        int curr = (index + i) % map->capacity;
         MapEntry *entry = map->backing + curr;
         if (map_empty_entry(entry)) {
             stack_pop();
             stack_pop();
-            stack_push(nil_value());
+            throw_user_level_runtime_error(Error_IndexError, "IndexError: the key does not exist");
             return;
         } else if (entry->hash == hash) {
             stack_push(entry->key); // map, key0, key1
@@ -241,10 +249,8 @@ static void map_indexing_set_with_hash(bool keep_map) {
 
     int hash = as_int(hash_result); // map, key0, value
     int index = MODULO(hash, map->capacity);
-//    int index = hash % map->capacity;
     for (int i = 0; i < map->capacity; ++i) {
         int curr = MODULO(index + i, map->capacity);
-//        int curr = (index + i) % map->capacity;
         MapEntry *entry = map->backing + curr;
         if (map_empty_entry(entry)) {
             if (mark == NULL) {
@@ -641,6 +647,9 @@ static Value multi_dimension_array(int dimension, Value *lens) {
 
 }
 
+/**
+ * 如果遇到异常，调用throw_user_level_runtime_error()
+ */
 static void binary_number_op(Value a, Value b, char operator) {
     if (is_int(a) && is_int(b)) {
         int a_v = as_int(a);
@@ -694,7 +703,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                throw_new_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
+                throw_user_level_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
                 return;
         }
     } else if (is_float(a) && is_int(b)) {
@@ -720,7 +729,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                throw_new_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
+                throw_user_level_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
                 return;
         }
     } else if (is_float(a) && is_float(b)) {
@@ -746,7 +755,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                throw_new_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
+                throw_user_level_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
                 return;
         }
     } else if (operator == '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
@@ -758,7 +767,7 @@ static void binary_number_op(Value a, Value b, char operator) {
         stack_push(ref_value(&str->object));
         return;
     } else {
-        throw_new_runtime_error(Error_TypeError, "TypeError: the operands do no support the operation: %c", operator);
+        throw_user_level_runtime_error(Error_TypeError, "TypeError: the operands do no support the operation: %c", operator);
         return;
     }
 }
@@ -811,31 +820,6 @@ static void print_error(Value value) {
         String *message = as_string(temp);
         table_get(&err->fields, POSITION, &temp);
         String *position = as_string(temp);
-//        const char *error_type_str;
-//        if (err->class == TypeError) {
-//            error_type_str = "TypeError";
-//        } else if (err->class == IndexError) {
-//            error_type_str = "IndexError";
-//        } else if (err->class == ArgError) {
-//            error_type_str = "ArgError";
-//        } else if (err->class == NameError) {
-//            error_type_str = "NameError";
-//        } else if (err->class == PropertyError) {
-//            error_type_str = "PropertyError";
-//        } else if (err->class == ValueError) {
-//            error_type_str = "ValueError";
-//        } else if (err->class == FatalError) {
-//            error_type_str = "FatalError";
-//        } else if (err->class == CompileError) {
-//            error_type_str = "CompileError";
-//        } else if (err->class == IOError) {
-//            error_type_str = "IOError";
-//        } else if (err->class == Error) {
-//            error_type_str = "Error";
-//        } else {
-//            error_type_str = "Some Error";
-//        }
-//        printf("%s: %s\n%s", error_type_str, message->chars, position->chars);
         printf("%s\n%s", message->chars, position->chars);
     } else {
         char *str = value_to_chars(value, NULL);
@@ -849,7 +833,7 @@ static void print_error(Value value) {
  * 如果不存在try，使用longjmp()传递INTERPRET_RUNTIME_ERROR。
  * @param value 被抛出的值。重置虚拟机后，将之置于栈顶。如果该值是一个Error, 那么在这里设置它的backtrace
  */
-void throw_value(Value value) {
+static void throw_value(Value value) {
 
     stack_push(value); // prevent gc
 
@@ -877,6 +861,21 @@ void throw_value(Value value) {
 
     vm.last_save = last_save->next; // clean
     free(last_save);
+}
+
+/**
+ * 和throw_new_runtime_error()的唯一区别在于，该函数认为生成的异常可以被虚拟机自行解决，因此不会自动调用catch()。
+ */
+void throw_user_level_runtime_error(ErrorType type, const char *format, ...) {
+    static char buf[RUNTIME_ERROR_VA_BUF_LEN];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, RUNTIME_ERROR_VA_BUF_LEN, format, args);
+    va_end(args);
+
+    new_error(type, buf);
+    Value err = stack_pop();
+    throw_value(err); // 如果没有try—savepoint，那么这个函数会直接导致虚拟机结束，而不会运行下一行的catch
 }
 
 /**
@@ -1466,7 +1465,7 @@ static InterpretResult run_frame_until(int end_when) {
                 if (is_number(a) && is_number(b)) {
                     stack_push(float_value(pow(AS_NUMBER(a), AS_NUMBER(b))));
                 } else {
-                    throw_new_runtime_error(Error_TypeError, "TypeError: the operands do not support the power operation");
+                    throw_user_level_runtime_error(Error_TypeError, "TypeError: the operands do not support the power operation");
                 }
                 break;
             }
@@ -1525,33 +1524,37 @@ static InterpretResult run_frame_until(int end_when) {
             case OP_DEF_GLOBAL: {
                 String *name = read_constant_string();
                 if (!table_add_new(curr_closure_global, name, stack_peek(0), false, false)) {
-                    throw_new_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
+                    throw_user_level_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
+                } else {
+                    stack_pop();
                 }
-                stack_pop();
                 break;
             }
             case OP_DEF_GLOBAL_CONST: {
                 String *name = read_constant_string();
                 if (!table_add_new(curr_closure_global, name, stack_peek(0), false, true)) {
-                    throw_new_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
+                    throw_user_level_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
+                } else {
+                    stack_pop();
                 }
-                stack_pop();
                 break;
             }
             case OP_DEF_PUB_GLOBAL: {
                 String *name = read_constant_string();
                 if (!table_add_new(curr_closure_global, name, stack_peek(0), true, false)) {
-                    throw_new_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
+                    throw_user_level_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
+                } else {
+                    stack_pop();
                 }
-                stack_pop();
                 break;
             }
             case OP_DEF_PUB_GLOBAL_CONST: {
                 String *name = read_constant_string();
                 if (!table_add_new(curr_closure_global, name, stack_peek(0), true, true)) {
-                    throw_new_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
+                    throw_user_level_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
+                } else {
+                    stack_pop();
                 }
-                stack_pop();
                 break;
             }
             case OP_GET_GLOBAL: {
@@ -1562,7 +1565,7 @@ static InterpretResult run_frame_until(int end_when) {
                 } else if (table_get(&vm.builtin, name, &value)) {
                     stack_push(value);
                 } else {
-                    throw_new_runtime_error(Error_NameError, "NameError: accessing an undefined variable: %s", name->chars);
+                    throw_user_level_runtime_error(Error_NameError, "NameError: accessing an undefined variable: %s", name->chars);
                 }
                 break;
             }
@@ -1571,9 +1574,9 @@ static InterpretResult run_frame_until(int end_when) {
                 char result = table_set_existent(curr_closure_global, name, stack_peek(0), false);
                 if (result != 0) {
                     if (result == 1) {
-                        throw_new_runtime_error(Error_NameError, "NameError: setting an undefined variable: %s", name->chars);
+                        throw_user_level_runtime_error(Error_NameError, "NameError: setting an undefined variable: %s", name->chars);
                     } else {
-                        throw_new_runtime_error(Error_NameError, "NameError: setting a const variable: %s", name->chars);
+                        throw_user_level_runtime_error(Error_NameError, "NameError: setting a const variable: %s", name->chars);
                     }
                 }
                 break;
@@ -1696,7 +1699,7 @@ static InterpretResult run_frame_until(int end_when) {
                     if (is_ref_of(target, OBJ_CLASS)) {
                         Class *class = as_class(target);
                         if (table_set_existent(&class->static_fields, property_name, value, false)) {
-                            throw_new_runtime_error(Error_PropertyError, "PropertyError: %s does not have the static field: %s", class->name->chars,
+                            throw_user_level_runtime_error(Error_PropertyError, "PropertyError: %s does not have the static field: %s", class->name->chars,
                                                   property_name->chars);
                         }
                         break;
@@ -1707,14 +1710,14 @@ static InterpretResult run_frame_until(int end_when) {
                             case 0:
                                 break;
                             case 1:
-                                throw_new_runtime_error(Error_PropertyError, "PropertyError: does not find the property: %s",
+                                throw_user_level_runtime_error(Error_PropertyError, "PropertyError: does not find the property: %s",
                                                       property_name->chars);
                                 break;
                             case 2:
-                                throw_new_runtime_error(Error_PropertyError, "PropertyError: cannot modify the const property: %s", property_name->chars);
+                                throw_user_level_runtime_error(Error_PropertyError, "PropertyError: cannot modify the const property: %s", property_name->chars);
                                 break;
                             case 3:
-                                throw_new_runtime_error(Error_PropertyError, "PropertyError: cannot access the non-public property: %s",
+                                throw_user_level_runtime_error(Error_PropertyError, "PropertyError: cannot access the non-public property: %s",
                                                         property_name->chars);
                                 break;
                             default:
@@ -1722,7 +1725,7 @@ static InterpretResult run_frame_until(int end_when) {
                                 break;
                         }
                     } else {
-                        throw_new_runtime_error(Error_PropertyError, "PropertyError: does not find the property: %s",
+                        throw_user_level_runtime_error(Error_PropertyError, "PropertyError: does not find the property: %s",
                                               property_name->chars);
                     }
                 } else {
@@ -1754,14 +1757,15 @@ static InterpretResult run_frame_until(int end_when) {
                 //  super,sub,top
                 Value super = stack_peek(1);
                 if (!is_ref_of(super, OBJ_CLASS)) {
-                    throw_new_runtime_error(Error_TypeError, "TypeError: the value cannot be used as a super class");
+                    throw_user_level_runtime_error(Error_TypeError, "TypeError: the value cannot be used as a super class");
+                } else {
+                    Class *sub = as_class(stack_peek(0));
+                    Class *super_class = as_class(super);
+                    sub->super_class = super_class;
+                    table_add_all(&super_class->methods, &sub->methods, false);
+                    stack_pop();
+                    // super, top
                 }
-                Class *sub = as_class(stack_peek(0));
-                Class *super_class = as_class(super);
-                sub->super_class = super_class;
-                table_add_all(&super_class->methods, &sub->methods, false);
-                stack_pop();
-                // super, top
                 break;
             }
             case OP_SUPER_ACCESS: {
@@ -1811,7 +1815,7 @@ static InterpretResult run_frame_until(int end_when) {
                 } else if (is_ref_of(target, OBJ_MAP)) {
                     map_indexing_get();
                 } else {
-                    throw_new_runtime_error(Error_TypeError, "TypeError: TypeError: the value does not support indexing");
+                    throw_user_level_runtime_error(Error_TypeError, "TypeError: TypeError: the value does not support indexing");
                 }
                 break;
             }
@@ -1823,7 +1827,7 @@ static InterpretResult run_frame_until(int end_when) {
                 } else if (is_ref_of(target, OBJ_MAP)) {
                     map_indexing_set(false);
                 } else {
-                    throw_new_runtime_error(Error_TypeError, "TypeError: the value does not support indexing");
+                    throw_user_level_runtime_error(Error_TypeError, "TypeError: the value does not support indexing");
                 }
                 break;
             }
@@ -1852,12 +1856,13 @@ static InterpretResult run_frame_until(int end_when) {
                 char *resolved_path = resolve_path(relative_path);
                 char *src = read_file(resolved_path);
                 if (src == NULL) {
-                    throw_new_runtime_error(Error_IOError, "IOError: error when reading the file %s (%s)\n", resolved_path, relative_path);
+                    throw_user_level_runtime_error(Error_IOError, "IOError: error when reading the file %s (%s)\n", resolved_path, relative_path);
+                } else {
+                    free(relative_path);
+                    String *path_string = auto_length_string_copy(resolved_path);
+                    import(src, path_string);
+                    free(src);
                 }
-                free(relative_path);
-                String *path_string = auto_length_string_copy(resolved_path);
-                import(src, path_string);
-                free(src);
                 break;
             }
             case OP_COPY_N: {
@@ -1881,7 +1886,7 @@ static InterpretResult run_frame_until(int end_when) {
                 String *name = read_constant_string();
                 Entry *entry = table_find_entry(&curr_frame->module->globals, name, false, false);
                 if (entry->key == NULL && is_bool(entry->value)) {
-                    throw_new_runtime_error(Error_NameError, "NameError: no such variable: %s", name->chars);
+                    throw_user_level_runtime_error(Error_NameError, "NameError: no such variable: %s", name->chars);
                 } else {
                     entry->is_public = true;
                 }

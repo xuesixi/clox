@@ -66,6 +66,7 @@ bool multi_value_of(int count, Value *values);
 Value native_backtrace(int count, Value *value);
 void new_error(ErrorType type, const char *message);
 void throw_new_runtime_error(ErrorType type, const char *format, ...);
+void throw_user_level_runtime_error(ErrorType type, const char *format, ...);
 
 void init_vm_native();
 #endif //CLOX_NATIVE_H
