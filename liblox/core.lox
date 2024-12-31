@@ -178,22 +178,74 @@ fun benchmark(task) {
 }
 
 class Error {
-    init(message, value = nil) {
-        this.message = message;
-        this.value = value;
-        this.position = backtrace();
+    init(message) {
+        this.message = "Error: " + message;
     }
 }
 
-class TypeError: Error {} // inappropriate type
-class IndexError: Error {} // index out of bound
-class ArgError: Error {} // arg number does work match param number
-class NameError: Error {} // no such variable
-class PeopertyError: Error {} // no such property
-class ValueError: Error {}
+// inappropriate type
+class TypeError: Error {
+    init(message) {
+        this.message = ("TypeError: " + message);
+    }
+} 
+
+// index out of bound
+class IndexError: Error {
+    init(message) {
+        this.message = ("IndexError: " + message);
+    }
+} 
+
+// arg number does work match param number
+class ArgError: Error {
+    init(message) {
+        this.message = ("ArgError: " + message);
+    }
+} 
+
+// no such variable
+class NameError: Error {
+    init(message) {
+        this.message = ("NameError: " + message);
+    }
+} 
+
+// no such property
+class PeopertyError: Error {
+    init(message) {
+        this.message = ("PeopertyError: " + message);
+    }
+} 
+
+class ValueError: Error {
+    init(message) {
+        this.message = ("ValueError: " + message);
+    }
+}
+
+// e.g. stack overflow
+class FatalError: Error {
+    init(message) {
+        this.message = ("FatalError: " + message);
+    }
+} 
+
+// import a module that fails to compile
+class CompileError: Error {
+    init(message) {
+        this.message = ("CompileError: " + message);
+    }
+} 
+
+class IOError: Error {
+    init(message) {
+        this.message = ("IOError: " + message);
+    }
+}
 
 export 
 Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, Closure, Map,
 concat, join, string_join, benchmark, 
-Error, TypeError, IndexError, ArgError, NameError, PeopertyError, ValueError
+Error, TypeError, IndexError, ArgError, NameError, PeopertyError, ValueError, FatalError, CompileError, IOError
 ;

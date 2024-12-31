@@ -36,6 +36,9 @@ Class *ArgError;
 Class *NameError;
 Class *PropertyError;
 Class *ValueError;
+Class *FatalError;
+Class *CompileError;
+Class *IOError;
 
 String *INIT = NULL;
 String *LENGTH = NULL;
@@ -47,8 +50,45 @@ String *HASH = NULL;
 String *MESSAGE = NULL;
 String *POSITION = NULL;
 
+/**
+ * @return true: one等于two，或者one是two的子类
+ */
+bool is_subclass(Class *one, Class *two) {
+    if (one == two) {
+        return true;
+    }
+    if (one->super_class == NULL) {
+        return false;
+    }
+    return is_subclass(one->super_class, two);
+}
 
-static Value native_backtrace(int count, Value *value) {
+static Value native_is_subclass(int count, Value *values) {
+    (void ) count;
+    Value v0 = values[0];
+    Value v1 = values[1];
+    assert_ref_type(v0, OBJ_CLASS, "class");
+    assert_ref_type(v1, OBJ_CLASS, "class");
+    bool res = is_subclass(as_class(v0), as_class(v1));
+    return bool_value(res);
+}
+
+static Value native_instanceof(int count, Value *values) {
+    (void ) count;
+    Value v = values[0];
+    Value arg_class = values[1];
+    assert_ref_type(arg_class, OBJ_CLASS, "class");
+    bool result;
+    Class *class = value_class(v);
+    if (is_ref_of(v, OBJ_INSTANCE)) {
+        result = is_subclass(class, as_class(arg_class));
+    } else {
+        result = class == as_class(arg_class);
+    }
+    return bool_value(result);
+}
+
+Value native_backtrace(int count, Value *value) {
     (void ) count;
     (void ) value;
     int total_len = 0;
@@ -61,8 +101,10 @@ static Value native_backtrace(int count, Value *value) {
         size_t index = frame->PC - frame->closure->function->chunk.code - 1;
         int line = function->chunk.lines[index];
         char *name = value_to_chars(ref_value((Object *) frame->closure), NULL);
-        lens[i] = asprintf(css + i, "at [line %d] in %s\n", line, name);
+        char *module_name = value_to_chars(ref_value((Object *)frame->closure->module_of_define), NULL);
+        lens[i] = asprintf(css + i, "at [line %d] in %s of %s\n", line, name, module_name);
         free(name);
+        free(module_name);
         total_len += lens[i];
     }
     char *result = malloc(total_len + 1);
@@ -106,16 +148,21 @@ void new_error(ErrorType type, const char *message) {
         case Error_ArgError:
             error_class = ArgError;
             break;
+        case Error_FatalError:
+            error_class = FatalError;
+            break;
+        case Error_CompileError:
+            error_class = CompileError;
+            break;
+        case Error_IOError:
+            error_class = IOError;
+            break;
     }
     Instance *error_instance = new_instance(error_class);
     stack_push(ref_value((Object *)error_instance));
     String *message_str = auto_length_string_copy(message);
     stack_push(ref_value((Object *) message_str));
-    Value bt = native_backtrace(0, NULL);
-    stack_push(bt); // err, message, bt
     table_set(&error_instance->fields, MESSAGE, ref_value((Object*) message_str));
-    table_set(&error_instance->fields, POSITION, bt);
-    stack_pop();
     stack_pop();
 }
 
@@ -205,6 +252,14 @@ void load_libraries() {
         table_get(&vm.builtin, auto_length_string_copy("ValueError"), &class_value);
         ValueError = as_class(class_value);
 
+        table_get(&vm.builtin, auto_length_string_copy("FatalError"), &class_value);
+        FatalError = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("CompileError"), &class_value);
+        CompileError = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("IOError"), &class_value);
+        IOError = as_class(class_value);
     }
     preload_finished = true;
 }
@@ -261,7 +316,7 @@ static Value native_format(int count, Value *values) {
         if (format[curr] == '\0') {
             if (curr_v != count - 1) {
                 free(buf);
-                runtime_error_and_catch("format: more arguments than placeholders");
+                throw_new_runtime_error(Error_ArgError, "ArgError: more arguments than placeholders");
             }
             break;
         }
@@ -269,7 +324,7 @@ static Value native_format(int count, Value *values) {
         if (format[curr] == '#') {
             if (curr_v == count - 1) {
                 free(buf);
-                runtime_error_and_catch("format: more placeholders than arguments");
+                throw_new_runtime_error(Error_ArgError, "ArgError: more placeholders than arguments");
             }
 
             Value v = values[curr_v + 1];
@@ -314,11 +369,11 @@ static Value native_int(int count, Value *value) {
                 char *end;
                 int result = strtol(str->chars, &end, 10); // NOLINT
                 if (end == str->chars) {
-                    runtime_error_and_catch("not a valid int: %s", str->chars);
+                    throw_new_runtime_error(Error_ValueError, "ValueError: not a valid int: %s", str->chars);
                 }
                 return int_value(result);
             }
-            runtime_error_and_catch("not a valid input");
+            throw_new_runtime_error(Error_ValueError, "ValueError: not a valid input");
             return nil_value();
     }
 }
@@ -339,11 +394,11 @@ static Value native_float(int count, Value *value) {
                 char *end;
                 double result = strtod(str->chars, &end);
                 if (end == str->chars) {
-                    runtime_error_and_catch("not a valid float: %s", str->chars);
+                    throw_new_runtime_error(Error_ValueError, "ValueError: not a valid float: %s", str->chars);
                 }
                 return float_value(result);
             }
-            runtime_error_and_catch("not a valid input");
+            throw_new_runtime_error(Error_ValueError, "ValueError: not a valid input");
             return nil_value();
     }
 }
@@ -371,9 +426,8 @@ static Value native_rand(int count, Value *value) {
     (void) count;
     Value a = value[0];
     Value b = value[1];
-    if (!is_int(a) || !is_int(b)) {
-        runtime_error_and_catch("arguments need to be int");
-    }
+    assert_value_type(a, VAL_INT, "int");
+    assert_value_type(b, VAL_INT, "int");
     return int_value(as_int(a) + rand() % as_int(b)); // NOLINT(*-msc50-cpp)
 }
 
@@ -402,9 +456,7 @@ static Value native_string_combine(int count, Value *values) {
 static Value native_string_combine_array(int count, Value *value) {
     (void ) count;
     Value v = *value;
-    if (!is_ref_of(v, OBJ_ARRAY)) {
-        runtime_error_catch_1("The function only support one array as the argument", v);
-    }
+    assert_ref_type(v, OBJ_ARRAY, "array");
     Array *array = as_array(v);
     return native_string_combine(array->length, array->values);
 }
@@ -505,7 +557,7 @@ static Value native_char_at(int count, Value *value) {
     String *string = as_string(*value);
     int index = as_int(value[1]);
     if (index < 0 || index >= string->length) {
-        runtime_error_and_catch("index %d is out of bound: [%d, %d]", index, 0, string->length - 1);
+        throw_new_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [%d, %d]", index, 0, string->length - 1);
     }
     String *c = string_copy(string->chars+index, 1);
     return ref_value((Object *) c);
@@ -642,6 +694,8 @@ void init_vm_native() {
     define_native("native_general_hash", general_hash, 1);
     define_native("native_value_equal", native_value_equal, 2);
     define_native("backtrace", native_backtrace, 0);
+    define_native("instanceof", native_instanceof, 2);
+    define_native("is_subclass", native_is_subclass, 2);
 }
 
 void additional_repl_init() {

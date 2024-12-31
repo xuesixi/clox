@@ -61,6 +61,10 @@ static void print_result_with_color(InterpretResult result) {
             start_color(GREEN);
             printf("== repl exited ==\n");
             break;
+        case INTERPRET_ERROR_CAUGHT:
+        case INTERPRET_0:
+            IMPLEMENTATION_ERROR("????");
+            break;
     }
     end_color();
 }

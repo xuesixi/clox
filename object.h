@@ -107,6 +107,7 @@ typedef struct Class {
     String *name;
     Table methods;
     Table static_fields;
+    struct Class *super_class;
 } Class;
 
 typedef struct Instance {

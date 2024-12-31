@@ -161,6 +161,7 @@ NativeFunction *new_native(NativeImplementation impl, String *name, int arity) {
 Class *new_class(String *name) {
     Class *class = (Class *) allocate_object(sizeof(Class), OBJ_CLASS);
     class->name = name;
+    class->super_class = NULL;
     init_table(&class->methods);
     init_table(&class->static_fields);
     return class;

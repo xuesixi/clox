@@ -164,14 +164,12 @@ static inline void invoke_and_wait(String *name, int arg_count, NativeInterface 
 static void array_indexing_get() {
     // [arr, index]
     Value index_value = stack_pop();
-    if (!is_int(index_value)) {
-        runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
-    }
+    assert_value_type(index_value, VAL_INT, "int");
     Value arr_value = stack_pop();
     Array *array = as_array(arr_value);
     int index = as_int(index_value);
     if (index < 0 || index >= array->length) {
-        runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
+        throw_new_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [0, %d]", index, array->length - 1);
     }
     stack_push(array->values[index]);
 }
@@ -180,14 +178,12 @@ static void array_indexing_set() {
     // op: [array, index, value]
     Value value = stack_pop();
     Value index_value = stack_pop();
-    if (!is_int(index_value)) {
-        runtime_error_catch_1("%s is not an integer and cannot be used as an index", index_value);
-    }
+    assert_value_type(index_value, VAL_INT, "int");
     Value arr_value = stack_pop();
     Array *array = as_array(arr_value);
     int index = as_int(index_value);
     if (index < 0 || index >= array->length) {
-        runtime_error_and_catch("index %d is out of bound: [0, %d]", index, array->length - 1);
+        throw_new_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [0, %d]", index, array->length - 1);
     }
     array->values[index] = value;
     stack_push(value);
@@ -419,8 +415,7 @@ static void get_property(Value target, String *property_name) {
                 Module *module = as_module(target);
                 Value property;
                 if (!table_conditional_get(&module->globals, property_name, &property, true, false)) {
-                    runtime_error_catch_2("%s does not the have public property: %s", target,
-                                          ref_value((Object *) property_name));
+                    throw_new_runtime_error(Error_PropertyError, "PropertyError: no such public property: %s", property_name->chars);
                 } else {
                     stack_push(property);
                 }
@@ -428,7 +423,7 @@ static void get_property(Value target, String *property_name) {
             }
             OP_GET_PROPERTY_not_found:
             default:
-                runtime_error_catch_2("%s does not have the property: %s", target, ref_value((Object *) property_name));
+                throw_new_runtime_error(Error_PropertyError, "PropertyError: no such public property: %s", property_name->chars);
         }
     } else {
         switch (target.type) {
@@ -451,43 +446,17 @@ static void get_property(Value target, String *property_name) {
     }
 }
 
-void assert_ref_type(Value value, ObjectType type, const char *message) {
+inline void assert_ref_type(Value value, ObjectType type, const char *expected_type) {
     if (!is_ref_of(value, type)) {
-        char *str = value_to_chars(value, NULL);
-        runtime_error_and_catch("Expect value of type %s, but got %s", message, str);
-        free(str);
-        catch(INTERPRET_RUNTIME_ERROR);
+        throw_new_runtime_error(Error_TypeError, "TypeError: expect value of type: %s", expected_type );
     }
 }
 
-void assert_value_type(Value value, ValueType type, const char *message) {
+inline void assert_value_type(Value value, ValueType type, const char *expected_type) {
     if (value.type != type) {
-        char *str = value_to_chars(value, NULL);
-        runtime_error_and_catch("Expect value of type %s, but got %s", message, str);
-        free(str);
-        catch(INTERPRET_RUNTIME_ERROR);
+        throw_new_runtime_error(Error_TypeError, "TypeError: expect value of type: %s", expected_type );
     }
 }
-//
-//static void invoke_native_interface(int arg_count, NativeInterface interface) {
-//    Value receiver = stack_peek(arg_count);
-//    if (is_ref_of(receiver, OBJ_NATIVE_OBJECT)) {
-//        invoke_native_object(arg_count, interface, as_native_object(receiver));
-//        return;
-//    }
-//    switch (interface) {
-//        case INTER_EQUAL: {
-//            Value b = stack_pop();
-//            Value a = stack_pop();
-//            stack_push(bool_value(value_equal(a, b)));
-//            return;
-//        }
-//        default:
-//            goto error;
-//    }
-//    error:
-//    runtime_error_catch_1("%s does not support such operation", receiver);
-//}
 
 /**
  * 根据interface，执行native_object的对应行为。如果不匹配，该函数会导致runtime error
@@ -576,7 +545,7 @@ static void invoke_native_object(int arg_count, NativeInterface interface, Nativ
             goto error;
     }
     error:
-    runtime_error_catch_1("%s does not support such operation", ref_value((Object *) native_object));
+    throw_new_runtime_error(Error_TypeError, "TypeError: target does not support such operation");
 }
 
 /**
@@ -635,7 +604,7 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
                 break;
             }
             default:
-                runtime_error_catch_2("%s does not have the property: %s", receiver, ref_value((Object *) name));
+                throw_new_runtime_error(Error_PropertyError, "PropertyError: no such property: %s", name->chars);
         }
     } else {
         switch (receiver.type) {
@@ -654,9 +623,7 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
 
 static Value multi_dimension_array(int dimension, Value *lens) {
     Value len_value = *lens;
-    if (!is_int(len_value)) {
-        runtime_error_catch_1("%s cannot be used as the array length", len_value);
-    }
+    assert_value_type(len_value, VAL_INT, "int");
     int len = as_int(*lens);
     Array *arr;
     if (dimension == 1) {
@@ -727,7 +694,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error_and_catch("invalid binary operator");
+                throw_new_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
                 return;
         }
     } else if (is_float(a) && is_int(b)) {
@@ -753,7 +720,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error_and_catch("invalid binary operator");
+                throw_new_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
                 return;
         }
     } else if (is_float(a) && is_float(b)) {
@@ -779,7 +746,7 @@ static void binary_number_op(Value a, Value b, char operator) {
                 stack_push(bool_value(a_v < b_v));
                 break;
             default:
-                runtime_error_and_catch("invalid binary operator");
+                throw_new_runtime_error(Error_TypeError, "TypeError: operands do no support such operation");
                 return;
         }
     } else if (operator == '+' && (is_ref_of(a, OBJ_STRING) || is_ref_of(b, OBJ_STRING))) {
@@ -791,13 +758,7 @@ static void binary_number_op(Value a, Value b, char operator) {
         stack_push(ref_value(&str->object));
         return;
     } else {
-        throw_new_runtime_error(Error_ValueError, "the operands do no support the operation: %c", operator);
-//        char *a_text = value_to_chars(a, NULL);
-//        char *b_text = value_to_chars(b, NULL);
-//        runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
-//        free(a_text);
-//        free(b_text);
-//        catch(INTERPRET_RUNTIME_ERROR);
+        throw_new_runtime_error(Error_TypeError, "TypeError: the operands do no support the operation: %c", operator);
         return;
     }
 }
@@ -841,9 +802,68 @@ static inline Value stack_peek(int distance) {
     return vm.stack_top[-1 - distance];
 }
 
+static void print_error(Value value) {
+    Class *error_class = value_class(value);
+    if (is_ref_of(value, OBJ_INSTANCE) && is_subclass(error_class, Error)) {
+        Value temp;
+        Instance *err = as_instance(value);
+        table_get(&err->fields, MESSAGE, &temp);
+        String *message = as_string(temp);
+        table_get(&err->fields, POSITION, &temp);
+        String *position = as_string(temp);
+//        const char *error_type_str;
+//        if (err->class == TypeError) {
+//            error_type_str = "TypeError";
+//        } else if (err->class == IndexError) {
+//            error_type_str = "IndexError";
+//        } else if (err->class == ArgError) {
+//            error_type_str = "ArgError";
+//        } else if (err->class == NameError) {
+//            error_type_str = "NameError";
+//        } else if (err->class == PropertyError) {
+//            error_type_str = "PropertyError";
+//        } else if (err->class == ValueError) {
+//            error_type_str = "ValueError";
+//        } else if (err->class == FatalError) {
+//            error_type_str = "FatalError";
+//        } else if (err->class == CompileError) {
+//            error_type_str = "CompileError";
+//        } else if (err->class == IOError) {
+//            error_type_str = "IOError";
+//        } else if (err->class == Error) {
+//            error_type_str = "Error";
+//        } else {
+//            error_type_str = "Some Error";
+//        }
+//        printf("%s: %s\n%s", error_type_str, message->chars, position->chars);
+        printf("%s\n%s", message->chars, position->chars);
+    } else {
+        char *str = value_to_chars(value, NULL);
+        printf("A non-Error value is thrown: %s\n", str);
+        free(str);
+    }
+}
+
+/**
+ * 将虚拟机的状态复原为上一次try时所设置的TrySavePoint。
+ * 如果不存在try，使用longjmp()传递INTERPRET_RUNTIME_ERROR。
+ * @param value 被抛出的值。重置虚拟机后，将之置于栈顶。如果该值是一个Error, 那么在这里设置它的backtrace
+ */
 void throw_value(Value value) {
+
+    stack_push(value); // prevent gc
+
+    if (is_ref_of(value, OBJ_INSTANCE)) {
+        if (is_subclass(value_class(value), Error)) {
+            Instance *err = as_instance(value);
+            Value bt = native_backtrace(0, NULL);
+            table_add_new(&err->fields, POSITION, bt, true, false);
+        }
+    }
+
     TrySavePoint *last_save = vm.last_save;
     if (last_save == NULL) {
+        print_error(value);
         longjmp(error_buf, INTERPRET_RUNTIME_ERROR);
         return;
     }
@@ -859,6 +879,12 @@ void throw_value(Value value) {
     free(last_save);
 }
 
+/**
+ * 抛出的异常可以有两种：
+ * 1. 用户通过throw语句抛出的异常，throw_value()可以正确地调整虚拟机状态，处理这种情况。此时虚拟机只需要继续向下执行即可。
+ * 2. 虚拟机实现层面出现的异常（比如访问不存在的变量），这些操作常常嵌套在其他的虚拟机逻辑内部，throw_new_runtime_error()
+ * 被设计来处理这种情况，会调用catch来返回到上级，然后让上级重新调用run_frame_until()
+ */
 void throw_new_runtime_error(ErrorType type, const char *format, ...) {
     static char buf[RUNTIME_ERROR_VA_BUF_LEN];
     va_list args;
@@ -868,7 +894,7 @@ void throw_new_runtime_error(ErrorType type, const char *format, ...) {
 
     new_error(type, buf);
     Value err = stack_pop();
-    throw_value(err);
+    throw_value(err); // 如果没有try—savepoint，那么这个函数会直接导致虚拟机结束，而不会运行下一行的catch
     catch(INTERPRET_ERROR_CAUGHT);
 }
 
@@ -898,22 +924,6 @@ void runtime_error(const char *format, ...) {
     reset_stack();
 }
 
-void runtime_error_catch_1(const char *format, Value value) {
-    char *str = value_to_chars(value, NULL);
-    runtime_error(format, str);
-    free(str);
-    catch(INTERPRET_RUNTIME_ERROR);
-}
-
-void runtime_error_catch_2(const char *format, Value v1, Value v2) {
-    char *str1 = value_to_chars(v1, NULL);
-    char *str2 = value_to_chars(v2, NULL);
-    runtime_error(format, str1, str2);
-    free(str1);
-    free(str2);
-    catch(INTERPRET_RUNTIME_ERROR);
-}
-
 /**
  * 跳转到错误处理处。
  * 该函数只应该用在runtime_error()后面。
@@ -921,35 +931,6 @@ void runtime_error_catch_2(const char *format, Value v1, Value v2) {
 inline void catch(InterpretResult result) {
     longjmp(error_buf, result);
 }
-
-/**
- * 输出错误消息（会自动添加换行符）
- * 打印调用栈消息。清空栈。然后跳转至错误处理处
- */
-void runtime_error_and_catch(const char *format, ...) {
-    fputs("\nRuntime Error: ", stderr);
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-    fputs("\n", stderr);
-
-    for (int i = vm.frame_count - 1; i >= 0; i--) {
-        CallFrame *frame = vm.frames + i;
-        LoxFunction *function = frame->closure->function;
-        size_t index = frame->PC - frame->closure->function->chunk.code - 1;
-        int line = function->chunk.lines[index];
-        fprintf(stderr, "at [line %d] in ", line);
-        if (i == 0) {
-            fprintf(stderr, "main()\n");
-        } else {
-            fprintf(stderr, "%s()\n", function->name->chars);
-        }
-    }
-    reset_stack();
-    catch(INTERPRET_RUNTIME_ERROR);
-}
-
 /**
  * 读取curr_frame的下一个字节，然后移动PC
  * @return 下一个字节
@@ -975,7 +956,6 @@ static inline uint16_t read_uint16() {
 
 static inline Value read_constant16() {
     return curr_const_pool[read_uint16()];
-//    return curr_frame->closure->function->chunk.constants.values[read_uint16()];
 }
 
 /**
@@ -1045,9 +1025,8 @@ static void close_upvalue(Value *position) {
 static Method *bind_method(Class *class, String *name, Value receiver) {
     Value value;
     if (class == NULL || table_get(&class->methods, name, &value) == false) {
-        runtime_error_and_catch("no such property: %s", name->chars);
-//        throw_new_runtime_error(Error_PropertyError, "No such property: %s", name->chars);
-//        return NULL;
+        throw_new_runtime_error(Error_PropertyError, "PropertyError: no such property: %s", name->chars);
+        return NULL;
     } else {
         Method *method = new_method(as_closure(value), receiver);
         return method;
@@ -1066,8 +1045,7 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
     // code: op, name_index, arg_count
     Value closure_value;
     if (!table_get(&class->methods, name, &closure_value)) {
-        Value receiver = stack_peek(arg_count);
-        runtime_error_catch_2("%s does not have the property or method: %s", receiver, ref_value((Object *) name));
+        throw_new_runtime_error(Error_PropertyError, "PropertyError: no such property: %s", name->chars);
     }
     call_closure(as_closure(closure_value), arg_count);
 }
@@ -1095,24 +1073,24 @@ static void call_closure(Closure *closure, int arg_count) {
                 if (num_absence == -1) {
                     Value top = stack_peek(0);
                     if (!is_ref_of(top, OBJ_ARRAY)) {
-                        runtime_error_catch_1("cannot use a non-array value: %s as var arg", top);
+                        throw_new_runtime_error(Error_ArgError, "ArgError: cannot use a non-array value as var arg");
                     }
                 } else {
-                    runtime_error_and_catch("too many arguments when using an array as the var arg");
+                    throw_new_runtime_error(Error_ArgError, "ArgError: too many arguments when using an array as the var arg");
                 }
             } else {
                 build_array(-num_absence);
             }
         } else {
-            runtime_error_and_catch("%s expects at most %d arguments, but got %d", function->name->chars,
+            throw_new_runtime_error(Error_ArgError, "ArgError: %s expects at most %d arguments, but got %d", function->name->chars,
                                     fixed_arg_count + optional_arg_count, arg_count);
         }
     } else {
-        runtime_error_and_catch("%s expects at least %d arguments, but got %d", function->name->chars, fixed_arg_count,
+        throw_new_runtime_error(Error_ArgError, "ArgError: %s expects at least %d arguments, but got %d", function->name->chars, fixed_arg_count,
                                 arg_count);
     }
     if (vm.frame_count == FRAME_MAX) {
-        runtime_error_and_catch("Stack overflow.");
+        throw_new_runtime_error(Error_FatalError, "FatalError: Stack overflow");
     }
     vm.frame_count++;
     curr_frame = vm.frames + vm.frame_count - 1;
@@ -1131,7 +1109,7 @@ static void call_closure(Closure *closure, int arg_count) {
  */
 static void call_value(Value value, int arg_count) {
     if (!is_ref(value)) {
-        runtime_error_catch_1("%s is not callable", value);
+        throw_new_runtime_error(Error_TypeError, "TypeError: Calling a non-callable value");
     }
     switch (as_ref(value)->type) {
         case OBJ_CLOSURE: {
@@ -1141,7 +1119,7 @@ static void call_value(Value value, int arg_count) {
         case OBJ_NATIVE: {
             NativeFunction *native = as_native(value);
             if (native->arity != arg_count && native->arity != -1) {
-                runtime_error_and_catch("%s expects %d arguments, but got %d", native->name->chars, native->arity,
+                throw_new_runtime_error(Error_ArgError, "ArgError: %s expects %d arguments, but got %d", native->name->chars, native->arity,
                                         arg_count);
             }
             Value result = native->impl(arg_count, vm.stack_top - arg_count);
@@ -1157,7 +1135,7 @@ static void call_value(Value value, int arg_count) {
                 Method *initializer = new_method(as_closure(init_closure), ref_value((Object *) instance));
                 call_value(ref_value((Object *) initializer), arg_count);
             } else if (arg_count != 0) {
-                runtime_error_and_catch("%s does not define init() but got %d arguments", class->name->chars,
+                throw_new_runtime_error(Error_ArgError, "ArgError: %s does not define init() but got %d arguments", class->name->chars,
                                         arg_count);
             } else {
                 stack_pop();
@@ -1172,7 +1150,7 @@ static void call_value(Value value, int arg_count) {
             break;
         }
         default: {
-            runtime_error_catch_1("%s is not callable", value);
+            throw_new_runtime_error(Error_TypeError, "TypeError: Calling a non-callable value");
         }
     }
 }
@@ -1245,7 +1223,7 @@ static void import(const char *src, String *path) {
     LoxFunction *function = compile(src);
 
     if (function == NULL) {
-        runtime_error_and_catch("the module fails to compile");
+        throw_new_runtime_error(Error_CompileError, "CompileError: the module fails to compile");
         return;
     }
 
@@ -1465,7 +1443,7 @@ static InterpretResult run_frame_until(int end_when) {
                     stack_push(float_value(-as_float(stack_pop())));
                     break;
                 } else {
-                    runtime_error_and_catch("the value of type: %d is cannot be negated", value.type);
+                    throw_new_runtime_error(Error_TypeError, "TypeError: the value of cannot be negated");
                 }
                 break;
             }
@@ -1505,7 +1483,7 @@ static InterpretResult run_frame_until(int end_when) {
                 if (is_number(a) && is_number(b)) {
                     stack_push(float_value(pow(AS_NUMBER(a), AS_NUMBER(b))));
                 } else {
-                    runtime_error_catch_2("the operands, %s and %s, do not support the power operation", a, b);
+                    throw_new_runtime_error(Error_TypeError, "TypeError: the operands do not support the power operation");
                 }
                 break;
             }
@@ -1564,7 +1542,7 @@ static InterpretResult run_frame_until(int end_when) {
             case OP_DEF_GLOBAL: {
                 String *name = read_constant_string();
                 if (!table_add_new(curr_closure_global, name, stack_peek(0), false, false)) {
-                    runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
+                    throw_new_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
                 break;
@@ -1572,7 +1550,7 @@ static InterpretResult run_frame_until(int end_when) {
             case OP_DEF_GLOBAL_CONST: {
                 String *name = read_constant_string();
                 if (!table_add_new(curr_closure_global, name, stack_peek(0), false, true)) {
-                    runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
+                    throw_new_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
                 break;
@@ -1580,7 +1558,7 @@ static InterpretResult run_frame_until(int end_when) {
             case OP_DEF_PUB_GLOBAL: {
                 String *name = read_constant_string();
                 if (!table_add_new(curr_closure_global, name, stack_peek(0), true, false)) {
-                    runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
+                    throw_new_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
                 break;
@@ -1588,7 +1566,7 @@ static InterpretResult run_frame_until(int end_when) {
             case OP_DEF_PUB_GLOBAL_CONST: {
                 String *name = read_constant_string();
                 if (!table_add_new(curr_closure_global, name, stack_peek(0), true, true)) {
-                    runtime_error_and_catch("re-defining the existent global variable %s", name->chars);
+                    throw_new_runtime_error(Error_NameError, "NameError: re-defining the existent global variable %s", name->chars);
                 }
                 stack_pop();
                 break;
@@ -1601,7 +1579,7 @@ static InterpretResult run_frame_until(int end_when) {
                 } else if (table_get(&vm.builtin, name, &value)) {
                     stack_push(value);
                 } else {
-                    runtime_error_and_catch("Accessing an undefined variable: %s", name->chars);
+                    throw_new_runtime_error(Error_NameError, "NameError: accessing an undefined variable: %s", name->chars);
                 }
                 break;
             }
@@ -1610,9 +1588,9 @@ static InterpretResult run_frame_until(int end_when) {
                 char result = table_set_existent(curr_closure_global, name, stack_peek(0), false);
                 if (result != 0) {
                     if (result == 1) {
-                        runtime_error_and_catch("Setting an undefined variable: %s", name->chars);
+                        throw_new_runtime_error(Error_NameError, "NameError: setting an undefined variable: %s", name->chars);
                     } else {
-                        runtime_error_and_catch("Setting a const variable: %s", name->chars);
+                        throw_new_runtime_error(Error_NameError, "NameError: setting a const variable: %s", name->chars);
                     }
                 }
                 break;
@@ -1735,8 +1713,8 @@ static InterpretResult run_frame_until(int end_when) {
                     if (is_ref_of(target, OBJ_CLASS)) {
                         Class *class = as_class(target);
                         if (table_set_existent(&class->static_fields, property_name, value, false)) {
-                            runtime_error_catch_2("%s does not have the static field: %s", ref_value((Object *) class),
-                                                  ref_value((Object *) property_name));
+                            throw_new_runtime_error(Error_PropertyError, "PropertyError: %s does not have the static field: %s", class->name->chars,
+                                                  property_name->chars);
                         }
                         break;
                     } else if (is_ref_of(target, OBJ_MODULE)) {
@@ -1746,14 +1724,14 @@ static InterpretResult run_frame_until(int end_when) {
                             case 0:
                                 break;
                             case 1:
-                                runtime_error_catch_2("%s does not have the property: %s", target,
-                                                      ref_value((Object *) property_name));
+                                throw_new_runtime_error(Error_PropertyError, "PropertyError: does not find the property: %s",
+                                                      property_name->chars);
                                 break;
                             case 2:
-                                runtime_error_and_catch("cannot modify the const property: %s", property_name->chars);
+                                throw_new_runtime_error(Error_PropertyError, "PropertyError: cannot modify the const property: %s", property_name->chars);
                                 break;
                             case 3:
-                                runtime_error_and_catch("cannot access the non-public property: %s",
+                                throw_new_runtime_error(Error_PropertyError, "PropertyError: cannot access the non-public property: %s",
                                                         property_name->chars);
                                 break;
                             default:
@@ -1761,8 +1739,8 @@ static InterpretResult run_frame_until(int end_when) {
                                 break;
                         }
                     } else {
-                        runtime_error_catch_2("%s does not have the property: %s", target,
-                                              ref_value((Object *) property_name));
+                        throw_new_runtime_error(Error_PropertyError, "PropertyError: does not find the property: %s",
+                                              property_name->chars);
                     }
                 } else {
                     Instance *instance = as_instance(target);
@@ -1793,10 +1771,11 @@ static InterpretResult run_frame_until(int end_when) {
                 //  super,sub,top
                 Value super = stack_peek(1);
                 if (!is_ref_of(super, OBJ_CLASS)) {
-                    runtime_error_catch_1("%s cannot be used as a super class", super);
+                    throw_new_runtime_error(Error_TypeError, "TypeError: the value cannot be used as a super class");
                 }
                 Class *sub = as_class(stack_peek(0));
                 Class *super_class = as_class(super);
+                sub->super_class = super_class;
                 table_add_all(&super_class->methods, &sub->methods, false);
                 stack_pop();
                 // super, top
@@ -1849,7 +1828,7 @@ static InterpretResult run_frame_until(int end_when) {
                 } else if (is_ref_of(target, OBJ_MAP)) {
                     map_indexing_get();
                 } else {
-                    runtime_error_catch_1("%s does not support indexing", target);
+                    throw_new_runtime_error(Error_TypeError, "TypeError: TypeError: the value does not support indexing");
                 }
                 break;
             }
@@ -1861,7 +1840,7 @@ static InterpretResult run_frame_until(int end_when) {
                 } else if (is_ref_of(target, OBJ_MAP)) {
                     map_indexing_set(false);
                 } else {
-                    runtime_error_catch_1("%s does not support indexing", target);
+                    throw_new_runtime_error(Error_TypeError, "TypeError: the value does not support indexing");
                 }
                 break;
             }
@@ -1890,7 +1869,7 @@ static InterpretResult run_frame_until(int end_when) {
                 char *resolved_path = resolve_path(relative_path);
                 char *src = read_file(resolved_path);
                 if (src == NULL) {
-                    runtime_error_and_catch("error when reading the file %s (%s)\n", resolved_path, relative_path);
+                    throw_new_runtime_error(Error_IOError, "IOError: error when reading the file %s (%s)\n", resolved_path, relative_path);
                 }
                 free(relative_path);
                 String *path_string = auto_length_string_copy(resolved_path);
@@ -1919,7 +1898,7 @@ static InterpretResult run_frame_until(int end_when) {
                 String *name = read_constant_string();
                 Entry *entry = table_find_entry(&curr_frame->module->globals, name, false, false);
                 if (entry->key == NULL && is_bool(entry->value)) {
-                    runtime_error_and_catch("No such global variable: %s", name->chars);
+                    throw_new_runtime_error(Error_NameError, "NameError: no such variable: %s", name->chars);
                 } else {
                     entry->is_public = true;
                 }
@@ -1988,7 +1967,7 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             }
             default: {
-                runtime_error_and_catch("unrecognized instruction");
+                IMPLEMENTATION_ERROR("unrecognized instruction");
                 break;
             }
         }
