@@ -43,6 +43,7 @@ extern Module *repl_module;
 extern jmp_buf error_buf;
 
 typedef enum InterpretResult{
+    INTERPRET_0,
     INTERPRET_EXECUTE_OK,
     INTERPRET_PRODUCE_OK,
     INTERPRET_COMPILE_ERROR,
@@ -52,6 +53,7 @@ typedef enum InterpretResult{
     INTERPRET_BYTECODE_DISASSEMBLE_ERROR,
     INTERPRET_BYTECODE_DISASSEMBLE_OK,
     INTERPRET_REPL_EXIT,
+    INTERPRET_ERROR_CAUGHT,
 } InterpretResult;
 
 extern VM vm;
@@ -63,7 +65,6 @@ InterpretResult produce(const char *src, const char *path);
 InterpretResult read_run_bytecode(const char *path);
 InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const char *path);
 InterpretResult disassemble_byte_code(const char *path);
-
 
 void assert_ref_type(Value value, ObjectType type, const char *message);
 void assert_value_type(Value value, ValueType type, const char *message);

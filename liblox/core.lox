@@ -181,6 +181,7 @@ class Error {
     init(message, value = nil) {
         this.message = message;
         this.value = value;
+        this.position = backtrace();
     }
 }
 
@@ -189,8 +190,10 @@ class IndexError: Error {} // index out of bound
 class ArgError: Error {} // arg number does work match param number
 class NameError: Error {} // no such variable
 class PeopertyError: Error {} // no such property
+class ValueError: Error {}
 
 export 
 Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, Closure, Map,
-concat, join, string_join, benchmark, Error
+concat, join, string_join, benchmark, 
+Error, TypeError, IndexError, ArgError, NameError, PeopertyError, ValueError
 ;

@@ -14,7 +14,6 @@
 #define FNV_PRIME 16777619
 #define FNV_OFFSET_BASIS 2166136261
 
-
 Class *array_class;
 Class *string_class;
 Class *int_class;
@@ -30,6 +29,14 @@ Class *nil_class;
 Class *module_class;
 Class *native_object_class;
 
+Class *Error;
+Class *TypeError;
+Class *IndexError;
+Class *ArgError;
+Class *NameError;
+Class *PropertyError;
+Class *ValueError;
+
 String *INIT = NULL;
 String *LENGTH = NULL;
 String *ITERATOR = NULL;
@@ -37,21 +44,80 @@ String *HAS_NEXT = NULL;
 String *NEXT = NULL;
 String *EQUAL = NULL;
 String *HASH = NULL;
+String *MESSAGE = NULL;
+String *POSITION = NULL;
 
-String *ARRAY_CLASS = NULL;
-String *STRING_CLASS = NULL;
-String *INT_CLASS = NULL;
-String *FLOAT_CLASS = NULL;
-String *BOOL_CLASS = NULL;
-String *NATIVE_CLASS = NULL;
-String *FUNCTION_CLASS = NULL;
-String *MAP_CLASS = NULL;
-String *CLOSURE_CLASS = NULL;
-String *METHOD_CLASS = NULL;
-String *MODULE_CLASS = NULL;
-String *CLASS_CLASS = NULL;
-String *NIL_CLASS = NULL;
-String *NATIVE_OBJECT_CLASS = NULL;
+
+static Value native_backtrace(int count, Value *value) {
+    (void ) count;
+    (void ) value;
+    int total_len = 0;
+    char **css = malloc(sizeof(char *) * vm.frame_count);
+    int *lens = malloc(sizeof(int) * vm.frame_count);
+
+    for (int i = vm.frame_count - 1; i >= 0; i--) {
+        CallFrame *frame = vm.frames + i;
+        LoxFunction *function = frame->closure->function;
+        size_t index = frame->PC - frame->closure->function->chunk.code - 1;
+        int line = function->chunk.lines[index];
+        char *name = value_to_chars(ref_value((Object *) frame->closure), NULL);
+        lens[i] = asprintf(css + i, "at [line %d] in %s\n", line, name);
+        free(name);
+        total_len += lens[i];
+    }
+    char *result = malloc(total_len + 1);
+    char *curr = result;
+    for (int i = vm.frame_count - 1; i >= 0; i --) {
+        memcpy(curr, css[i], lens[i]);
+        curr += lens[i];
+        free(css[i]);
+    }
+    result[total_len] = '\0';
+    free(css);
+    free(lens);
+    String *str = string_copy(result, total_len);
+    return ref_value((Object *) str);
+}
+
+/**
+ * 生成一个新的指定类型的error对象，然后将其置入栈顶。
+ */
+void new_error(ErrorType type, const char *message) {
+    Class *error_class;
+    switch (type) {
+        case Error_Error:
+            error_class = Error;
+            break;
+        case Error_IndexError:
+            error_class = IndexError;
+            break;
+        case Error_NameError:
+            error_class = NameError;
+            break;
+        case Error_PropertyError:
+            error_class = PropertyError;
+            break;
+        case Error_TypeError:
+            error_class = TypeError;
+            break;
+        case Error_ValueError:
+            error_class = ValueError;
+            break;
+        case Error_ArgError:
+            error_class = ArgError;
+            break;
+    }
+    Instance *error_instance = new_instance(error_class);
+    stack_push(ref_value((Object *)error_instance));
+    String *message_str = auto_length_string_copy(message);
+    stack_push(ref_value((Object *) message_str));
+    Value bt = native_backtrace(0, NULL);
+    stack_push(bt); // err, message, bt
+    table_set(&error_instance->fields, MESSAGE, ref_value((Object*) message_str));
+    table_set(&error_instance->fields, POSITION, bt);
+    stack_pop();
+    stack_pop();
+}
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
     int len = (int) strlen(name);
@@ -74,62 +140,70 @@ void load_libraries() {
         if (load_bytes_into_builtin(liblox_core, liblox_core_len, "lib_core") != INTERPRET_EXECUTE_OK) {
             exit(1);
         }
-        Value array_class_value;
-        Value string_class_value;
-        Value int_class_value;
-        Value float_class_value;
-        Value bool_class_value;
-        Value native_class_value;
-        Value class_class_value;
-        Value function_class_value;
-        Value closure_class_value;
-        Value method_class_value;
-        Value module_class_value;
-        Value nil_class_value;
-        Value map_class_value;
-        Value native_object_class_value;
+        Value class_value;
 
-        table_get(&vm.builtin, ARRAY_CLASS, &array_class_value);
-        array_class = as_class(array_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Array"), &class_value);
+        array_class = as_class(class_value);
 
-        table_get(&vm.builtin, STRING_CLASS, &string_class_value);
-        string_class = as_class(string_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("String"), &class_value);
+        string_class = as_class(class_value);
 
-        table_get(&vm.builtin, INT_CLASS, &int_class_value);
-        int_class = as_class(int_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Int"), &class_value);
+        int_class = as_class(class_value);
 
-        table_get(&vm.builtin, FLOAT_CLASS, &float_class_value);
-        float_class = as_class(float_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Float"), &class_value);
+        float_class = as_class(class_value);
 
-        table_get(&vm.builtin, BOOL_CLASS, &bool_class_value);
-        bool_class = as_class(bool_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Bool"), &class_value);
+        bool_class = as_class(class_value);
 
-        table_get(&vm.builtin, NATIVE_CLASS, &native_class_value);
-        native_class = as_class(native_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Native"), &class_value);
+        native_class = as_class(class_value);
 
-        table_get(&vm.builtin, CLASS_CLASS, &class_class_value);
-        class_class = as_class(class_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Class"), &class_value);
+        class_class = as_class(class_value);
 
-        table_get(&vm.builtin, FUNCTION_CLASS, &function_class_value);
-        function_class = as_class(function_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Function"), &class_value);
+        function_class = as_class(class_value);
 
-        table_get(&vm.builtin, CLOSURE_CLASS, &closure_class_value);
-        closure_class= as_class(closure_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Closure"), &class_value);
+        closure_class= as_class(class_value);
 
-        table_get(&vm.builtin, METHOD_CLASS, &method_class_value);
-        method_class = as_class(method_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Method"), &class_value);
+        method_class = as_class(class_value);
 
-        table_get(&vm.builtin, MODULE_CLASS, &module_class_value);
-        module_class = as_class(module_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Module"), &class_value);
+        module_class = as_class(class_value);
 
-        table_get(&vm.builtin, NIL_CLASS, &nil_class_value);
-        nil_class = as_class(nil_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Nil"), &class_value);
+        nil_class = as_class(class_value);
 
-        table_get(&vm.builtin, MAP_CLASS, &map_class_value);
-        map_class = as_class(map_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("Map"), &class_value);
+        map_class = as_class(class_value);
 
-        table_get(&vm.builtin, NATIVE_OBJECT_CLASS, &native_object_class_value);
-        native_class = as_class(native_object_class_value);
+        table_get(&vm.builtin, auto_length_string_copy("NativeObject"), &class_value);
+        native_object_class = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("Error"), &class_value);
+        Error = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("TypeError"), &class_value);
+        TypeError = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("ArgError"), &class_value);
+        ArgError = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("IndexError"), &class_value);
+        IndexError = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("NameError"), &class_value);
+        NameError = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("PropertyError"), &class_value);
+        PropertyError = as_class(class_value);
+
+        table_get(&vm.builtin, auto_length_string_copy("ValueError"), &class_value);
+        ValueError = as_class(class_value);
 
     }
     preload_finished = true;
@@ -567,6 +641,7 @@ void init_vm_native() {
     define_native("native_map_iter", native_map_iter, 1);
     define_native("native_general_hash", general_hash, 1);
     define_native("native_value_equal", native_value_equal, 2);
+    define_native("backtrace", native_backtrace, 0);
 }
 
 void additional_repl_init() {
@@ -582,20 +657,7 @@ void init_static_strings() {
     NEXT = auto_length_string_copy("next");
     EQUAL = auto_length_string_copy("equal");
     HASH = auto_length_string_copy("hash");
-
-    ARRAY_CLASS = auto_length_string_copy("Array");
-    STRING_CLASS = auto_length_string_copy("String");
-    INT_CLASS = auto_length_string_copy("Int");
-    FLOAT_CLASS = auto_length_string_copy("Float");
-    BOOL_CLASS = auto_length_string_copy("Bool");
-    NATIVE_CLASS = auto_length_string_copy("Native");
-    FUNCTION_CLASS = auto_length_string_copy("Function");
-    CLOSURE_CLASS = auto_length_string_copy("Closure");
-    METHOD_CLASS = auto_length_string_copy("Method");
-    MAP_CLASS = auto_length_string_copy("Map");
-    MODULE_CLASS = auto_length_string_copy("Module");
-    CLASS_CLASS = auto_length_string_copy("Class");
-    NIL_CLASS = auto_length_string_copy("Nil");
-    NATIVE_OBJECT_CLASS = auto_length_string_copy("NativeObject");
+    MESSAGE = auto_length_string_copy("message");
+    POSITION = auto_length_string_copy("position");
 }
 

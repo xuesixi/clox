@@ -67,8 +67,6 @@ static void close_upvalue(Value *position);
 
 static void invoke_native_object(int arg_count, NativeInterface interface, NativeObject *native_object);
 
-//static inline void new_try_save_point(int offset) {
-//}
 
 /**
  * 根据vm.frame_count来更新curr_frame, 然后根据curr_frame来更新curr_const_pool以及curr_closure_global
@@ -793,12 +791,13 @@ static void binary_number_op(Value a, Value b, char operator) {
         stack_push(ref_value(&str->object));
         return;
     } else {
-        char *a_text = value_to_chars(a, NULL);
-        char *b_text = value_to_chars(b, NULL);
-        runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
-        free(a_text);
-        free(b_text);
-        catch(INTERPRET_RUNTIME_ERROR);
+        throw_new_runtime_error(Error_ValueError, "the operands do no support the operation: %c", operator);
+//        char *a_text = value_to_chars(a, NULL);
+//        char *b_text = value_to_chars(b, NULL);
+//        runtime_error("the operands, %s and %s, do not support the operation: %c", a_text, b_text, operator);
+//        free(a_text);
+//        free(b_text);
+//        catch(INTERPRET_RUNTIME_ERROR);
         return;
     }
 }
@@ -860,6 +859,18 @@ void throw_value(Value value) {
     free(last_save);
 }
 
+void throw_new_runtime_error(ErrorType type, const char *format, ...) {
+    static char buf[RUNTIME_ERROR_VA_BUF_LEN];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, RUNTIME_ERROR_VA_BUF_LEN, format, args);
+    va_end(args);
+
+    new_error(type, buf);
+    Value err = stack_pop();
+    throw_value(err);
+    catch(INTERPRET_ERROR_CAUGHT);
+}
 
 /**
  * 输出错误消息（会自动添加换行符）
@@ -1035,9 +1046,12 @@ static Method *bind_method(Class *class, String *name, Value receiver) {
     Value value;
     if (class == NULL || table_get(&class->methods, name, &value) == false) {
         runtime_error_and_catch("no such property: %s", name->chars);
+//        throw_new_runtime_error(Error_PropertyError, "No such property: %s", name->chars);
+//        return NULL;
+    } else {
+        Method *method = new_method(as_closure(value), receiver);
+        return method;
     }
-    Method *method = new_method(as_closure(value), receiver);
-    return method;
 }
 
 
@@ -1197,20 +1211,6 @@ void free_VM() {
     free(vm.gray_stack);
 }
 
-///**
-// * 将value置于stack_top处，然后自增stack_top
-// * @param value 想要添加的value
-// */
-//inline void stack_push(Value value) {
-//    *vm.stack_top = value;
-//    vm.stack_top++;
-//}
-//
-//inline Value stack_pop() {
-//    vm.stack_top--;
-//    return *(vm.stack_top);
-//}
-
 /**
  * 调用 compile() 将源代码编译成一个function，构造一个closure，设置栈帧，
  * 将closure置入栈中，然后用run()运行代码，返回其结果。
@@ -1231,11 +1231,13 @@ InterpretResult interpret(const char *src, const char *path) {
     warmup(function, path, NULL, true);
 
     InterpretResult error;
-    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
-        return error;
+
+    error = setjmp(error_buf);
+    if (error == INTERPRET_0 || error == INTERPRET_ERROR_CAUGHT) {
+        error = run_frame_until(0);
     }
 
-    return run_frame_until(0);
+    return error;
 }
 
 static void import(const char *src, String *path) {
@@ -1324,19 +1326,30 @@ InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const 
 
     warmup(function, path, NULL, false);
 
+//    InterpretResult error;
+//    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
+//        return error;
+//    }
+//
+//    InterpretResult result = run_frame_until(0);
+//    if (result == INTERPRET_EXECUTE_OK) {
+//    } else {
+//        IMPLEMENTATION_ERROR("Error when loading lib");
+//    }
+//
+//    return result;
+
     InterpretResult error;
-    if ((error = setjmp(error_buf)) != INTERPRET_EXECUTE_OK) {
-        return error;
-    }
 
-    InterpretResult result = run_frame_until(0);
-    if (result == INTERPRET_EXECUTE_OK) {
+    error = setjmp(error_buf);
+    if (error == INTERPRET_0 || error == INTERPRET_ERROR_CAUGHT) {
+        error = run_frame_until(0);
+    }
+    if (error == INTERPRET_EXECUTE_OK) {
         table_add_all(curr_closure_global, &vm.builtin, true);
-    } else {
-        IMPLEMENTATION_ERROR("Error when loading lib");
     }
 
-    return result;
+    return error;
 }
 
 
@@ -1426,14 +1439,11 @@ static InterpretResult run_frame_until(int end_when) {
                 vm.stack_top = curr_frame->FP;
                 close_upvalue(vm.stack_top);
                 vm.frame_count--;
-//                curr_frame = vm.frames + vm.frame_count - 1;
                 if (vm.frame_count == TRACE_SKIP) {
                     TRACE_SKIP = -1; // no skip. Step by step
                 }
                 if (vm.frame_count != 0) {
                     sync_frame_cache();
-//                    curr_const_pool = curr_frame->closure->function->chunk.constants.values;
-//                    curr_closure_global = &curr_frame->closure->module_of_define->globals;
                     stack_push(result);
                 }
                 if (vm.frame_count == end_when) {
