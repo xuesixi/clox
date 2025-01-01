@@ -615,6 +615,22 @@ static inline void mark_initialized() {
     }
 }
 
+static void parse_type_hint() {
+    // var num: Int|Float ! = 10;
+    // var num: @Int|Float = 10;
+    // var num: @[Int, Int, Int]
+    // var num = 10 @Int;
+    // var num = rand_int(2, 3) @Int;
+    // fun hey(input: String = "name")
+    // fun hey(input = "name": @String)
+    // [Int, Int]
+    // var nums: int[], [][], Int,
+    // num: !Int = 10;
+    do {
+        consume(TOKEN_IDENTIFIER, "Expect identifier for type hint");
+    } while (!check(TOKEN_EOF) && match(TOKEN_PIPE));
+}
+
 /**
  * 解析函数的参数列表和函数体，但不包括函数名的申明。将函数储存入常数中，然后产生op-closure以及upvalue指令
  */
@@ -635,6 +651,10 @@ static void function_statement(FunctionType type) {
         do {
             parse_identifier_declaration(false);
             mark_initialized();
+
+            if (match(TOKEN_COLON)) {
+                parse_type_hint();
+            }
 
             // var arg
             if (match(TOKEN_DOT_DOT_DOT)) {
@@ -672,6 +692,11 @@ static void function_statement(FunctionType type) {
     }
 
     consume(TOKEN_RIGHT_PAREN, "Expect ) after parameters");
+
+    if (match(TOKEN_COLON)) {
+        parse_type_hint();
+    }
+
     consume(TOKEN_LEFT_BRACE, "Expect { to start the function body");
 
     // 函数体
@@ -713,6 +738,10 @@ static void var_declaration(bool is_public) {
 
     int index = parse_identifier_declaration(false);
 
+    if (match(TOKEN_COLON)) {
+        parse_type_hint();
+    }
+
     if (match(TOKEN_EQUAL)) {
         expression();
     } else {
@@ -736,6 +765,11 @@ static void var_declaration(bool is_public) {
 static void const_declaration(bool is_public) {
 
     int index = parse_identifier_declaration(true);
+
+    if (match(TOKEN_COLON)) {
+        parse_type_hint();
+    }
+
     consume(TOKEN_EQUAL, "A const variable must be initialized");
     expression();
     consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the const statement");
