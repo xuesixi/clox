@@ -1,4 +1,10 @@
+
+#if defined(__linux__)
+#define _GNU_SOURCE
+#endif
+
 #include "readline/readline.h"
+#include <readline/history.h>
 #include "stdlib.h"
 #include <unistd.h>
 #include "memory.h"
@@ -9,7 +15,7 @@
 
 #define REPL_FILE_NAME "LOX_REPL"
 
-char OUTPUT_PATH[100];
+char OUTPUT_PATH[PATH_MAX];
 
 bool COMPILE_ONLY = false;
 bool RUN_BYTECODE = false;
@@ -19,8 +25,8 @@ bool LOAD_LIB = true;
 bool preload_finished = false;
 bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
+
 int TRACE_SKIP = -1;
-bool SHOW_LABEL = false;
 jmp_buf consume_buf;
 
 static void print_result_with_color(InterpretResult result) {
@@ -216,11 +222,7 @@ static void main_disassemble_bytecode(const char *code_path) {
 int main(int argc, char *const argv[]) {
 
     init_VM();
-#ifdef JUST_SCRIPT
-    run_file(argv[1]);
-    return 0;
-#endif
-    char *options = "dlsc:bhnv";
+    char *options = "dsc:bhnv";
     int op;
     while ((op = getopt(argc, argv, options)) != -1) {
         switch (op) {
@@ -229,9 +231,6 @@ int main(int argc, char *const argv[]) {
                 break;
             case 's': // disassemble bytecode
                 SHOW_COMPILE_RESULT = true;
-                break;
-            case 'l': // unused
-                SHOW_LABEL = true;
                 break;
             case 'c': // compile only
                 COMPILE_ONLY = true;

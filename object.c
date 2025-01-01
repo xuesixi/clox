@@ -40,7 +40,7 @@ String *auto_length_string_copy(const char *name) {
 }
 
 /**
- * 如果同值的String不存在，使用给定的 char* 来产生一个 String。
+ * 如果同值的String不存在，使用（占据）给定的 char* 来产生一个 String。
  * 如果同值的String已经存在，那么不产生新的，而是直接返回旧有的，并free给定的chars
  * */
 String *string_allocate(char *chars, int length) {

@@ -1,4 +1,4 @@
-CFLAGS = -Wall -Wextra -Wformat -g 
+CFLAGS = -Wall -Wextra -g 
 SRC = chunk.c compiler.c debug.c io.c main.c memory.c object.c scanner.c table.c value.c vm.c native.c
 OBJ = $(SRC:.c=.o)
 TARGET = clox
@@ -41,3 +41,4 @@ clion_debug: $(OBJ)
 .PHONY: clean
 clean:
 	@rm -f *.o
+	@rm clox

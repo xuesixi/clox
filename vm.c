@@ -3,6 +3,7 @@
 //
 
 #include "vm.h"
+#include "libgen.h"
 #include "native.h"
 
 #include "compiler.h"
@@ -132,6 +133,7 @@ Class *value_class(Value value) {
             IMPLEMENTATION_ERROR("bad");
             return NULL;
     }
+    return NULL;
 }
 
 /**
@@ -1217,6 +1219,9 @@ InterpretResult interpret(const char *src, const char *path) {
     return error;
 }
 
+/**
+ * 根据给定的源代码，编译一个函数，然后将其设置为接下来要执行的closure
+ */
 static void import(const char *src, String *path) {
 
     LoxFunction *function = compile(src);
@@ -1850,16 +1855,32 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             }
             case OP_IMPORT: {
-                String *relative = as_string(stack_pop());
+                String *path = as_string(stack_pop());
+
                 char *relative_path;
-                asprintf(&relative_path, "%s/../%s", curr_frame->module->path->chars, relative->chars);
-                char *resolved_path = resolve_path(relative_path);
-                char *src = read_file(resolved_path);
+
+                char *curr_module_path;
+                asprintf(&curr_module_path, "%s", curr_frame->module->path->chars); // copy the string first, because dirname may modify it
+
+                char *curr_dir = dirname(curr_module_path);
+
+                printf("curr frame module dir: %s\n", curr_dir);
+
+                asprintf(&relative_path, "%s/%s", curr_dir, path->chars);
+
+                free(curr_module_path);
+
+                printf("relative path is %s\n", relative_path);
+
+                char *absolute_path = resolve_path(relative_path); // no need to free absolute_path
+
+                free(relative_path);
+
+                char *src = read_file(absolute_path);
                 if (src == NULL) {
-                    throw_user_level_runtime_error(Error_IOError, "IOError: error when reading the file %s (%s)\n", resolved_path, relative_path);
+                    throw_user_level_runtime_error(Error_IOError, "IOError: error when reading the file %s (%s)\n", absolute_path, path->chars);
                 } else {
-                    free(relative_path);
-                    String *path_string = auto_length_string_copy(resolved_path);
+                    String *path_string = auto_length_string_copy(absolute_path);
                     import(src, path_string);
                     free(src);
                 }
