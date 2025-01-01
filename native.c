@@ -73,6 +73,12 @@ static Value native_subclass_of(int count, Value *values) {
     return bool_value(res);
 }
 
+static Value native_is_object(int count, Value *value) {
+    (void ) count;
+    Value v = *value;
+    return bool_value(is_ref_of(v, OBJ_INSTANCE));
+}
+
 /**
  *
  * @param count class的数量。
@@ -723,6 +729,7 @@ void init_vm_native() {
     define_native("backtrace", native_backtrace, 0);
     define_native("value_of", native_value_of, 2);
     define_native("subclass_of", native_subclass_of, 2);
+    define_native("is_object", native_is_object, 1);
 }
 
 void additional_repl_init() {

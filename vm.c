@@ -204,6 +204,12 @@ static void array_indexing_set() {
 static void map_indexing_get() {
     // [map, key0]
     Map *map = as_map(stack_peek(1));
+    if (map->count == 0) {
+        stack_pop();
+        stack_pop();
+        throw_user_level_runtime_error(Error_IndexError, "IndexError: the key does not exist");
+        return;
+    }
     stack_push(stack_peek(0)); // [map, key0, key0]
     invoke_and_wait(HASH, 0, INTER_HASH);
     Value hash_result = stack_pop();
@@ -233,9 +239,10 @@ static void map_indexing_get() {
             }
         }
     }
+    // not found
     stack_pop();
     stack_pop();
-    stack_push(nil_value());
+    throw_user_level_runtime_error(Error_IndexError, "IndexError: the key does not exist");
 }
 
 /**
@@ -1314,9 +1321,11 @@ InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const 
     if (error == INTERPRET_0 || error == INTERPRET_ERROR_CAUGHT) {
         error = run_frame_until(0);
     }
+    vm.frame_count = 1; // so that the module at frames[0] won't be gc when doing table_add_all()
     if (error == INTERPRET_EXECUTE_OK) {
-        table_add_all(curr_closure_global, &vm.builtin, true);
+        table_add_all(&vm.frames[0].module->globals, &vm.builtin, true);
     }
+    vm.frame_count = 0;
 
     return error;
 }

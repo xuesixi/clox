@@ -118,6 +118,15 @@ class Map {
     equal(v) {
         return native_value_equal(this, v);
     }
+    get_or(key, default_value) {
+        var value;
+        try {
+            value = this[key];
+        } catch err: IndexError {
+            value = default_value;
+        }
+        return value;
+    }
 }
 
 class String {
