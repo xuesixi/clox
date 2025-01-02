@@ -95,7 +95,7 @@ class Class {
 
 class Array {
     iterator() {
-        return native_array_iter(this);
+        return native_array_iter(this, this.length);
     }
     join(delimiter = ", ", prefix = "[", suffix = "]") {
         return native_value_join(delimiter, prefix, suffix, this);
@@ -105,6 +105,11 @@ class Array {
     }
     equal(v) {
         return native_value_equal(this, v);
+    }
+    copy(start: Int = 0, end: Int = this.length, new_length: Int = end - start) {
+        var new_arr = [new_length];
+        array_copy(this, new_arr, start, 0, end - start);
+        return new_arr;
     }
 }
 
@@ -126,6 +131,9 @@ class Map {
             value = default_value;
         }
         return value;
+    }
+    delete(key) {
+        return map_delete(this, key);
     }
 }
 

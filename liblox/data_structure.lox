@@ -1,8 +1,7 @@
 // entry: (key, value, hash)
 // empty entry: both key and value are nil
 // del mark: key is nil, value is not nil
-
-export class HashMap {
+class HashMap {
     init() {
         this.size = 0;
         this.capacity = 0;
@@ -99,3 +98,105 @@ export class HashMap {
         }
     }
 }
+
+class Vector {
+
+    static with_capacity(capacity: Int) {
+        var vec = Vector();
+        vec.backing = [capacity];
+        return vec;
+    }
+
+    init(items...) {
+        if (items.length == 0) {
+            this.size = 0;
+            this.backing = [8];
+        } else {
+            this.size = items.length;
+            this.backing = items;
+        }
+    }
+
+    iterator() {
+        return native_array_iter(this.backing, this.size);
+    }
+
+    get(index: Int) {
+        if (index >= this.size) {
+            throw IndexError(f("Index # is out of bound [#, #]", index, 0, this.size - 1));
+        }
+        return this.backing[index];
+    }
+
+    set(index: Int, element) {
+        if (index >= this.size) {
+            throw IndexError(f("can only set element at index in range [#, #]", index, 0, this.size - 1));
+        }
+        this.backing[index] = element;
+    }
+
+    append(element) {
+        if (this.backing.length == this.size) {
+            var backing = this.backing;
+            var new_capacity = 2 * backing.length;
+            var new_backing = [new_capacity];
+            array_copy(backing, new_backing, 0, 0, backing.length);
+            new_backing[backing.length] = element;
+            this.backing = new_backing;
+        } else {
+            this.backing[this.size] = element;
+        }
+        this.size += 1;
+    }
+
+    add(element, index: Int = this.size) {
+        if (index < 0 or index > this.size) {
+            throw IndexError(f("can only add to index in range [#, #]", index, 0, this.size));
+        }
+        var backing = this.backing;
+        if (backing.length == this.size) {
+            var new_capacity = 2 * backing.length;
+            var new_backing = [new_capacity];
+            array_copy(backing, new_backing, 0, 0, index);
+            array_copy(backing, new_backing, index, index + 1, backing.length - index);
+            new_backing[index] = element;
+            this.backing = new_backing;
+        } else {
+            if (index != this.size) {
+                var move_length = this.size - index;
+                array_copy(this.backing, this.backing, index, index + 1, move_length);
+            }
+            backing[index] = element;
+        }
+        this.size += 1;
+    }
+
+    pop() {
+        if (this.size == 0) {
+            throw NoDataError("cannot pop from an empty vector");
+        }
+        return this.backing[this.size -= 1];
+    }
+
+    delete(index: Int = this.size - 1) {
+        if (this.size == 0) {
+            throw NoDataError("cannot delete from an empty vector");
+        }
+        if (index < 0 or index >= this.size) {
+            throw IndexError(f("can only delete at index in range [#, #]", index, 0, this.size - 1));
+        }
+        var move_length = this.size - 1 - index; 
+        var result = this.backing[index];
+        array_copy(this.backing, this.backing, index + 1, index, move_length);
+        this.size -= 1;
+        return result;
+    }
+}
+
+class NoDataError: Error {
+    init(message) {
+        this.message = ("NoDataError: " + message);
+    }
+}
+
+export HashMap, Vector, NoDataError;

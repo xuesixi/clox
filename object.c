@@ -217,7 +217,8 @@ Map *new_map() {
     Map *map = (Map *) allocate_object(sizeof(Map), OBJ_MAP);
     map->backing = NULL;
     map->capacity = 0;
-    map->count = 0;
+    map->active_count = 0;
+    map->del_count = 0;
     return map;
 }
 
@@ -229,7 +230,7 @@ inline bool map_empty_entry(MapEntry *entry) {
 }
 
 inline bool map_need_resize(Map *map) {
-    return map->count + 1 >= map->capacity * 0.75;
+    return (map->active_count + map->del_count + 1) >= map->capacity * 0.75;
 }
 
 /**

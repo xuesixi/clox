@@ -2,7 +2,7 @@ CFLAGS = -Wall -Wextra -g
 SRC = chunk.c compiler.c debug.c io.c main.c memory.c object.c scanner.c table.c value.c vm.c native.c
 OBJ = $(SRC:.c=.o)
 TARGET = clox
-LIB_HEADERS = liblox_iter.h liblox_core.h
+LIB_HEADERS = liblox_iter.h liblox_core.h liblox_data_structure.h
 C_HEADERS = chunk.h common.h compiler.h debug.h io.h memory.h native.h object.h scanner.h table.h value.h vm.h
 
 all: $(TARGET) $(LIB_HEADERS)

@@ -204,7 +204,7 @@ static void array_indexing_set() {
 static void map_indexing_get() {
     // [map, key0]
     Map *map = as_map(stack_peek(1));
-    if (map->count == 0) {
+    if (map->active_count == 0) {
         stack_pop();
         stack_pop();
         throw_user_level_runtime_error(Error_IndexError, "IndexError: the key does not exist");
@@ -254,7 +254,7 @@ static void map_indexing_set_with_hash(bool keep_map) {
     Map *map = as_map(stack_peek(3));
     Value hash_result = stack_pop(); // map, key0, value
     assert_value_type(hash_result, VAL_INT, "int");
-    MapEntry *mark = NULL;
+    MapEntry *del_mark = NULL;
 
     int hash = as_int(hash_result); // map, key0, value
     int index = MODULO(hash, map->capacity);
@@ -262,24 +262,25 @@ static void map_indexing_set_with_hash(bool keep_map) {
         int curr = MODULO(index + i, map->capacity);
         MapEntry *entry = map->backing + curr;
         if (map_empty_entry(entry)) {
-            if (mark == NULL) {
+            if (del_mark == NULL) {
                 entry->value = stack_pop(); // -> map, key0
                 entry->key = stack_pop(); //  -> [map]
                 entry->hash = hash;
-                map->count++;
+                map->active_count++;
                 if (!keep_map) {
                     stack_pop(); // -> [ ]
                     stack_push(entry->value); // -> [value]
                 }
                 return;
             } else {
-                mark->value = stack_pop();
-                mark->key = stack_pop(); // -> [map]
-                mark->hash = hash;
+                del_mark->value = stack_pop();
+                del_mark->key = stack_pop(); // -> [map]
+                del_mark->hash = hash;
                 if (!keep_map) {
                     stack_pop();
-                    stack_push(mark->value); // -> [value]
+                    stack_push(del_mark->value); // -> [value]
                 }
+                map->del_count --;
                 return;
             }
         } else if (entry->hash == hash) {
@@ -300,8 +301,8 @@ static void map_indexing_set_with_hash(bool keep_map) {
                 }
                 return;
             }
-        } else if (mark == NULL && map_del_mark(entry)) {
-            mark = entry;
+        } else if (del_mark == NULL && map_del_mark(entry)) {
+            del_mark = entry;
         }
     }
     runtime_error("map cannot find empty spot, this is an implementation error!");
@@ -335,17 +336,17 @@ static void map_indexing_set(bool keep_map) {
                 // map, k0, v, m2, k1, v1, hash1
                 map_indexing_set_with_hash(true);
                 // map, k0, v, m2
-//                map_indexing_set(true);
             }
         }
         // map, k0, v, m2
-        FREE_ARRAY(MapEntry, map->backing, map->count);
+        FREE_ARRAY(MapEntry, map->backing, map->capacity);
         map->backing = new_backing;
         map->capacity = new_capacity;
-        map->count = m2->count;
+        map->active_count = m2->active_count;
+        map->del_count = 0;
         m2->backing = NULL;
         m2->capacity = 0;
-        m2->count = 0;
+        m2->active_count = 0;
         stack_pop(); // map, k0, v
     }
 
@@ -355,6 +356,41 @@ static void map_indexing_set(bool keep_map) {
 
     map_indexing_set_with_hash(keep_map);
     // map | value
+}
+
+void map_delete() {
+    // [map, key] -> [map, key, value]
+    Map *map = as_map(stack_peek(1));
+    stack_push(stack_peek(0)); // [map, key, key]
+    invoke_and_wait(HASH, 0, INTER_HASH); // [map, key, hash]
+    Value hash_result = stack_pop(); // map, key0, value
+    assert_value_type(hash_result, VAL_INT, "int");
+    int hash = as_int(hash_result); // map, key0, value
+    int index = MODULO(hash, map->capacity);
+    for (int i = 0; i < map->capacity; ++i) {
+        int curr = MODULO(index + i, map->capacity);
+        MapEntry *entry = map->backing + curr;
+        if (map_empty_entry(entry)) {
+            throw_new_runtime_error(Error_IndexError, "IndexError: the key does not exist");
+            return;
+        } else if (entry->hash == hash) {
+            stack_push(entry->key); // map, key0, key1
+            stack_push(stack_peek(1)); // map, k0, k1, k0
+            invoke_and_wait(EQUAL, 1, INTER_EQUAL);
+            // map, k0, bool
+            Value eq_result = stack_pop(); // map, k0
+            assert_value_type(eq_result, VAL_BOOL, "bool");
+            bool eq = as_bool(eq_result);
+            if (eq) {
+                stack_push(entry->value); // [map, key, value]
+                map->active_count --;
+                map->del_count ++;
+                entry->key = absence_value();
+                return;
+            }
+        }
+    }
+    throw_new_runtime_error(Error_IndexError, "IndexError: the key does not exist");
 }
 
 /**
@@ -415,7 +451,7 @@ static void get_property(Value target, String *property_name) {
             case OBJ_MAP: {
                 if (property_name == LENGTH) {
                     Map *map = as_map(target);
-                    stack_push(int_value(map->count));
+                    stack_push(int_value(map->active_count));
                     break;
                 }
                 Value property;
@@ -504,7 +540,7 @@ static void invoke_native_object(int arg_count, NativeInterface interface, Nativ
                 case NativeArrayIter: {
                     // curr, array
                     stack_pop();
-                    bool has_next = as_int(native_object->values[0]) < as_array(native_object->values[1])->length;
+                    bool has_next = as_int(native_object->values[0]) < as_int(native_object->values[2]);
                     stack_push(bool_value(has_next));
                     return;
                 }
@@ -1873,13 +1909,9 @@ static InterpretResult run_frame_until(int end_when) {
 
                 char *curr_dir = dirname(curr_module_path);
 
-                printf("curr frame module dir: %s\n", curr_dir);
-
                 asprintf(&relative_path, "%s/%s", curr_dir, path->chars);
 
                 free(curr_module_path);
-
-                printf("relative path is %s\n", relative_path);
 
                 char *absolute_path = resolve_path(relative_path); // no need to free absolute_path
 

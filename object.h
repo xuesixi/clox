@@ -124,7 +124,8 @@ typedef struct MapEntry {
 
 typedef struct Map {
     Object object;
-    int count;
+    int active_count;
+    int del_count;
     int capacity;
     MapEntry *backing;
 } Map;

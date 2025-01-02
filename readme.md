@@ -26,7 +26,7 @@ Other options
     * e.g. `$ clox -b hello.byte`
 
 # The Lox Programming Language 
-(with many personal extensions)
+(***with some personal extensions***)
 
 ## basic
 
@@ -72,6 +72,7 @@ name = 10;
 ```
 
 ## scope
+
 `{}` creates a new scope. Variables in the inner scope can shadow variables in outer scopes with the same name. No varibales can have the same name in one scope. 
 
 The global scope is different. If a variable cannot be resolved at compiled time, it is assumed to be global. If such a variable does not exist at runtime, a runtime error occurs. 
@@ -108,9 +109,9 @@ switch (num) {
 ### for in
 It requires the value after `in` to be iterable.
 
-* Iterable: has the `iterator` property: `iterator(): iterator` and map are iterable. 
+* Iterable: has the `iterator` property: `iterator(): Iterator` and map are iterable. 
 * Iterator: an object with `has_next` and `next` callable properties. 
-    * `has_next(): bool`
+    * `has_next(): Bool`
     * `next(): any`
 
 ```lox
@@ -222,7 +223,7 @@ Inside a function, you can define methods (you don't need `fun` here). `this` is
 
 ### init
 
-`init` is a special method which behaves like a constructor. When creating an instance, we don't need the `new` keyword. 
+Like python, lox does not use the `new` keyword to create an instance. `init` is a special method that is called on the new created instance if defined. . 
 
 ### static
 
@@ -328,22 +329,93 @@ export hey, Animal, time; // export multiple members at a time
 * Import specific members. `import "path/to/animal.lox":Dog, Cat;` In such case, you can use `Dog`, `Cat` directly.
 * Rename. `import "path/to/animal.lox": Dog as ModuleDog, Cat;` You can use `as` to rename one or more members to prevent naming conflicts. 
 * The path is relative to the directory of current module (at compile time). 
+## type annotation
+
+***You can have type annotation for function parameter or variable. Type annotation is basically embeded comment, which is completely ignored by the interpreter.*** 
+
+`|` may be used to represent union of types, like `Int|Float`
+
+```lox
+var name: String = "anda";
+const num: Int = 10;
+
+fun test(num: Int|Float, name: String): Bool {}
+```
+
+## Error Handling
+
+***Similar to many other languages, you may use `throw` to throw a value and `try-catch` block to handle errors.*** 
+
+All values can be thrown, but we typically throw values of the `Error` class (or its subclasses).
+
+A try block must be followed by one or more catch clauses. 
+
+Each catch clause may specifies the type of values it wants to catch. A catch clause may catch values of multiple types by using `|`.
+
+```lox
+try {
+	var arr = [3];
+	print arr[5]; // This will throw an IndexError!
+} catch str: String {
+	print "catch String!";
+} catch err: IndexError { // this clause will catch the thrown value
+	print "catch IndexError!";
+} catch err: Error {
+	print err.message;
+	print err.position;
+} catch err { // if no type is specified, it becomes an unconditional catch
+	print "this is an unconditional catch!";
+}
+
+try {
+	throw 998;
+} catch num: Int|Float {
+	print "catch Int/Float!";
+} 
+```
+
+Values that are instances of `Error` (or its subclass) have `message`  (error description) and `position` (backtrace) properties. 
+
+Common error types include:
+
+* `TypeError`: perform operations on values of inappropriate types
+* `ValueError`: "bad input" (but typically with correct type)
+* `ArgError`: incorrect amount of arguments to functions
+* `IndexError`: index out of bound for arrays, or use non-existent keys for maps
+* `NameError`: access undefined variables
+* `PropertyError`: access undefined properties
+* `FatalError`: serious errors like stack overflow
+* `IOError`: cannot find the file to import
+* `CompileError`: the module to import fails to compile. 
+
 ## native functions
 
 Clox has some built-in functions written in C.
 
-* `clock(): float`: return the time (in seconds) since the program starts
-* `int(input: string|float): int`: convert string or float to int
-* `float(input: string|int): float`: convert int or string to float
-* `rand(low: int, high: int): int`: return a random int in [low, high]. Both arguments need to be int. 
-* `f(format: string, values...): string`: return a formated string according to the specify format. `#` is used as the placeholder. 
-    * For example, ` str = f("the name is #, age is #", "anda", 22)`
+* `clock(): Float`: return the time (in seconds) since the program starts
+* `int(input: String|Float): Int`: convert string or float to int
+* `float(input: String|Int): Float`: convert int or string to float
+* `rand(low: Int, high: Int): Int`: return a random int in [low, high]. Both arguments need to be int. 
+* `f(format: String, values...): String`: return a formated string according to the specify format. `#` is used as the placeholder. 
+    * For example, ` var str = f("the name is #, age is #", "anda", 22)`
 
-* `read(prompt: string?): string`: read a line of string from the keyboard (excluding the newline). If `prompt` is provided, it will be printed out first.
+* `read(prompt: String): String`: read a line of string from the keyboard (excluding the newline). If `prompt` is provided, it will be printed out first.
 
-* `type(value): class`: return the type (a class object) of the input
+* `type(value): Class`: return the type (a class object) of the input
 
-* `char_at(value: string, index: int): string`: return a char at a specific index (as a string)
+* `char_at(value: String, index: Int): String`: return a char at a specific index (as a string). The String class has a wrapper method over this called `char_at(index: Int): String`
+
+* `backtrace(): String`: return a string representing the call frames.
+
+* `value_of(value, t: Class): Bool`: return if the give value is of the given type.
+
+* `subclass_of(a: Class, b: Class): Bool`: return if class A is a subclass of class B (or A == B)
+
+* `is_object(value): Bool`: return if the given value is an "object" (not Int, Float, Bool, Nil, String, Array, Map, Function, Module, Class...)
+
+* `map_delete(map: Map, key)`: delete a key and its value in a map. Return the deleted value. The Map class has a wrapper method over this called `delete(key)`. 
+
+* `array_copy(src: Array, dest: Array, src_index: Int, dest_index: Int, length: Int)`: memcpy for arrays. src is allowed to be the same as dest, in which case memmove is used. 
 
 * Some other functions with names starting with `native_`. The standard library provides some wrapper functions over them. For example, `range` is a wrapper over `native_range` that supports optional parameters and is more convenient to use. 
 

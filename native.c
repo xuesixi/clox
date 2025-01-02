@@ -6,6 +6,7 @@
 #include "object.h"
 #include "liblox_core.h"
 #include "liblox_iter.h"
+#include "liblox_data_structure.h"
 #include "vm.h"
 #include "stdlib.h"
 #include "string.h"
@@ -209,6 +210,45 @@ static void define_native(const char *name, NativeImplementation impl, int arity
     stack_pop();
 }
 
+static Value native_map_delete(int count, Value *values) {
+    (void ) count;
+    Value v0 = values[0];
+    assert_ref_type(v0, OBJ_MAP, "Map"); // [native_delete, map, key]
+    map_delete(); // [native_delete, map, key, value]
+    return stack_pop();
+}
+
+/**
+ * 类似于memcpy
+ * @param values [src, dest, src_start_index, dest_start_index, len_to_copy]。
+ */
+static Value native_array_copy(int count, Value *values) {
+    (void ) count;
+    assert_ref_type(values[0], OBJ_ARRAY, "Array");
+    assert_ref_type(values[1], OBJ_ARRAY, "Array");
+    assert_value_type(values[2], VAL_INT, "Int");
+    assert_value_type(values[3], VAL_INT, "Int");
+    assert_value_type(values[4], VAL_INT, "Int");
+    Array *src = as_array(values[0]);
+    Array *dest = as_array(values[1]);
+    int src_start_index = as_int(values[2]);
+    int dest_start_index = as_int(values[3]);
+    int len_to_copy = as_int(values[4]);
+    if (len_to_copy == 0) {
+        return nil_value();
+    }
+
+    if (len_to_copy < 0 || src_start_index < 0 || dest_start_index < 0 || src_start_index + len_to_copy > src->length || dest_start_index + len_to_copy > dest->length) {
+        throw_new_runtime_error(Error_ValueError, "ValueError: the range to copy is out of bound");
+    }
+    if (src == dest) {
+        memmove(dest->values + dest_start_index, src->values + src_start_index, len_to_copy * sizeof(Value));
+    } else {
+        memcpy(dest->values + dest_start_index, src->values + src_start_index, len_to_copy * sizeof(Value));
+    }
+    return nil_value();
+}
+
 /**
  * 如果 LOAD_LIB 不为false，则加载标准库（执行字节码），将标准库的成员导入builtin命名空间中。
  */
@@ -218,6 +258,9 @@ void load_libraries() {
             exit(1);
         }
         if (load_bytes_into_builtin(liblox_core, liblox_core_len, "lib_core") != INTERPRET_EXECUTE_OK) {
+            exit(1);
+        }
+        if (load_bytes_into_builtin(liblox_data_structure, liblox_data_structure_len, "lib_data_structure") != INTERPRET_EXECUTE_OK) {
             exit(1);
         }
         Value class_value;
@@ -608,11 +651,12 @@ static Value native_range(int count, Value *value) {
 
 static Value native_array_iter(int count, Value *value) {
     (void ) count;
-    // curr, array
+    // curr, array, limit
     assert_ref_type(*value, OBJ_ARRAY, "array");
-    NativeObject *nativeObject = new_native_object(NativeArrayIter, 2);
+    NativeObject *nativeObject = new_native_object(NativeArrayIter, 3);
     nativeObject->values[0] = int_value(0);
     nativeObject->values[1] = *value;
+    nativeObject->values[2] = value[1];
     return ref_value((Object *) nativeObject);
 }
 
@@ -722,7 +766,7 @@ void init_vm_native() {
     define_native("native_value_join", native_value_join, 4);
     define_native("native_string_join", native_string_join, 4);
     define_native("native_range", native_range, 3);
-    define_native("native_array_iter", native_array_iter, 1);
+    define_native("native_array_iter", native_array_iter, 2);
     define_native("native_map_iter", native_map_iter, 1);
     define_native("native_general_hash", general_hash, 1);
     define_native("native_value_equal", native_value_equal, 2);
@@ -730,6 +774,8 @@ void init_vm_native() {
     define_native("value_of", native_value_of, 2);
     define_native("subclass_of", native_subclass_of, 2);
     define_native("is_object", native_is_object, 1);
+    define_native("map_delete", native_map_delete, 2);
+    define_native("array_copy", native_array_copy, 5);
 }
 
 void additional_repl_init() {
