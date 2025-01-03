@@ -167,6 +167,10 @@ typedef struct NativeMethod {
 #define as_map(v) ((Map *)(as_ref(v)) )
 #define as_native_method(v) ((NativeMethod *)as_ref(v) )
 
+#define map_empty_entry(entry) (is_absence((entry)->key) && is_absence((entry)->value))
+#define map_del_mark(entry) (is_absence((entry)->key) && is_nil((entry)->value))
+#define map_need_resize(map) (((map)->active_count + (map)->del_count + 1) >= (map)->capacity * 0.75)
+
 String *string_copy(const char *src, int length);
 String *auto_length_string_copy(const char *name);
 String *string_allocate(char *chars, int length);
@@ -188,10 +192,6 @@ Map *new_map();
 NativeObject *new_native_object(NativeObjectType type, int num_used);
 NativeMethod *new_native_method(NativeFunction *fun, Value receiver);
 uint32_t chars_hash(const char *key, int length);
-
-bool map_empty_entry(MapEntry *entry);
-bool map_del_mark(MapEntry *entry);
-bool map_need_resize(Map *map);
 
 
 #endif

@@ -60,9 +60,9 @@ static void table_resize(Table *table) {
  * 如果存在，但不是满足条件，返回NULL
  */
 Entry *table_find_entry(Table *table, String *key, bool public_only, bool mutable_only) {
-    int index = MODULO(key->hash, table->capacity);
+    int hash = key->hash;
     for (int i = 0; i < table->capacity; ++i) {
-        int curr = MODULO(index + i, table->capacity);
+        int curr = MODULO(hash + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             return entry;
@@ -131,9 +131,9 @@ bool table_set(Table *table, String *key, Value value) {
         table_resize(table);
     }
     Entry *mark = NULL;
-    int index = MODULO(key->hash, table->capacity);
+    int hash = key->hash;
     for (int i = 0; i < table->capacity; ++i) {
-        int curr = MODULO(index + i, table->capacity);
+        int curr = MODULO(hash + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             if (mark == NULL) {
@@ -175,9 +175,9 @@ char table_set_existent(Table *table, String *key, Value value, bool public_only
     if (need_resize(table)) {
         table_resize(table);
     }
-    int index = MODULO(key->hash, table->capacity);
+    int hash = key->hash;
     for (int i = 0; i < table->capacity; ++i) {
-        int curr = MODULO(index + i, table->capacity);
+        int curr = MODULO(hash + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             return 1;
@@ -206,9 +206,9 @@ bool table_add_new(Table *table, String *key, Value value, bool is_public, bool 
         table_resize(table);
     }
     Entry *mark = NULL;
-    int index = MODULO(key->hash, table->capacity);
+    int hash = key->hash;
     for (int i = 0; i < table->capacity; ++i) {
-        int curr = MODULO(index + i, table->capacity);
+        int curr = MODULO(hash + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             if (mark == NULL) {
@@ -291,9 +291,8 @@ String *table_find_string(Table *table, const char *name, int length, uint32_t h
     if (table->count == 0) {
         return NULL;
     }
-    int index = MODULO(hash, table->capacity);
     for (int i = 0; i < table->capacity; ++i) {
-        int curr = MODULO(index + i, table->capacity);
+        int curr = MODULO(hash + i, table->capacity);
         Entry *entry = table->backing + curr;
         if (empty_entry(entry)) {
             return NULL;

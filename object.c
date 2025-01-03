@@ -229,22 +229,4 @@ Map *new_map() {
     return map;
 }
 
-/**
- * 键为absence，值为absence
- */
-inline bool map_empty_entry(MapEntry *entry) {
-    return is_absence(entry->key) && is_absence(entry->value);
-}
-
-inline bool map_need_resize(Map *map) {
-    return (map->active_count + map->del_count + 1) >= map->capacity * 0.75;
-}
-
-/**
- * 键为absence，值为nil
- */
-inline bool map_del_mark(MapEntry *entry) {
-    return is_absence(entry->key) && is_nil(entry->value);
-}
-
 

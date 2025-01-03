@@ -34,11 +34,11 @@ void mark_object(Object *object) {
     vm.gray_stack[vm.gray_count++] = object;
 }
 
-inline void mark_value(Value value) {
-    if (value.type == VAL_REF) {
-        mark_object(as_ref(value));
-    }
-}
+//inline void mark_value(Value value) {
+//    if (value.type == VAL_REF) {
+//        mark_object(as_ref(value));
+//    }
+//}
 
 static void mark_roots() {
 
