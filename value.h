@@ -63,6 +63,7 @@ char *value_to_chars(Value value, int *len);
 #define float_value(v) ((Value) {.type = VAL_FLOAT, .as = {.decimal = (v)}})
 #define nil_value() ((Value) {.type = VAL_NIL, .as = {}})
 #define ref_value(v) ((Value) {.type = VAL_REF, .as = {.reference = (v)}})
+#define ref_value_cast(v) ref_value((Object *)(v))
 #define absence_value() ((Value) {.type = VAL_ABSENCE, .as = {}})
 
 bool value_equal(Value a, Value b);

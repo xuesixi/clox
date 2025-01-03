@@ -576,6 +576,10 @@ static void export_statement() {
     consume(TOKEN_SEMICOLON, "Expect ; to terminate the export statement");
 }
 
+static bool check_declaration() {
+    return check(TOKEN_VAR) || check(TOKEN_CONST) || check(TOKEN_FUN) || check(TOKEN_CLASS) || check(TOKEN_IMPORT);
+}
+
 static void declaration() {
     bool is_export = false;
     if (match(TOKEN_EXPORT)) {
@@ -953,7 +957,10 @@ static void statement() {
         try_statement();
     } else if (match(TOKEN_THROW)){
         throw_statement();
-    } else {
+    } else if (check_declaration()){
+        error_at_current("Cannot define or import here. Consider doing so inside {}. This error may cascade.");
+        return;
+    }  else {
         expression_statement();
     }
 }
@@ -1247,8 +1254,10 @@ static void switch_statement() {
         emit_byte(OP_POP);
         emit_byte(OP_POP);
 
-        while (!check(TOKEN_EOF) && !check(TOKEN_CASE) && !check(TOKEN_DEFAULT) && !check(TOKEN_RIGHT_BRACE)) {
-            statement();
+        statement();
+        if (!check(TOKEN_CASE) && !check(TOKEN_DEFAULT)) {
+            error_at_current("Use {} to group multiple statements in one case");
+            return;
         }
         loop_back(temp);
     }
@@ -1264,8 +1273,10 @@ static void switch_statement() {
 
     if (match(TOKEN_DEFAULT)) {
         consume(TOKEN_COLON, "Expect ':' after each case");
-        while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
-            statement();
+        statement();
+        if (!check(TOKEN_RIGHT_BRACE)) {
+            error_at_current("Use {} to group multiple statements in one case");
+            return;
         }
     }
 

@@ -97,7 +97,7 @@ class Array {
     iterator() {
         return native_array_iter(this, this.length);
     }
-    join(delimiter = ", ", prefix = "[", suffix = "]") {
+    join(delimiter: String = ", ", prefix: String = "[", suffix: String = "]") {
         return native_value_join(delimiter, prefix, suffix, this);
     }
     hash() {
@@ -141,15 +141,25 @@ class String {
     iterator() {
         return StringIter(this);
     }
-    char_at(index) {
-        return char_at(this, index);
-    }
     hash() {
         return native_general_hash(this);
     }
     equal(v) {
         return native_value_equal(this, v);
     }
+
+    char_at(index: Int) {
+        return char_at(this, index);
+    }
+
+    replace(from: Int, to: Int, insert: String) {
+        return string_replace(this, from, to, insert);
+    }
+
+    substring(from: Int, to: Int) {
+        return substring(this, from, to);
+    }
+
 }
 
 class NativeObject {
@@ -162,7 +172,7 @@ class NativeObject {
 }
 
 class StringIter {
-    init(str) {
+    init(str: String) {
         this.str = str;
         this.curr = -1;
         this.limit = str.length - 1;
@@ -179,12 +189,12 @@ fun concat(values...) {
     return native_string_combine_array(values);
 }
 
-fun join(arr, delimiter="", prefix="", suffix="") {
+fun join(arr: Array, delimiter: String = "", prefix: String = "", suffix: String = "") {
     return native_value_join(delimiter, prefix, suffix, arr);
 }
 
-// when the array has only strings, this function is faster
-fun string_join(arr, delimiter="", prefix="", suffix="") {
+// when the array contains only strings, this function is faster
+fun string_join(arr: Array, delimiter: String = "", prefix: String = "", suffix: String = "") {
     return native_string_join(delimiter, prefix, suffix, arr);
 }
 
@@ -195,68 +205,68 @@ fun benchmark(task) {
 }
 
 class Error {
-    init(message) {
+    init(message: String) {
         this.message = "Error: " + message;
     }
 }
 
 // inappropriate type
 class TypeError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("TypeError: " + message);
     }
 } 
 
 // index out of bound
 class IndexError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("IndexError: " + message);
     }
 } 
 
 // arg number does work match param number
 class ArgError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("ArgError: " + message);
     }
 } 
 
 // no such variable
 class NameError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("NameError: " + message);
     }
 } 
 
 // no such property
 class PropertyError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("PropertyError: " + message);
     }
 } 
 
 class ValueError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("ValueError: " + message);
     }
 }
 
 // e.g. stack overflow
 class FatalError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("FatalError: " + message);
     }
 } 
 
 // import a module that fails to compile
 class CompileError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("CompileError: " + message);
     }
 } 
 
 class IOError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("IOError: " + message);
     }
 }

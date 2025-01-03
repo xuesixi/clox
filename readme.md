@@ -38,17 +38,17 @@ Other options
 
 ## type
 Primitive types: 
-* ***`int` : 32 bits integer***
-* `float`: 64 bits float point number
-* `bool`: true/false
-* `nil`
+* ***`Int` : 32 bits integer***
+* `Float`: 64 bits float point number
+* `Bool`: `true`/`false`
+* `Nil`: `nil`
 
 Reference types:
 
-* `string`
+* `String`: immutable.
 * `object`
-* ***`array`***
-* ***`map`***
+* ***`Array`***
+* ***`Map`***
 
 ## arithmetic
 

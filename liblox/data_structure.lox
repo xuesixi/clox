@@ -28,7 +28,7 @@ class HashMap {
         }
         return nil;
     }
-    set(key, value, h = key.hash()) {
+    set(key, value, h: Int = key.hash()) {
         this.check_resize();
         var cap = this.capacity;
         var index = h % cap;
@@ -149,7 +149,7 @@ class Vector {
         this.size += 1;
     }
 
-    add(element, index: Int = this.size) {
+    insert(element, index: Int) {
         if (index < 0 or index > this.size) {
             throw IndexError(f("can only add to index in range [#, #]", index, 0, this.size));
         }
@@ -178,23 +178,24 @@ class Vector {
         return this.backing[this.size -= 1];
     }
 
-    delete(index: Int = this.size - 1) {
+    delete(index: Int) {
         if (this.size == 0) {
             throw NoDataError("cannot delete from an empty vector");
         }
         if (index < 0 or index >= this.size) {
             throw IndexError(f("can only delete at index in range [#, #]", index, 0, this.size - 1));
         }
+        var backing = this.backing;
         var move_length = this.size - 1 - index; 
-        var result = this.backing[index];
-        array_copy(this.backing, this.backing, index + 1, index, move_length);
+        var result = backing[index];
+        array_copy(backing, backing, index + 1, index, move_length);
         this.size -= 1;
         return result;
     }
 }
 
 class NoDataError: Error {
-    init(message) {
+    init(message: String) {
         this.message = ("NoDataError: " + message);
     }
 }

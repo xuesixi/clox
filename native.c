@@ -580,6 +580,55 @@ static Value native_string_join(int count, Value *values) {
     return ref_value((Object *) str);
 }
 
+/**
+ * @param values [old_str, start_index, end_index, str_to_insert]
+ * @return new string
+ */
+static Value native_string_replace(int count, Value *values) {
+    (void ) count;
+    assert_ref_type(values[0], OBJ_STRING, "String");
+    assert_value_type(values[1], VAL_INT, "Int");
+    assert_value_type(values[2], VAL_INT, "Int");
+    assert_ref_type(values[3], OBJ_STRING, "String");
+
+    // "animal", 2, 4, "moria" -> an[moria]al
+
+    String *old_str = as_string(values[0]);
+    int start = as_int(values[1]);
+    int end = as_int(values[2]);
+    String *new_str = as_string(values[3]);
+    if (start < 0 || end > old_str->length || start > end) {
+        throw_new_runtime_error(Error_ValueError, "the range: [%s, %s] is invalid", start, end);
+    }
+    int new_len = old_str->length - (end - start) + new_str->length;
+    char *cs = malloc(new_len + 1);
+    memcpy(cs, old_str->chars, start);
+    memcpy(cs + start, new_str->chars, new_str->length);
+    memcpy(cs + start + new_str->length, old_str->chars + end, old_str->length - end);
+    cs[new_len] = '\0';
+    String *result = string_allocate(cs, new_len);
+    return ref_value_cast(result);
+}
+
+/**
+ *
+ * @param value [str, start, end]
+ */
+static Value native_substring(int count, Value *value) {
+    (void ) count;
+    assert_ref_type(value[0], OBJ_STRING, "String");
+    assert_value_type(value[1], VAL_INT, "Int");
+    assert_value_type(value[2], VAL_INT, "Int");
+    String *str = as_string(value[0]);
+    int start = as_int(value[1]);
+    int end = as_int(value[2]);
+    if (start < 0 || end > str->length) {
+        throw_new_runtime_error(Error_ValueError, "the range: [%d, %d] is invalid", start, end);
+    }
+    String *result = string_copy(str->chars + start, (end - start));
+    return ref_value_cast(result);
+}
+
 static Value native_value_join(int count, Value *values) {
    // 0: delimiter, 1: prefix, 2: suffix, 3: array
     (void ) count;
@@ -776,6 +825,8 @@ void init_vm_native() {
     define_native("is_object", native_is_object, 1);
     define_native("map_delete", native_map_delete, 2);
     define_native("array_copy", native_array_copy, 5);
+    define_native("string_replace", native_string_replace, 4);
+    define_native("substring", native_substring, 3);
 }
 
 void additional_repl_init() {
