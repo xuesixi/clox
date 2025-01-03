@@ -45,6 +45,7 @@ void print_value_with_color(Value value) {
         case VAL_REF: {
             switch (as_ref(value)->type) {
                 case OBJ_NATIVE:
+                case OBJ_NATIVE_METHOD:
                 case OBJ_NATIVE_OBJECT:
                     break;
                 case OBJ_STRING:
@@ -164,7 +165,7 @@ static char *ref_to_chars(Value value, int *len) {
             break;
         }
         case OBJ_NATIVE:
-            *len = asprintf(&buffer, "<native: %s>", as_native(value)->name->chars);
+            *len = asprintf(&buffer, "<native fn: %s>", as_native(value)->name->chars);
             break;
         case OBJ_FUNCTION: {
             LoxFunction *fun = as_function(value);
@@ -214,6 +215,11 @@ static char *ref_to_chars(Value value, int *len) {
         case OBJ_MAP: {
             Map *map = as_map(value);
             *len = asprintf(&buffer, "<map: %d/%d>", map->active_count, map->capacity);
+            break;
+        }
+        case OBJ_NATIVE_METHOD: {
+            NativeMethod *method = as_native_method(value);
+            *len = asprintf(&buffer, "<native mthd: %s>", method->fun->name->chars);
             break;
         }
         default:

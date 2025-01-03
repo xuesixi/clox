@@ -181,6 +181,13 @@ Method *new_method(Closure *closure, Value value) {
     return method;
 }
 
+NativeMethod *new_native_method(NativeFunction *fun, Value receiver) {
+    NativeMethod * method = (NativeMethod *) allocate_object(sizeof(NativeMethod), OBJ_NATIVE_METHOD);
+    method->fun = fun;
+    method->receiver = receiver;
+    return method;
+}
+
 Array *new_array(int length, bool init_with_nil) {
     Value *values = ALLOCATE(Value, length);
 //    memset(values, 0, sizeof(Value) * length);

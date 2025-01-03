@@ -50,6 +50,8 @@ static void show_stack();
 
 static void build_array(int length);
 
+static void call_native(NativeFunction *native , int arg_count);
+
 static Value stack_peek(int distance);
 
 static void binary_number_op(Value a, Value b, char operator);
@@ -64,7 +66,7 @@ static Value multi_dimension_array(int dimension, Value *lens);
 
 static void warmup(LoxFunction *function, const char *path_chars, String *path_string, bool care_repl);
 
-static Method *bind_method(Class *class, String *name, Value receiver);
+static Value bind_method(Class *class, String *name, Value receiver);
 
 static void close_upvalue(Value *position);
 
@@ -123,6 +125,8 @@ Class *value_class(Value value) {
                     return as_instance(value)->class;
                 case OBJ_NATIVE_OBJECT:
                     return native_object_class;
+                case OBJ_NATIVE_METHOD:
+                    return NULL;
                 case OBJ_UPVALUE:
                     return NULL;
                     IMPLEMENTATION_ERROR("bad");
@@ -224,7 +228,7 @@ static void map_indexing_get() {
             stack_pop();
             throw_user_level_runtime_error(Error_IndexError, "IndexError: the key does not exist");
             return;
-        } else if (entry->hash == hash) {
+        } else if (!is_absence(entry->key) && entry->hash == hash) {
             stack_push(entry->key); // map, key0, key1
             stack_push(stack_peek(1)); // map, key0, key1, key0
             invoke_and_wait(EQUAL, 1, INTER_EQUAL); // map, key0, bool
@@ -283,6 +287,8 @@ static void map_indexing_set_with_hash(bool keep_map) {
                 map->del_count --;
                 return;
             }
+        } else if (del_mark == NULL && map_del_mark(entry)) {
+            del_mark = entry;
         } else if (entry->hash == hash) {
             // [map, key0, value, ]
             stack_push(entry->key); // map, key0, value, key1
@@ -301,8 +307,6 @@ static void map_indexing_set_with_hash(bool keep_map) {
                 }
                 return;
             }
-        } else if (del_mark == NULL && map_del_mark(entry)) {
-            del_mark = entry;
         }
     }
     runtime_error("map cannot find empty spot, this is an implementation error!");
@@ -373,7 +377,7 @@ void map_delete() {
         if (map_empty_entry(entry)) {
             throw_new_runtime_error(Error_IndexError, "IndexError: the key does not exist");
             return;
-        } else if (entry->hash == hash) {
+        } else if (!map_del_mark(entry) && entry->hash == hash) {
             stack_push(entry->key); // map, key0, key1
             stack_push(stack_peek(1)); // map, k0, k1, k0
             invoke_and_wait(EQUAL, 1, INTER_EQUAL);
@@ -397,25 +401,25 @@ void map_delete() {
  * 获取target的指定属性，并将之置于栈顶。
  */
 static void get_property(Value target, String *property_name) {
-    if (is_ref_of(target, OBJ_INSTANCE)) {
-        Instance *instance = as_instance(target);
-        Value result = nil_value();
-        bool found = table_get(&instance->fields, property_name, &result);
-        if (found == false) {
-            Method *method = bind_method(instance->class, property_name, target);
-            result = ref_value((Object *) method);
-        }
-        stack_push(result);
-    } else if (is_ref(target)) {
+    if (is_ref(target)) {
         switch (as_ref(target)->type) {
+            case OBJ_INSTANCE: {
+                Instance *instance = as_instance(target);
+                Value result;
+                bool found = table_get(&instance->fields, property_name, &result);
+                if (found == false) {
+                    result = bind_method(instance->class, property_name, target);
+                }
+                stack_push(result);
+                break;
+            }
             case OBJ_ARRAY: {
                 if (property_name == LENGTH) {
                     Array *array = as_array(target);
                     stack_push(int_value(array->length));
-                    break;
                 } else {
-                    Method *method = bind_method(array_class, property_name, target);
-                    stack_push(ref_value((Object *) method));
+                    Value res = bind_method(array_class, property_name, target);
+                    stack_push(res);
                 }
                 break;
             }
@@ -423,28 +427,9 @@ static void get_property(Value target, String *property_name) {
                 if (property_name == LENGTH) {
                     String *string = as_string(target);
                     stack_push(int_value(string->length));
-                    break;
                 } else {
-                    Method *method = bind_method(string_class, property_name, target);
-                    stack_push(ref_value((Object *) method));
-                }
-                break;
-            }
-            case OBJ_CLASS: {
-                Class *class = as_class(target);
-                Value static_field;
-                if (!table_get(&class->static_fields, property_name, &static_field)) {
-                    goto OP_GET_PROPERTY_not_found;
-                }
-                stack_push(static_field);
-                break;
-            }
-            case OBJ_CLOSURE: {
-                Value property;
-                if (!table_get(&closure_class->methods, property_name, &property)) {
-                    goto OP_GET_PROPERTY_not_found;
-                } else {
-                    stack_push(property);
+                    Value res = bind_method(string_class, property_name, target);
+                    stack_push(res);
                 }
                 break;
             }
@@ -452,13 +437,18 @@ static void get_property(Value target, String *property_name) {
                 if (property_name == LENGTH) {
                     Map *map = as_map(target);
                     stack_push(int_value(map->active_count));
-                    break;
-                }
-                Value property;
-                if (!table_get(&map_class->methods, property_name, &property)) {
-                    goto OP_GET_PROPERTY_not_found;
                 } else {
-                    stack_push(property);
+                    stack_push(bind_method(map_class, property_name, target));
+                }
+                break;
+            }
+            case OBJ_CLASS: {
+                Class *class = as_class(target);
+                Value static_field;
+                if (table_get(&class->static_fields, property_name, &static_field)) {
+                    stack_push(static_field);
+                } else {
+                    stack_push(bind_method(class_class, property_name, target));
                 }
                 break;
             }
@@ -472,7 +462,24 @@ static void get_property(Value target, String *property_name) {
                 }
                 break;
             }
-            OP_GET_PROPERTY_not_found:
+            case OBJ_NATIVE:
+                stack_push(bind_method(native_class, property_name, target));
+                break;
+            case OBJ_CLOSURE:
+                stack_push(bind_method(closure_class, property_name, target));
+                break;
+            case OBJ_METHOD:
+                stack_push(bind_method(method_class, property_name, target));
+                break;
+            case OBJ_FUNCTION:
+                stack_push(bind_method(function_class, property_name, target));
+                break;
+            case OBJ_NATIVE_OBJECT:
+                stack_push(bind_method(native_class, property_name, target));
+                break;
+            case OBJ_NATIVE_METHOD:
+                stack_push(bind_method(NULL, property_name, target));
+                break;
             default:
                 throw_new_runtime_error(Error_PropertyError, "PropertyError: no such public property: %s", property_name->chars);
         }
@@ -482,12 +489,7 @@ static void get_property(Value target, String *property_name) {
             case VAL_BOOL:
             case VAL_FLOAT:
             case VAL_NIL: {
-                Value property;
-                if (!table_get(&value_class(target)->methods, property_name, &property)) {
-                    goto OP_GET_PROPERTY_not_found;
-                } else {
-                    stack_push(property);
-                }
+                stack_push(bind_method(value_class(target), property_name, target));
                 break;
             }
             default:
@@ -606,17 +608,18 @@ static void invoke_native_object(int arg_count, NativeInterface interface, Nativ
  */
 static void invoke_property(String *name, int arg_count, NativeInterface interface) {
     Value receiver = stack_peek(arg_count);
-    if (is_ref_of(receiver, OBJ_INSTANCE)) {
-        Instance *instance = as_instance(receiver);
-        Value closure_value;
-        if (table_get(&instance->fields, name, &closure_value)) {
-            call_value(closure_value, arg_count);
-        } else {
-            Class *class = instance->class;
-            invoke_from_class(class, name, arg_count);
-        }
-    } else if (is_ref(receiver)){
+    if (is_ref(receiver)){
         switch (receiver.as.reference->type) {
+            case OBJ_INSTANCE: {
+                Instance *instance = as_instance(receiver);
+                Value closure_value;
+                if (table_get(&instance->fields, name, &closure_value)) {
+                    call_value(closure_value, arg_count);
+                } else {
+                    invoke_from_class(instance->class, name, arg_count);
+                }
+                break;
+            }
             case OBJ_CLASS: {
                 Class *class = as_class(receiver);
                 Value static_field;
@@ -643,9 +646,6 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
             case OBJ_STRING:
                 invoke_from_class(string_class, name, arg_count);
                 break;
-            case OBJ_CLOSURE:
-                invoke_from_class(closure_class, name, arg_count);
-                break;
             case OBJ_MAP:
                 invoke_from_class(map_class, name, arg_count);
                 break;
@@ -654,6 +654,21 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
                 invoke_native_object(arg_count, interface, native_object);
                 break;
             }
+            case OBJ_CLOSURE:
+                invoke_from_class(closure_class, name, arg_count);
+                break;
+            case OBJ_METHOD:
+                invoke_from_class(method_class, name, arg_count);
+                break;
+            case OBJ_FUNCTION:
+                invoke_from_class(function_class, name, arg_count);
+                break;
+            case OBJ_NATIVE:
+                invoke_from_class(native_class, name, arg_count);
+                break;
+            case OBJ_NATIVE_METHOD:
+                invoke_from_class(NULL, name, arg_count);
+                break;
             default:
                 throw_new_runtime_error(Error_PropertyError, "PropertyError: no such property: %s", name->chars);
         }
@@ -663,10 +678,22 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
             case VAL_BOOL:
             case VAL_FLOAT:
             case VAL_NIL:
-                invoke_from_class(value_class(receiver), name, arg_count);
+                if (interface == INTER_HASH) {
+                    // key -> hash
+                    stack_pop();
+                    stack_push(int_value(value_hash(receiver)));
+                } else if (interface == INTER_EQUAL) {
+                    // a, b -> bool
+                    bool eq = value_equal(receiver, stack_pop());
+                    stack_pop();
+                    stack_push(bool_value(eq));
+                } else {
+                    invoke_from_class(value_class(receiver), name, arg_count);
+                }
                 break;
             default:
                 IMPLEMENTATION_ERROR("bad");
+                throw_new_runtime_error(Error_FatalError, "Implementation error");
         }
     }
 }
@@ -1066,14 +1093,20 @@ static void close_upvalue(Value *position) {
  * 在指定的class的methods中寻找某个closure，然后将其包装成一个Method.
  * 如果没找到，该函数自身会调用runtime error
  */
-static Method *bind_method(Class *class, String *name, Value receiver) {
+static Value bind_method(Class *class, String *name, Value receiver) {
     Value value;
     if (class == NULL || table_get(&class->methods, name, &value) == false) {
         throw_new_runtime_error(Error_PropertyError, "PropertyError: no such property: %s", name->chars);
-        return NULL;
-    } else {
+        return nil_value();
+    } else if (is_ref_of(value, OBJ_CLOSURE)){
         Method *method = new_method(as_closure(value), receiver);
-        return method;
+        return ref_value_cast(method);
+    } else if (is_ref_of(value, OBJ_NATIVE)) {
+        NativeMethod *method = new_native_method(as_native(value), receiver);
+        return ref_value_cast(method);
+    } else {
+        throw_new_runtime_error(Error_PropertyError, "PropertyError: no such property: %s", name->chars);
+        return nil_value();
     }
 }
 
@@ -1087,11 +1120,15 @@ static void invoke_from_class(Class *class, String *name, int arg_count) {
 
     // stack: obj, arg1, arg2, top
     // code: op, name_index, arg_count
-    Value closure_value;
-    if (!table_get(&class->methods, name, &closure_value)) {
+    Value callable;
+    if (!table_get(&class->methods, name, &callable)) {
         throw_new_runtime_error(Error_PropertyError, "PropertyError: no such property: %s", name->chars);
     }
-    call_closure(as_closure(closure_value), arg_count);
+    if (is_ref_of(callable, OBJ_CLOSURE)) {
+        call_closure(as_closure(callable), arg_count);
+    } else if (is_ref_of(callable, OBJ_NATIVE)) {
+        call_native(as_native(callable), arg_count);
+    }
 }
 
 static void call_closure(Closure *closure, int arg_count) {
@@ -1146,6 +1183,19 @@ static void call_closure(Closure *closure, int arg_count) {
 }
 
 /**
+ * 注意，如果该native是作为method调用的，那么其receiver处于values[-1]的位置
+ */
+static void call_native(NativeFunction *native , int arg_count) {
+    if (native->arity != arg_count && native->arity != -1) {
+        throw_new_runtime_error(Error_ArgError, "ArgError: %s expects %d arguments, but got %d", native->name->chars, native->arity,
+                                arg_count);
+    }
+    Value result = native->impl(arg_count, vm.stack_top - arg_count); //
+    vm.stack_top -= arg_count + 1;
+    stack_push(result);
+}
+
+/**
  * 创建一个call frame。
  * 如果value不可调用，或者参数数量不匹配，则出现runtime错误
  * @param value 要调用的closure、method、native、class
@@ -1162,13 +1212,7 @@ static void call_value(Value value, int arg_count) {
         }
         case OBJ_NATIVE: {
             NativeFunction *native = as_native(value);
-            if (native->arity != arg_count && native->arity != -1) {
-                throw_new_runtime_error(Error_ArgError, "ArgError: %s expects %d arguments, but got %d", native->name->chars, native->arity,
-                                        arg_count);
-            }
-            Value result = native->impl(arg_count, vm.stack_top - arg_count);
-            vm.stack_top -= arg_count + 1;
-            stack_push(result);
+            call_native(native, arg_count);
             break;
         }
         case OBJ_CLASS: {
@@ -1191,6 +1235,12 @@ static void call_value(Value value, int arg_count) {
             Method *method = as_method(value);
             vm.stack_top[-arg_count - 1] = method->receiver;
             call_closure(method->closure, arg_count);
+            break;
+        }
+        case OBJ_NATIVE_METHOD: {
+            NativeMethod *method = as_native_method(value);
+            vm.stack_top[-arg_count - 1] = method->receiver;
+            call_native(method->fun, arg_count);
             break;
         }
         default: {
@@ -1824,8 +1874,7 @@ static InterpretResult run_frame_until(int end_when) {
                 String *name = read_constant_string();
                 Class *class = as_class(stack_pop());
                 Value receiver = stack_pop();
-                Method *method = bind_method(class, name, receiver);
-                stack_push(ref_value((Object *) method));
+                stack_push(bind_method(class, name, receiver));
                 // stack: method, top
                 break;
             }

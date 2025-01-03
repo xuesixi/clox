@@ -201,20 +201,40 @@ void new_error(ErrorType type, const char *message) {
 }
 
 static void define_native(const char *name, NativeImplementation impl, int arity) {
-    int len = (int) strlen(name);
+//    int len = (int) strlen(name);
 
-    stack_push(ref_value((Object *) string_copy(name, len)));
-    stack_push(ref_value((Object *) new_native(impl, as_string(vm.stack[0]), arity)));
-    table_add_new(&vm.builtin, as_string(vm.stack[0]), vm.stack[1], true, false);
+    String *native_name = auto_length_string_copy(name);
+    stack_push(ref_value_cast(native_name));
+
+    NativeFunction *fun = new_native(impl, native_name, arity);
+    Value fun_value = ref_value_cast(fun);
+    stack_push(fun_value);
+
+    table_add_new(&vm.builtin, native_name, fun_value, true, false);
+
     stack_pop();
     stack_pop();
 }
 
-static Value native_map_delete(int count, Value *values) {
+static void add_native_method(Class *class, const char *name, NativeImplementation impl, int arity) {
+
+    String *native_name = auto_length_string_copy(name);
+    stack_push(ref_value_cast(native_name));
+
+    NativeFunction *fun = new_native(impl, native_name, arity);
+    Value fun_value = ref_value_cast(fun);
+    stack_push(fun_value);
+
+    table_add_new(&class->methods, native_name, fun_value, true, false);
+
+    stack_pop();
+    stack_pop();
+}
+
+static Value native_map_method_delete(int count, Value *values) {
     (void ) count;
-    Value v0 = values[0];
-    assert_ref_type(v0, OBJ_MAP, "Map"); // [native_delete, map, key]
-    map_delete(); // [native_delete, map, key, value]
+    assert_ref_type(values[-1], OBJ_MAP, "Map"); // [map, key]
+    map_delete(); // [map, key, value]
     return stack_pop();
 }
 
@@ -249,96 +269,6 @@ static Value native_array_copy(int count, Value *values) {
     return nil_value();
 }
 
-/**
- * 如果 LOAD_LIB 不为false，则加载标准库（执行字节码），将标准库的成员导入builtin命名空间中。
- */
-void load_libraries() {
-    if (LOAD_LIB) {
-        if (load_bytes_into_builtin(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_EXECUTE_OK) {
-            exit(1);
-        }
-        if (load_bytes_into_builtin(liblox_core, liblox_core_len, "lib_core") != INTERPRET_EXECUTE_OK) {
-            exit(1);
-        }
-        if (load_bytes_into_builtin(liblox_data_structure, liblox_data_structure_len, "lib_data_structure") != INTERPRET_EXECUTE_OK) {
-            exit(1);
-        }
-        Value class_value;
-
-        table_get(&vm.builtin, auto_length_string_copy("Array"), &class_value);
-        array_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("String"), &class_value);
-        string_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Int"), &class_value);
-        int_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Float"), &class_value);
-        float_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Bool"), &class_value);
-        bool_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Native"), &class_value);
-        native_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Class"), &class_value);
-        class_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Function"), &class_value);
-        function_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Closure"), &class_value);
-        closure_class= as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Method"), &class_value);
-        method_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Module"), &class_value);
-        module_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Nil"), &class_value);
-        nil_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Map"), &class_value);
-        map_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("NativeObject"), &class_value);
-        native_object_class = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("Error"), &class_value);
-        Error = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("TypeError"), &class_value);
-        TypeError = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("ArgError"), &class_value);
-        ArgError = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("IndexError"), &class_value);
-        IndexError = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("NameError"), &class_value);
-        NameError = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("PropertyError"), &class_value);
-        PropertyError = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("ValueError"), &class_value);
-        ValueError = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("FatalError"), &class_value);
-        FatalError = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("CompileError"), &class_value);
-        CompileError = as_class(class_value);
-
-        table_get(&vm.builtin, auto_length_string_copy("IOError"), &class_value);
-        IOError = as_class(class_value);
-    }
-    preload_finished = true;
-}
 
 static Value native_type(int count, Value *value) {
     (void ) count;
@@ -584,19 +514,19 @@ static Value native_string_join(int count, Value *values) {
  * @param values [old_str, start_index, end_index, str_to_insert]
  * @return new string
  */
-static Value native_string_replace(int count, Value *values) {
+static Value native_string_method_replace(int count, Value *values) {
     (void ) count;
-    assert_ref_type(values[0], OBJ_STRING, "String");
+    assert_ref_type(values[-1], OBJ_STRING, "String");
+    assert_value_type(values[0], VAL_INT, "Int");
     assert_value_type(values[1], VAL_INT, "Int");
-    assert_value_type(values[2], VAL_INT, "Int");
-    assert_ref_type(values[3], OBJ_STRING, "String");
+    assert_ref_type(values[2], OBJ_STRING, "String");
 
     // "animal", 2, 4, "moria" -> an[moria]al
 
-    String *old_str = as_string(values[0]);
-    int start = as_int(values[1]);
-    int end = as_int(values[2]);
-    String *new_str = as_string(values[3]);
+    String *old_str = as_string(values[-1]);
+    int start = as_int(values[0]);
+    int end = as_int(values[1]);
+    String *new_str = as_string(values[2]);
     if (start < 0 || end > old_str->length || start > end) {
         throw_new_runtime_error(Error_ValueError, "the range: [%s, %s] is invalid", start, end);
     }
@@ -611,17 +541,16 @@ static Value native_string_replace(int count, Value *values) {
 }
 
 /**
- *
- * @param value [str, start, end]
+ * @param value [receiver(str), start, end]
  */
-static Value native_substring(int count, Value *value) {
+static Value native_string_method_substring(int count, Value *value) {
     (void ) count;
-    assert_ref_type(value[0], OBJ_STRING, "String");
+    assert_ref_type(value[-1], OBJ_STRING, "String");
+    assert_value_type(value[0], VAL_INT, "Int");
     assert_value_type(value[1], VAL_INT, "Int");
-    assert_value_type(value[2], VAL_INT, "Int");
-    String *str = as_string(value[0]);
-    int start = as_int(value[1]);
-    int end = as_int(value[2]);
+    String *str = as_string(value[-1]);
+    int start = as_int(value[0]);
+    int end = as_int(value[1]);
     if (start < 0 || end > str->length) {
         throw_new_runtime_error(Error_ValueError, "the range: [%d, %d] is invalid", start, end);
     }
@@ -675,12 +604,12 @@ static Value native_value_join(int count, Value *values) {
     return ref_value((Object *) str);
 }
 
-static Value native_char_at(int count, Value *value) {
+static Value native_string_method_char_at(int count, Value *value) {
     (void )count;
-    assert_ref_type(value[0], OBJ_STRING, "string");
-    assert_value_type(value[1], VAL_INT, "int");
-    String *string = as_string(*value);
-    int index = as_int(value[1]);
+    assert_ref_type(value[-1], OBJ_STRING, "string");
+    assert_value_type(value[0], VAL_INT, "int");
+    String *string = as_string(value[-1]);
+    int index = as_int(value[0]);
     if (index < 0 || index >= string->length) {
         throw_new_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [%d, %d]", index, 0, string->length - 1);
     }
@@ -709,56 +638,60 @@ static Value native_array_iter(int count, Value *value) {
     return ref_value((Object *) nativeObject);
 }
 
-static Value general_hash(int count, Value *given) {
-    (void ) count;
+uint32_t value_hash(Value given) {
     uint32_t hash = FNV_OFFSET_BASIS;
-    Value v = *given;
-    switch(given->type) {
+    switch(given.type) {
         case VAL_INT: { // int
-            int value = as_int(v);
+            int value = as_int(given);
             const unsigned char* bytes = (const unsigned char*)&value;
             for (size_t i = 0; i < sizeof(int); i++) {
                 hash ^= bytes[i];
                 hash *= FNV_PRIME;
             }
-            break;
+            return hash;
         }
         case VAL_FLOAT: { // double
-            double value = as_float(v);
+            double value = as_float(given);
             const unsigned char* bytes = (const unsigned char*)&value;
             for (size_t i = 0; i < sizeof(double); i++) {
                 hash ^= bytes[i];
                 hash *= FNV_PRIME;
             }
-            break;
+            return hash;
         }
         case VAL_BOOL: { // bool
-            bool value = as_bool(v);
+            bool value = as_bool(given);
             hash ^= value ? 1 : 0;
             hash *= FNV_PRIME;
-            break;
+            return hash;
         }
         case VAL_NIL: {
-            return int_value(0);
+            return 0;
         }
         case VAL_REF: { // pointer
-            if (is_ref_of(v, OBJ_STRING)) {
-                String *string = as_string(v);
-                hash = chars_hash(string->chars, string->length);
+            if (is_ref_of(given, OBJ_STRING)) {
+                String *string = as_string(given);
+                return string->hash;
             } else {
-                uintptr_t ptr = (uintptr_t) as_ref(v);
+                uintptr_t ptr = (uintptr_t) as_ref(given);
                 const unsigned char* bytes = (const unsigned char*)&ptr;
                 for (size_t i = 0; i < sizeof(void*); i++) {
                     hash ^= bytes[i];
                     hash *= FNV_PRIME;
                 }
+                return hash;
             }
-            break;
         }
         default:
             IMPLEMENTATION_ERROR("bad");
+            return 0;
     }
+}
 
+static Value native_general_hash(int count, Value *given) {
+    (void ) count;
+    Value v = *given;
+    int hash = (int) value_hash(v);
     return int_value(hash);
 }
 
@@ -809,7 +742,6 @@ void init_vm_native() {
     define_native("rand", native_rand, 2);
     define_native("f", native_format, -1);
     define_native("read", native_read, -1);
-    define_native("char_at", native_char_at, 2);
     define_native("type", native_type, 1);
     define_native("native_string_combine_array", native_string_combine_array, 1);
     define_native("native_value_join", native_value_join, 4);
@@ -817,16 +749,13 @@ void init_vm_native() {
     define_native("native_range", native_range, 3);
     define_native("native_array_iter", native_array_iter, 2);
     define_native("native_map_iter", native_map_iter, 1);
-    define_native("native_general_hash", general_hash, 1);
+    define_native("native_general_hash", native_general_hash, 1);
     define_native("native_value_equal", native_value_equal, 2);
     define_native("backtrace", native_backtrace, 0);
     define_native("value_of", native_value_of, 2);
     define_native("subclass_of", native_subclass_of, 2);
     define_native("is_object", native_is_object, 1);
-    define_native("map_delete", native_map_delete, 2);
     define_native("array_copy", native_array_copy, 5);
-    define_native("string_replace", native_string_replace, 4);
-    define_native("substring", native_substring, 3);
 }
 
 void additional_repl_init() {
@@ -846,3 +775,101 @@ void init_static_strings() {
     POSITION = auto_length_string_copy("position");
 }
 
+/**
+ * 如果 LOAD_LIB 不为false，则加载标准库（执行字节码），将标准库的成员导入builtin命名空间中。
+ */
+void load_libraries() {
+    if (!LOAD_LIB) {
+        return;
+    }
+
+    if (load_bytes_into_builtin(liblox_iter, liblox_iter_len, "lib_iter") != INTERPRET_EXECUTE_OK) {
+        exit(1);
+    }
+    if (load_bytes_into_builtin(liblox_core, liblox_core_len, "lib_core") != INTERPRET_EXECUTE_OK) {
+        exit(1);
+    }
+    if (load_bytes_into_builtin(liblox_data_structure, liblox_data_structure_len, "lib_data_structure") != INTERPRET_EXECUTE_OK) {
+        exit(1);
+    }
+    Value class_value;
+
+    table_get(&vm.builtin, auto_length_string_copy("Array"), &class_value);
+    array_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("String"), &class_value);
+    string_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Int"), &class_value);
+    int_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Float"), &class_value);
+    float_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Bool"), &class_value);
+    bool_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Native"), &class_value);
+    native_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Class"), &class_value);
+    class_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Function"), &class_value);
+    function_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Closure"), &class_value);
+    closure_class= as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Method"), &class_value);
+    method_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Module"), &class_value);
+    module_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Nil"), &class_value);
+    nil_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Map"), &class_value);
+    map_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("NativeObject"), &class_value);
+    native_object_class = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("Error"), &class_value);
+    Error = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("TypeError"), &class_value);
+    TypeError = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("ArgError"), &class_value);
+    ArgError = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("IndexError"), &class_value);
+    IndexError = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("NameError"), &class_value);
+    NameError = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("PropertyError"), &class_value);
+    PropertyError = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("ValueError"), &class_value);
+    ValueError = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("FatalError"), &class_value);
+    FatalError = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("CompileError"), &class_value);
+    CompileError = as_class(class_value);
+
+    table_get(&vm.builtin, auto_length_string_copy("IOError"), &class_value);
+    IOError = as_class(class_value);
+
+    add_native_method(string_class, "substring", native_string_method_substring, 2);
+    add_native_method(string_class, "replace", native_string_method_replace, 3);
+    add_native_method(string_class, "char_at", native_string_method_char_at, 1);
+    add_native_method(map_class, "delete", native_map_method_delete, 1);
+
+    preload_finished = true;
+}

@@ -60,6 +60,7 @@ typedef enum ErrorType {
 
 void additional_repl_init();
 void load_libraries();
+uint32_t value_hash(Value given);
 void init_static_strings();
 bool is_subclass(Class *one, Class *two);
 bool multi_value_of(int count, Value *values);

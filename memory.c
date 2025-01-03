@@ -149,6 +149,12 @@ static void blacken_object(Object *object) {
             }
             break;
         }
+        case OBJ_NATIVE_METHOD: {
+            NativeMethod *method = (NativeMethod *) object;
+            mark_object((Object *)method->fun);;
+            mark_value(method->receiver);
+            break;
+        }
         case OBJ_MAP: {
             Map *map = (Map *) object;
             for (int i = 0; i < map->capacity; ++i) {
@@ -324,8 +330,11 @@ void free_object(Object *object) {
             break;
         }
         case OBJ_NATIVE_OBJECT: {
-//            NativeObject *nativeObject = (NativeObject *) object;
             re_allocate(object, sizeof(NativeObject), 0);
+            break;
+        }
+        case OBJ_NATIVE_METHOD: {
+            re_allocate(object, sizeof(NativeMethod), 0);
             break;
         }
         case OBJ_MAP: {

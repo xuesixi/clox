@@ -19,6 +19,7 @@ typedef enum {
   OBJ_ARRAY,
   OBJ_MODULE,
   OBJ_NATIVE_OBJECT,
+  OBJ_NATIVE_METHOD,
   OBJ_MAP,
 } ObjectType;
 
@@ -145,6 +146,12 @@ typedef struct NativeObject {
     NativeObjectType native_type;
 } NativeObject;
 
+typedef struct NativeMethod {
+    Object object;
+    NativeFunction *fun;
+    Value receiver;
+} NativeMethod;
+
 #define is_ref_of(value, ref_type) (is_ref(value) && as_ref(value)->type == (ref_type))
 
 #define as_string(v) ((String *)(as_ref(v)))
@@ -158,6 +165,7 @@ typedef struct NativeObject {
 #define as_module(v) ((Module *)(as_ref(v)))
 #define as_native_object(v) ((NativeObject *)as_ref(v) )
 #define as_map(v) ((Map *)(as_ref(v)) )
+#define as_native_method(v) ((NativeMethod *)as_ref(v) )
 
 String *string_copy(const char *src, int length);
 String *auto_length_string_copy(const char *name);
@@ -178,6 +186,7 @@ Module *new_module(String *path);
 Map *new_map();
 
 NativeObject *new_native_object(NativeObjectType type, int num_used);
+NativeMethod *new_native_method(NativeFunction *fun, Value receiver);
 uint32_t chars_hash(const char *key, int length);
 
 bool map_empty_entry(MapEntry *entry);

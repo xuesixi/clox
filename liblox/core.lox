@@ -1,42 +1,12 @@
-class Obj {
+class Obj {}
 
-}
+class Int {}
 
-class Int {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class Float {}
 
-class Float {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class Bool {}
 
-class Bool {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
-
-class Nil {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class Nil {}
 
 class Function {
     hash() {
@@ -132,9 +102,7 @@ class Map {
         }
         return value;
     }
-    delete(key) {
-        return map_delete(this, key);
-    }
+    # native method: delete(key)
 }
 
 class String {
@@ -147,19 +115,9 @@ class String {
     equal(v) {
         return native_value_equal(this, v);
     }
-
-    char_at(index: Int) {
-        return char_at(this, index);
-    }
-
-    replace(from: Int, to: Int, insert: String) {
-        return string_replace(this, from, to, insert);
-    }
-
-    substring(from: Int, to: Int) {
-        return substring(this, from, to);
-    }
-
+    # native char_at(index: Int): String
+    # native substring(start: Int, end: Int): String
+    # native replace(start: int, end: Int, insert: String): String
 }
 
 class NativeObject {
@@ -181,7 +139,7 @@ class StringIter {
         return this.curr < this.limit;
     }
     next() {
-        return char_at(this.str, this.curr += 1);
+        return this.str.char_at(this.curr += 1);
     }
 }
 
