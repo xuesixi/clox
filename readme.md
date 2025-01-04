@@ -6,18 +6,28 @@ I read the book [Crafting Interpreters](https://craftinginterpreters.com) and ma
 
 Lox is a dynamic-typed, gc language, similar to javascript and python. 
 
-## build
+## docker/build
 
-It currently requires GNU/readline.
+The implementation uses `asprintf()`  a lot. It also requires GNU/readline. A docker image is provided.
 
-* `$ make clox`: produce the executable "clox". You can also do `$ cc *.c -o clox -l readline`
+* `$ docker pull xuesixi/clox` : download the image
+
+***
+
+* `$ docker run --rm -itv $(pwd):/clox xuesixi/clox` : run the image and mount current directory into the `/clox`. You should run this command in the root of the project. 
+    
+	Once inside the container:
+	
+	* `$ cd /clox`: go the `/clox`
+	
+	* `$ make`: produce the executable "clox".  `$ make opt` does the same thing but apply O3 optimization. 
 
 ## usage
 * `$ clox`: run REPL
 * `$ clox path/to/script`: run a lox script 
 
 Other options
-* `-s`: show the compiled bytecode 
+* `-s`: show the compiled bytecode before execution
 * ***`-d`: trace the execution process***
 * ***`-c path/to/output`: compile the script to bytecode and write to the specified output path.***
     * e.g. `$ clox -c hello.byte hello.lox`
@@ -64,12 +74,14 @@ float and int support arithmetic operations.
 
 ## variable
 * `var` to declare a variable. Lox is dynamic typed. A variable can hold values of different types. If not initialized, it has the default value of `nil`
-* ***`const` to declare a constant variable which must be initialized and cannot be mutated.***
+* ***`const` to declare a constant variable which must be initialized and cannot be reassigned.***
 
 ```LOX
 var name = "anda";
 name = 10;
 ```
+
+* ***`var` and `const` allow definining multiple variables at the same time. e.g. `var a, b, c = 1, 2, 3;` The value on the right hand side of the equal sign must be an array. It is an error if the length of the array is less than the number of variables to definie.***
 
 ## scope
 
@@ -123,9 +135,21 @@ for i in arr {
 for i in range(10) { // range is a optimized function
 	print i;
 }
+
+var map = {
+	1: 10,
+	2: 20,
+	3: "huhuh",
+};
+
+for k, v in map {
+	print k;
+	print v;
+}
 ```
 
 ## function
+
 Use the keyword `fun` to declare a function. Functions are first-class values in lox. 
 
 Functions can be nested, You can define functions inside functions. Closure is supported. 
