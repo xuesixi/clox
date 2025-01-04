@@ -21,7 +21,6 @@
 typedef struct Parser {
     Token previous;
     Token current;
-//    Table lexeme_table;
     int break_point;
     int old_break_point;
     int continue_point;
@@ -151,8 +150,6 @@ static inline void emit_u8_u16(uint8_t u8, uint16_t u16);
 static void emit_u8_u8(uint8_t byte1, uint8_t byte2);
 
 static void emit_u16(uint16_t value);
-
-//static void emit_constant(int index);
 
 static void emit_return();
 
@@ -315,8 +312,6 @@ void mark_compiler_roots() {
 
 static void array_literal(bool can_assign) {
 //    (void ) can_assign;
-    // a, b = 1, 2
-    // a, b = c, d = 1, 2
     parse_precedence(PREC_COMMA + 1);
     (void) can_assign;
     int length = 2;
@@ -324,12 +319,7 @@ static void array_literal(bool can_assign) {
         parse_precedence(PREC_COMMA + 1);
         length ++;
     }
-//    if (can_assign && match(TOKEN_EQUAL)) {
-//        expression();
-//        emit_two_bytes(OP_UNPACK_ARRAY, length);
-//    } else {
     emit_u8_u8(OP_MAKE_ARRAY, length);
-//    }
 }
 
 static inline bool lexeme_equal(Token *a, Token *b) {
@@ -363,7 +353,6 @@ static void string(bool can_assign) {
     Value value = ref_value((Object *) str);
     uint16_t index = make_constant(value);
     emit_u8_u16(OP_LOAD_CONSTANT, index);
-//    emit_constant(index);
 }
 
 static void this_expression(bool can_assign) {
@@ -408,7 +397,6 @@ static void class_member() {
             emit_u8_u16(OP_MAKE_STATIC_FIELD, name);
         } else {
             // static field
-            // static num = 10;
             if (match(TOKEN_EQUAL)) {
                 expression();
                 consume(TOKEN_SEMICOLON, "Expect semicolon");
@@ -812,8 +800,6 @@ static void declare_local(bool is_const, Token *token) {
         return;
     }
 
-//    Token *token = &parser.previous;
-
     // 检查同一层scope中是否存在同名的变量
     for (int i = current_scope->local_count - 1; i >= 0; i--) {
         Local *curr = current_scope->locals + i;
@@ -1018,7 +1004,7 @@ static void patch_jump(int from) {
  *
  * then:
  *     ...
- *     jump to [after]
+ *     jump -> after
  *
  * else:
  *     ...
@@ -1830,7 +1816,6 @@ static void super_expression(bool can_assign) {
         int arg_count = argument_list(&arr_as_var_arg);
         named_variable(&super, false);
         emit_byte(OP_SUPER_INVOKE);
-//        emit_byte(method);
         emit_u16(method);
         emit_byte(arg_count);
         if (arr_as_var_arg) {
@@ -2139,7 +2124,7 @@ static inline bool check(TokenType type) {
 static inline void consume(TokenType type, const char *message) {
     if (parser.current.type != type) {
 
-        if (check(TOKEN_EOF) && REPL) {
+        if (check(TOKEN_EOF) && REPL && !parser.has_error) {
 
             // 如果consume的是分号，那么什么都不做
             // 否则让用户继续输入

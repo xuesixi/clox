@@ -95,7 +95,6 @@ void write_to_chunk(Chunk *c, uint8_t data, int line);
 void free_chunk(Chunk *c);
 int constant_mapping(Value value);
 uint16_t add_constant(Chunk *c, Value constant);
-//uint16_t u8_to_u16(uint8_t i0, uint8_t i1);
 void u16_to_u8(uint16_t value, uint8_t *i0, uint8_t *i1);
 
 #define u8_to_u16(i0, i1) ( ( ( (uint16_t) (i1) ) << 8) | (i0) )

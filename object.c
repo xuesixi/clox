@@ -190,7 +190,6 @@ NativeMethod *new_native_method(NativeFunction *fun, Value receiver) {
 
 Array *new_array(int length, bool init_with_nil) {
     Value *values = ALLOCATE(Value, length);
-//    memset(values, 0, sizeof(Value) * length);
     Array *array = (Array *) allocate_object(sizeof(Array), OBJ_ARRAY);
     array->length = length;
     array->values = values;

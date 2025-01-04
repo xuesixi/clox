@@ -219,7 +219,7 @@ static void map_indexing_get() {
     Value hash_result = stack_pop();
     assert_value_type(hash_result, VAL_INT, "int");
     int hash = as_int(hash_result); // [map, key0, hash]
-    for (int i = 0; i < map->capacity; ++i) { ;
+    for (int i = 0; i < map->capacity; ++i) {
         int curr = MODULO(hash + i, map->capacity);
         MapEntry *entry = map->backing + curr;
         if (map_empty_entry(entry)) {
@@ -288,7 +288,7 @@ static void map_indexing_set_with_hash(bool keep_map) {
         } else if (del_mark == NULL && map_del_mark(entry)) {
             del_mark = entry;
         } else if (entry->hash == hash) {
-            // [map, key0, value, ]
+            // [map, key0, value]
             stack_push(entry->key); // map, key0, value, key1
             stack_push(stack_peek(2)); // map, k0, v, k1, k0
             invoke_and_wait(EQUAL, 1);
