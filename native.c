@@ -29,6 +29,7 @@ Class *method_class;
 Class *nil_class;
 Class *module_class;
 Class *native_object_class;
+Class *native_method_class;
 
 Class *Error;
 Class *TypeError;
@@ -412,8 +413,8 @@ static Value native_float(int count, Value *value) {
 static Value native_help(int count, Value *value) {
     (void) count;
     (void) value;
-    printf("You are in the REPL mode because you run_vm clox directly without providing any arguments.\n");
-    printf("You can also do `clox path/to/script` to run_vm a lox script.\n");
+    printf("You are in the REPL mode because you run clox without providing a path to a script.\n");
+    printf("You can also do `clox path/to/script` to run a lox script.\n");
     printf("Or do `clox -h` to see more options\n");
     printf("In this REPL mode, expression results will be printed out automatically in gray color. \n");
     printf("You may also omit the last semicolon for a statement.\n");
@@ -688,17 +689,17 @@ uint32_t value_hash(Value given) {
     }
 }
 
-static Value native_general_hash(int count, Value *given) {
+static Value native_method_general_hash(int count, Value *given) {
     (void ) count;
-    Value v = *given;
+    Value v = given[-1];
     int hash = (int) value_hash(v);
     return int_value(hash);
 }
 
-Value native_value_equal(int count, Value *values) {
+Value native_method_value_equal(int count, Value *values) {
     (void ) count;
-    Value a = values[0];
-    Value b = values[1];
+    Value a = values[-1];
+    Value b = values[0];
     if (a.type != b.type) {
         return bool_value(false);
     }
@@ -749,8 +750,6 @@ void init_vm_native() {
     define_native("native_range", native_range, 3);
     define_native("native_array_iter", native_array_iter, 2);
     define_native("native_map_iter", native_map_iter, 1);
-    define_native("native_general_hash", native_general_hash, 1);
-    define_native("native_value_equal", native_value_equal, 2);
     define_native("backtrace", native_backtrace, 0);
     define_native("value_of", native_value_of, 2);
     define_native("subclass_of", native_subclass_of, 2);
@@ -836,6 +835,9 @@ void load_libraries() {
     table_get(&vm.builtin, auto_length_string_copy("NativeObject"), &class_value);
     native_object_class = as_class(class_value);
 
+    table_get(&vm.builtin, auto_length_string_copy("NativeMethod"), &class_value);
+    native_method_class = as_class(class_value);
+
     table_get(&vm.builtin, auto_length_string_copy("Error"), &class_value);
     Error = as_class(class_value);
 
@@ -870,6 +872,36 @@ void load_libraries() {
     add_native_method(string_class, "replace", native_string_method_replace, 3);
     add_native_method(string_class, "char_at", native_string_method_char_at, 1);
     add_native_method(map_class, "delete", native_map_method_delete, 1);
+
+    add_native_method(int_class, "hash", native_method_general_hash, 0);
+    add_native_method(nil_class, "hash", native_method_general_hash, 0);
+    add_native_method(float_class, "hash", native_method_general_hash, 0);
+    add_native_method(bool_class, "hash", native_method_general_hash, 0);
+    add_native_method(array_class, "hash", native_method_general_hash, 0);
+    add_native_method(map_class, "hash", native_method_general_hash, 0);
+    add_native_method(module_class, "hash", native_method_general_hash, 0);
+    add_native_method(method_class, "hash", native_method_general_hash, 0);
+    add_native_method(closure_class, "hash", native_method_general_hash, 0);
+    add_native_method(class_class, "hash", native_method_general_hash, 0);
+    add_native_method(function_class, "hash", native_method_general_hash, 0);
+    add_native_method(native_class, "hash", native_method_general_hash, 0);
+    add_native_method(string_class, "hash", native_method_general_hash, 0);
+    add_native_method(native_object_class, "hash", native_method_general_hash, 0);
+
+    add_native_method(int_class, "equal", native_method_value_equal, 1);
+    add_native_method(nil_class, "equal", native_method_value_equal, 1);
+    add_native_method(float_class, "equal", native_method_value_equal, 1);
+    add_native_method(bool_class, "equal", native_method_value_equal, 1);
+    add_native_method(array_class, "equal", native_method_value_equal, 1);
+    add_native_method(map_class, "equal", native_method_value_equal, 1);
+    add_native_method(module_class, "equal", native_method_value_equal, 1);
+    add_native_method(method_class, "equal", native_method_value_equal, 1);
+    add_native_method(closure_class, "equal", native_method_value_equal, 1);
+    add_native_method(class_class, "equal", native_method_value_equal, 1);
+    add_native_method(function_class, "equal", native_method_value_equal, 1);
+    add_native_method(native_class, "equal", native_method_value_equal, 1);
+    add_native_method(string_class, "equal", native_method_value_equal, 1);
+    add_native_method(native_object_class, "equal", native_method_value_equal, 1);
 
     preload_finished = true;
 }

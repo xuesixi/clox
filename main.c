@@ -27,7 +27,7 @@ bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
 
 int TRACE_SKIP = -1;
-jmp_buf consume_buf;
+jmp_buf consume_buf;/* Function to insert a literal tab */
 
 static void print_result_with_color(InterpretResult result) {
     switch (result) {
@@ -249,10 +249,11 @@ int main(int argc, char *const argv[]) {
             case 'h':
             default:
                 printf("Options: \n");
-                printf("-s: show the compile result\n");
+                printf("-s: if the given file is a script, show the compiled result before execution\n");
                 printf("-d: trace the execution\n");
-                printf("-c path/to/output: compile and write and result to the specified path\n");
+                printf("-c path/to/output: compile and write the result to the specified path\n");
                 printf("-b: treat the given file as bytecode\n");
+                printf("-v: treat the given file as bytecode and disassemble it (but don't run it)");
                 exit(1);
         }
     }

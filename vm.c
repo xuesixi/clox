@@ -126,7 +126,7 @@ Class *value_class(Value value) {
                 case OBJ_NATIVE_OBJECT:
                     return native_object_class;
                 case OBJ_NATIVE_METHOD:
-                    return NULL;
+                    return native_method_class;
                 case OBJ_UPVALUE:
                     return NULL;
                     IMPLEMENTATION_ERROR("bad");
@@ -167,6 +167,22 @@ static inline void invoke_and_wait(String *name, int arg_count) {
     int count = vm.frame_count;
     invoke_property(name, arg_count);
     run_frame_until(count);
+}
+
+static void string_indexing_get() {
+    // [str, index]
+    Value index_value = stack_pop();
+    assert_value_type(index_value, VAL_INT, "int");
+    Value str_value = stack_pop();
+    String *str = as_string(str_value);
+    int index = as_int(index_value);
+    if (index < 0 || index >= str->length) {
+        throw_user_level_runtime_error(Error_IndexError, "IndexError: index %d is out of bound: [0, %d]", index,
+                                       str->length - 1);
+    } else {
+        String *char_at_index = string_copy(str->chars + index, 1);
+        stack_push(ref_value_cast(char_at_index));
+    }
 }
 
 static void array_indexing_get() {
@@ -660,7 +676,7 @@ static void invoke_property(String *name, int arg_count) {
                 invoke_from_class(native_class, name, arg_count);
                 break;
             case OBJ_NATIVE_METHOD:
-                invoke_from_class(NULL, name, arg_count);
+                invoke_from_class(native_method_class, name, arg_count);
                 break;
             default:
                 throw_new_runtime_error(Error_PropertyError, "PropertyError: no such property: %s", name->chars);
@@ -671,18 +687,7 @@ static void invoke_property(String *name, int arg_count) {
             case VAL_BOOL:
             case VAL_FLOAT:
             case VAL_NIL:
-                if (name == HASH) {
-                    // key -> hash
-                    stack_pop();
-                    stack_push(int_value(value_hash(receiver)));
-                } else if (name == EQUAL) {
-                    // a, b -> bool
-                    bool eq = value_equal(receiver, stack_pop());
-                    stack_pop();
-                    stack_push(bool_value(eq));
-                } else {
-                    invoke_from_class(value_class(receiver), name, arg_count);
-                }
+                invoke_from_class(value_class(receiver), name, arg_count);
                 break;
             default:
                 IMPLEMENTATION_ERROR("bad");
@@ -1906,6 +1911,8 @@ static InterpretResult run_frame_until(int end_when) {
                     array_indexing_get();
                 } else if (is_ref_of(target, OBJ_MAP)) {
                     map_indexing_get();
+                } else if (is_ref_of(target, OBJ_STRING)){
+                    string_indexing_get();
                 } else {
                     throw_user_level_runtime_error(Error_TypeError, "TypeError: TypeError: the value does not support indexing");
                 }

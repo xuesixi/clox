@@ -1,11 +1,4 @@
-class Obj {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class Obj {} 
 
 class Int {}
 
@@ -15,60 +8,21 @@ class Bool {}
 
 class Nil {}
 
-class Function {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class Function {}
 
-class Closure {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class Closure {}
 
-class Method {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class Method {}
 
-class Native {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
+class Module {}
 
-}
+class Class {}
 
-class Module {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class NativeObject {}
 
-class Class {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-}
+class NativeMethod {}
+
+class Native {}
 
 class Array {
     iterator() {
@@ -76,12 +30,6 @@ class Array {
     }
     join(delimiter: String = ", ", prefix: String = "[", suffix: String = "]") {
         return native_value_join(delimiter, prefix, suffix, this);
-    }
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
     }
     copy(start: Int = 0, end: Int = this.length, new_length: Int = end - start) {
         var new_arr = [new_length];
@@ -94,12 +42,6 @@ class Map {
     iterator() {
         return native_map_iter(this);
     }
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
     get_or(key, default_value) {
         var value;
         try {
@@ -109,30 +51,11 @@ class Map {
         }
         return value;
     }
-    # native method: delete(key)
 }
 
 class String {
     iterator() {
         return StringIter(this);
-    }
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
-    }
-    # native char_at(index: Int): String
-    # native substring(start: Int, end: Int): String
-    # native replace(start: int, end: Int, insert: String): String
-}
-
-class NativeObject {
-    hash() {
-        return native_general_hash(this);
-    }
-    equal(v) {
-        return native_value_equal(this, v);
     }
 }
 
@@ -237,7 +160,7 @@ class IOError: Error {
 }
 
 export 
-Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, Closure, Map,
+Obj, String, Array, Int, Float, Bool, Nil, Function, Method, Native, Module, Class, Closure, Map, NativeMethod, NativeObject,
 concat, join, string_join, benchmark, 
 Error, TypeError, IndexError, ArgError, NameError, PropertyError, ValueError, FatalError, CompileError, IOError
 ;

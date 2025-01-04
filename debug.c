@@ -51,14 +51,16 @@ static int constant16_instruction(const char *name, const Chunk *chunk, int offs
 }
 
 static int invoke_instruction(const char *name, const Chunk *chunk, int offset) {
-    uint8_t name_index = chunk->code[offset + 1];
-    uint8_t arg_count = chunk->code[offset + 2];
+    uint8_t name_index0 = chunk->code[offset + 1];
+    uint8_t name_index1 = chunk->code[offset + 2];
+    int name_index = u8_to_u16(name_index0, name_index1);
+    uint8_t arg_count = chunk->code[offset + 3];
     Value method_name = chunk->constants.values[name_index];
-    printf("%-23s    ", name);
+    printf("%-23s ", name);
     print_value_with_color(method_name);
     printf("(%d)", arg_count);
     NEW_LINE();
-    return offset + 3;
+    return offset + 4;
 }
 
 static int jump_instruction(const char *name, const Chunk *chunk, int offset, bool forward) {
@@ -67,7 +69,7 @@ static int jump_instruction(const char *name, const Chunk *chunk, int offset, bo
     int index = u8_to_u16(i0, i1);
     int target = forward ? offset + 3 + index : offset + 3 - index;
 
-    printf("%-23s   ", name);
+    printf("%-23s ", name);
     start_color(BOLD_RED);
     printf("-> %d\n", target);
     end_color();
@@ -82,12 +84,12 @@ int disassemble_instruction(Chunk *chunk, int offset, bool line_break) {
 
     // print line number
     if (offset > 0 && chunk->lines[offset] == chunk->lines[offset-1]) {
-        printf("     ");
+        printf("       ");
     }else {
         if (line_break) {
             printf("\n");
         }
-        printf("%4d ", chunk->lines[offset]);
+        printf("%4d   ", chunk->lines[offset]);
     }
 
     printf("     %4d   ", offset);

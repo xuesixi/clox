@@ -23,6 +23,7 @@ extern Class *method_class;
 extern Class *nil_class;
 extern Class *module_class;
 extern Class *native_object_class;
+extern Class *native_method_class;
 
 extern Class *Error;
 extern Class *TypeError;
