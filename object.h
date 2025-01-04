@@ -29,15 +29,6 @@ typedef enum NativeObjectType {
     NativeMapIter
 } NativeObjectType;
 
-typedef enum NativeInterface {
-    INTER_NULL,
-    INTER_HAS_NEXT,
-    INTER_NEXT,
-    INTER_ITERATOR,
-    INTER_HASH,
-    INTER_EQUAL,
-} NativeInterface;
-
 typedef struct Object{
     ObjectType type;
     Object *next;

@@ -38,7 +38,7 @@ static inline void reset_stack();
 
 static InterpretResult run_frame_until(int end_when);
 
-static void invoke_property(String *name, int arg_count, NativeInterface interface);
+static void invoke_property(String *name, int arg_count);
 
 static inline bool if_read_byte(OpCode op);
 
@@ -70,7 +70,7 @@ static Value bind_method(Class *class, String *name, Value receiver);
 
 static void close_upvalue(Value *position);
 
-static void invoke_native_object(int arg_count, NativeInterface interface, NativeObject *native_object);
+static void invoke_native_object(int arg_count, String *name, NativeObject *native_object);
 
 
 /**
@@ -163,9 +163,9 @@ static inline void stack_swap(int n) {
     stack_set(0, temp);
 }
 
-static inline void invoke_and_wait(String *name, int arg_count, NativeInterface interface) {
+static inline void invoke_and_wait(String *name, int arg_count) {
     int count = vm.frame_count;
-    invoke_property(name, arg_count, interface);
+    invoke_property(name, arg_count);
     run_frame_until(count);
 }
 
@@ -215,7 +215,7 @@ static void map_indexing_get() {
         return;
     }
     stack_push(stack_peek(0)); // [map, key0, key0]
-    invoke_and_wait(HASH, 0, INTER_HASH);
+    invoke_and_wait(HASH, 0);
     Value hash_result = stack_pop();
     assert_value_type(hash_result, VAL_INT, "int");
     int hash = as_int(hash_result); // [map, key0, hash]
@@ -230,7 +230,7 @@ static void map_indexing_get() {
         } else if (!is_absence(entry->key) && entry->hash == hash) {
             stack_push(entry->key); // map, key0, key1
             stack_push(stack_peek(1)); // map, key0, key1, key0
-            invoke_and_wait(EQUAL, 1, INTER_EQUAL); // map, key0, bool
+            invoke_and_wait(EQUAL, 1); // map, key0, bool
             Value cmp_result = stack_pop(); // map, key0
             assert_value_type(cmp_result, VAL_BOOL, "bool");
             bool eq = as_bool(cmp_result);
@@ -291,7 +291,7 @@ static void map_indexing_set_with_hash(bool keep_map) {
             // [map, key0, value, ]
             stack_push(entry->key); // map, key0, value, key1
             stack_push(stack_peek(2)); // map, k0, v, k1, k0
-            invoke_and_wait(EQUAL, 1, INTER_EQUAL);
+            invoke_and_wait(EQUAL, 1);
             // map, k0, v, bool
             Value eq_result = stack_pop(); // map, k0, v
             assert_value_type(eq_result, VAL_BOOL, "bool");
@@ -353,7 +353,7 @@ static void map_indexing_set(bool keep_map) {
     }
 
     stack_push(stack_peek(1)); // map, key0, value, key0
-    invoke_and_wait(HASH, 0, INTER_HASH);
+    invoke_and_wait(HASH, 0);
     // map, key0, value, hash
 
     map_indexing_set_with_hash(keep_map);
@@ -364,7 +364,7 @@ void map_delete() {
     // [map, key] -> [map, key, value]
     Map *map = as_map(stack_peek(1));
     stack_push(stack_peek(0)); // [map, key, key]
-    invoke_and_wait(HASH, 0, INTER_HASH); // [map, key, hash]
+    invoke_and_wait(HASH, 0); // [map, key, hash]
     Value hash_result = stack_pop(); // map, key0, value
     assert_value_type(hash_result, VAL_INT, "int");
     int hash = as_int(hash_result); // map, key0, value
@@ -378,7 +378,7 @@ void map_delete() {
         } else if (!map_del_mark(entry) && entry->hash == hash) {
             stack_push(entry->key); // map, key0, key1
             stack_push(stack_peek(1)); // map, k0, k1, k0
-            invoke_and_wait(EQUAL, 1, INTER_EQUAL);
+            invoke_and_wait(EQUAL, 1);
             // map, k0, bool
             Value eq_result = stack_pop(); // map, k0
             assert_value_type(eq_result, VAL_BOOL, "bool");
@@ -515,88 +515,83 @@ inline void assert_value_type(Value value, ValueType type, const char *expected_
  * @param interface 接口（预期行为）
  * @param native_object
  */
-static void invoke_native_object(int arg_count, NativeInterface interface, NativeObject *native_object) {
+static void invoke_native_object(int arg_count, String *name, NativeObject *native_object) {
     (void ) arg_count;
-    switch (interface) {
-        case INTER_ITERATOR:
-            switch (native_object->native_type) {
-                case NativeRangeIter: {
-                    // do nothing, it is by itself an iterator
-                    return;
-                }
-                default:
-                    goto error;
+    if (name == ITERATOR) {
+        switch (native_object->native_type) {
+            case NativeRangeIter: {
+                // do nothing, it is by itself an iterator
+                return;
             }
-            break;
-        case INTER_HAS_NEXT: // [iter, iter] -> [iter, bool]
-            switch (native_object->native_type) {
-                case NativeRangeIter: {
-                    // curr, limit, step
-                    stack_pop();
-                    bool has_next = as_int(native_object->values[0]) < as_int(native_object->values[1]);
-                    stack_push(bool_value(has_next));
-                    return;
-                }
-                case NativeArrayIter: {
-                    // curr, array
-                    stack_pop();
-                    bool has_next = as_int(native_object->values[0]) < as_int(native_object->values[2]);
-                    stack_push(bool_value(has_next));
-                    return;
-                }
-                case NativeMapIter: {
-                    // curr, map
-                    stack_pop();
-                    Map *map = as_map(native_object->values[1]);
-                    int curr = as_int(native_object->values[0]);
-                    bool has_next = false;
-                    for (int i = curr; i < map->capacity; ++i) {
-                        if (!is_absence(map->backing[i].key)) {
-                            has_next = true;
-                            native_object->values[0] = int_value(i);
-                            break;
-                        }
+            default:
+                goto error;
+        }
+    } else if (name == HAS_NEXT) {
+        switch (native_object->native_type) {
+            case NativeRangeIter: {
+                // curr, limit, step
+                stack_pop();
+                bool has_next = as_int(native_object->values[0]) < as_int(native_object->values[1]);
+                stack_push(bool_value(has_next));
+                return;
+            }
+            case NativeArrayIter: {
+                // curr, array
+                stack_pop();
+                bool has_next = as_int(native_object->values[0]) < as_int(native_object->values[2]);
+                stack_push(bool_value(has_next));
+                return;
+            }
+            case NativeMapIter: {
+                // curr, map
+                stack_pop();
+                Map *map = as_map(native_object->values[1]);
+                int curr = as_int(native_object->values[0]);
+                bool has_next = false;
+                for (int i = curr; i < map->capacity; ++i) {
+                    if (!is_absence(map->backing[i].key)) {
+                        has_next = true;
+                        native_object->values[0] = int_value(i);
+                        break;
                     }
-                    stack_push(bool_value(has_next));
-                    return;
                 }
-                default:
-                    goto error;
+                stack_push(bool_value(has_next));
+                return;
             }
-            break;
-        case INTER_NEXT: // [iter, iter] -> [iter, item]
-            switch (native_object->native_type) {
-                case NativeRangeIter: {
-                    stack_pop();
-                    int result = as_int(native_object->values[0]) += as_int(native_object->values[2]);
-                    stack_push(int_value(result));
-                    return;
-                }
-                case NativeArrayIter: {
-                    stack_pop();
-                    Value result = as_array(native_object->values[1])->values[as_int(native_object->values[0])++];
-                    stack_push(result);
-                    return;
-                }
-                case NativeMapIter: {
-                    stack_pop();
-                    MapEntry entry = as_map(native_object->values[1])->backing[as_int(native_object->values[0])];
-                    as_int(native_object->values[0])++;
-                    Array *tuple = new_array(2, false);
-                    tuple->values[0] = entry.key;
-                    tuple->values[1] = entry.value;
-                    stack_push(ref_value((Object *)tuple));
-                    return;
-                }
-                default:
-                    goto error;
+            default:
+                goto error;
+        }
+    } else if (name == NEXT) {
+        switch (native_object->native_type) {
+            case NativeRangeIter: {
+                stack_pop();
+                int result = as_int(native_object->values[0]) += as_int(native_object->values[2]);
+                stack_push(int_value(result));
+                return;
             }
-            break;
-        default:
-            goto error;
+            case NativeArrayIter: {
+                stack_pop();
+                Value result = as_array(native_object->values[1])->values[as_int(native_object->values[0])++];
+                stack_push(result);
+                return;
+            }
+            case NativeMapIter: {
+                stack_pop();
+                MapEntry entry = as_map(native_object->values[1])->backing[as_int(native_object->values[0])];
+                as_int(native_object->values[0])++;
+                Array *tuple = new_array(2, false);
+                tuple->values[0] = entry.key;
+                tuple->values[1] = entry.value;
+                stack_push(ref_value((Object *)tuple));
+                return;
+            }
+            default:
+                goto error;
+        }
+    } else {
+        error:
+        throw_new_runtime_error(Error_TypeError, "TypeError: target does not support such operation");
     }
-    error:
-    throw_new_runtime_error(Error_TypeError, "TypeError: target does not support such operation");
 }
 
 /**
@@ -604,7 +599,7 @@ static void invoke_native_object(int arg_count, NativeInterface interface, Nativ
  * @param name 名字
  * @param arg_count 参数个数
  */
-static void invoke_property(String *name, int arg_count, NativeInterface interface) {
+static void invoke_property(String *name, int arg_count) {
     Value receiver = stack_peek(arg_count);
     if (is_ref(receiver)){
         switch (receiver.as.reference->type) {
@@ -649,7 +644,7 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
                 break;
             case OBJ_NATIVE_OBJECT: {
                 NativeObject *native_object = as_native_object(receiver);
-                invoke_native_object(arg_count, interface, native_object);
+                invoke_native_object(arg_count, name, native_object);
                 break;
             }
             case OBJ_CLOSURE:
@@ -676,11 +671,11 @@ static void invoke_property(String *name, int arg_count, NativeInterface interfa
             case VAL_BOOL:
             case VAL_FLOAT:
             case VAL_NIL:
-                if (interface == INTER_HASH) {
+                if (name == HASH) {
                     // key -> hash
                     stack_pop();
                     stack_push(int_value(value_hash(receiver)));
-                } else if (interface == INTER_EQUAL) {
+                } else if (name == EQUAL) {
                     // a, b -> bool
                     bool eq = value_equal(receiver, stack_pop());
                     stack_pop();
@@ -1848,7 +1843,7 @@ static InterpretResult run_frame_until(int end_when) {
                 // code: op, name_index, arg_count
                 String *name = read_constant_string();
                 int arg_count = read_byte();
-                invoke_property(name, arg_count, INTER_NULL);
+                invoke_property(name, arg_count);
                 break;
             }
             case OP_INHERIT: {
@@ -2026,21 +2021,21 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             }
             case OP_GET_ITERATOR: {
-                invoke_property(ITERATOR, 0, INTER_ITERATOR);
+                invoke_property(ITERATOR, 0);
                 break;
             }
             case OP_JUMP_FOR_ITER: {
                 // [iter]
                 int offset = read_uint16();
                 stack_push(stack_peek(0)); // [iter, iter]
-                invoke_and_wait(HAS_NEXT, 0, INTER_HAS_NEXT); // [iter, bool]
+                invoke_and_wait(HAS_NEXT, 0); // [iter, bool]
                 if (is_falsy(stack_pop())) {
                     curr_frame->PC += offset;
                     break;
                 }
                 // [iter, iter]
                 stack_push(stack_peek(0));
-                invoke_property(NEXT, 0, INTER_NEXT);
+                invoke_property(NEXT, 0);
                 // [iter, item]
                 break;
             }
