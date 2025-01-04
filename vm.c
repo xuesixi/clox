@@ -1934,7 +1934,21 @@ static InterpretResult run_frame_until(int end_when) {
                 break;
             }
             case OP_UNPACK_ARRAY: {
-                read_byte();
+                int len = read_byte();
+                // [arr] -> [v0, v1, ... v_n]
+                Value v = stack_pop();
+                if (!is_ref_of(v, OBJ_ARRAY)) {
+                    throw_user_level_runtime_error(Error_TypeError, "TypeError: only arrays can be unpacked");
+                    break;
+                }
+                Array *array = as_array(v);
+                if (array->length < len) {
+                    throw_user_level_runtime_error(Error_TypeError, "ValueError: array of length %d cannot be unpacked into %d elements", array->length, len);
+                    break;
+                }
+                for (int i = 0; i < len; ++i) {
+                    stack_push(array->values[i]);
+                }
                 break;
             }
             case OP_MAKE_STATIC_FIELD: {

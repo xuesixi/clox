@@ -106,7 +106,11 @@ static void indexing(bool can_assign);
 
 static inline bool lexeme_equal(Token *a, Token *b);
 
+static void iteration_statement() ;
+
 static inline void begin_scope();
+
+static void new_var_declaration(bool is_public, bool is_const);
 
 static void declare_local(bool is_const, Token *token);
 
@@ -125,10 +129,6 @@ static void clear_scope(int to);
 static inline void block_statement();
 
 static inline void return_statement();
-
-//static void iteration_statement();
-
-static void new_iteration_statement();
 
 static void set_new_scope(Scope *scope, FunctionType type);
 
@@ -224,11 +224,7 @@ static int emit_jump(uint8_t jump_op);
 
 static void emit_goto(int dest);
 
-static void var_declaration(bool is_public);
-
 static void fun_declaration(bool is_public);
-
-static void const_declaration(bool is_public);
 
 static int parse_identifier_declaration(bool is_const);
 
@@ -590,9 +586,9 @@ static void declaration() {
         }
     }
     if (match(TOKEN_VAR)) {
-        var_declaration(is_export);
+        new_var_declaration(is_export, false);
     } else if (match(TOKEN_CONST)) {
-        const_declaration(is_export);
+        new_var_declaration(is_export, true);
     } else if (match(TOKEN_FUN)) {
         fun_declaration(is_export);
     } else if (match(TOKEN_CLASS)) {
@@ -738,9 +734,19 @@ static void fun_declaration(bool is_public) {
     }
 }
 
-static void var_declaration(bool is_public) {
+static void new_var_declaration(bool is_public, bool is_const) {
 
-    int index = parse_identifier_declaration(false);
+    static int indices[UINT8_MAX + 1];
+    int count = 0;
+
+    do {
+        if (count == UINT8_MAX) {
+            error_at_previous("Cannot have more than "XSTR(UINT8_MAX)" for local variables");
+        }
+        int index = parse_identifier_declaration(false);
+        indices[count++] = index;
+        mark_initialized();
+    } while (match(TOKEN_COMMA));
 
     if (match(TOKEN_COLON)) {
         parse_type_hint();
@@ -748,46 +754,46 @@ static void var_declaration(bool is_public) {
 
     if (match(TOKEN_EQUAL)) {
         expression();
-    } else {
-        emit_byte(OP_LOAD_NIL);
-    }
-    consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the var statement");
-
-    if (current_scope->depth == 0) {
-        if (is_public) {
-            emit_u8_u16(OP_DEF_PUB_GLOBAL, index);
-        } else {
-            emit_u8_u16(OP_DEF_GLOBAL, index);
+        if (count > 1) {
+            emit_u8_u8(OP_UNPACK_ARRAY, count);
+        }
+    } else if (!is_const) {
+        for (int i = 0; i < count; ++i) {
+            emit_byte(OP_LOAD_NIL);
         }
     } else {
-        mark_initialized();
+        // const without initialization is an error!
+        error_at_current("const variables must be initialized");
+        return;
+    }
+    consume(TOKEN_SEMICOLON, "Expect ';' after end the var declaration");
+
+    if (current_scope->depth == 0) {
+        if (is_const) {
+            if (is_public) {
+                for (int i = count - 1; i >= 0; i --) {
+                    emit_u8_u16(OP_DEF_PUB_GLOBAL_CONST, indices[i]);
+                }
+            } else {
+                for (int i = count - 1; i >= 0; i --) {
+                    emit_u8_u16(OP_DEF_GLOBAL_CONST, indices[i]);
+                }
+            }
+        } else {
+            if (is_public) {
+                for (int i = count - 1; i >= 0; i --) {
+                    emit_u8_u16(OP_DEF_PUB_GLOBAL, indices[i]);
+                }
+            } else {
+                for (int i = count - 1; i >= 0; i --) {
+                    emit_u8_u16(OP_DEF_GLOBAL, indices[i]);
+                }
+            }
+        }
     }
 
     // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
-}
 
-static void const_declaration(bool is_public) {
-
-    int index = parse_identifier_declaration(true);
-
-    if (match(TOKEN_COLON)) {
-        parse_type_hint();
-    }
-
-    consume(TOKEN_EQUAL, "A const variable must be initialized");
-    expression();
-    consume(TOKEN_SEMICOLON, "A semicolon is needed to terminate the const statement");
-
-    if (current_scope->depth == 0) {
-        if (is_public) {
-            emit_u8_u16(OP_DEF_PUB_GLOBAL_CONST, index);
-        } else {
-            emit_u8_u16(OP_DEF_GLOBAL_CONST, index);
-        }
-    } else {
-        current_scope->locals[current_scope->local_count - 1].depth = current_scope->depth;
-    }
-    // 局部变量不需要额外操作。先前把初始值或者nil置入栈中就足够了。
 }
 
 /**
@@ -947,7 +953,7 @@ static void statement() {
         if (check(TOKEN_LEFT_PAREN)) {
             for_statement();
         } else {
-            new_iteration_statement();
+            iteration_statement();
         }
     } else if (match(TOKEN_SWITCH)) {
         switch_statement();
@@ -1082,16 +1088,24 @@ static void loop_back(int start) {
  *
  *
  */
-static void new_iteration_statement() {
+static void iteration_statement() {
 
-    consume(TOKEN_IDENTIFIER, "Expect an identifier");
-    Token item = parser.previous;
-    consume(TOKEN_IN, "Expect 'in'");
+    int count = 0;
+    static Token tokens[UINT8_MAX + 1];
+    do {
+        if (count == UINT8_MAX) {
+            error_at_previous("Cannot have more than "XSTR(UINT8_MAX)" for local variables");
+            return;
+        }
+        consume(TOKEN_IDENTIFIER, "Expect an identifier");
+        tokens[count++] = parser.previous;
+    } while (match(TOKEN_COMMA));
+
+    consume(TOKEN_IN, "Expect 'in' ");
 
     expression(); // [iterable]
 
     begin_scope();
-//    emit_invoke_no_arg("iterator"); // [iter]
     emit_byte(OP_GET_ITERATOR);
     Token iter = literal_token("$iter");
     declare_identifier_token(&iter);
@@ -1109,10 +1123,14 @@ static void new_iteration_statement() {
     int condition = current_chunk()->count;
 
     int to_end = emit_jump(OP_JUMP_FOR_ITER);
-
+    if (count > 1) {
+        emit_u8_u8(OP_UNPACK_ARRAY, count);
+    }
     begin_scope();
-    declare_identifier_token(&item);
-    mark_initialized(); // [iter, item]
+    for (int i = 0; i < count; ++i) {
+        declare_identifier_token(tokens + i);
+        mark_initialized(); // [iter, item...]
+    }
 
     consume(TOKEN_LEFT_BRACE, "A { is required");
     while (!check(TOKEN_EOF) && !check(TOKEN_RIGHT_BRACE)) {
@@ -1134,15 +1152,6 @@ static void new_iteration_statement() {
     restore_continue_point();
     restore_break_point();
 }
-
-//static void unpack_iterable() {
-//    // [iterable]
-//
-//    // iter, 1
-//    // copy, getnext, swap,
-//
-//    // [items...]
-//}
 
 /**
  * start:
@@ -1322,7 +1331,7 @@ static void for_statement() {
     if (match(TOKEN_SEMICOLON)) {
 
     } else if (match(TOKEN_VAR)) {
-        var_declaration(false);
+        new_var_declaration(false, false);
     } else {
         expression_statement();
     }

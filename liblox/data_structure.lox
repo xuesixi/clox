@@ -2,6 +2,14 @@
 // empty entry: both key and value are nil
 // del mark: key is nil, value is not nil
 class HashMap {
+
+    static with_capacity(capacity: Int) {
+        var m = HashMap();
+        m.capacity = capacity;
+        m.backing = [capacity][3];
+        return m;
+    }
+
     init() {
         this.size = 0;
         this.capacity = 0;

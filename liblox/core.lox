@@ -1,12 +1,47 @@
-class Obj {}
+class Obj {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
+}
 
-class Int {}
+class Int {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
+}
 
-class Float {}
+class Float {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
+}
 
-class Bool {}
+class Bool {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
+}
 
-class Nil {}
+class Nil {
+    hash() {
+        return native_general_hash(this);
+    }
+    equal(v) {
+        return native_value_equal(this, v);
+    }
+}
 
 class Function {
     hash() {
