@@ -1178,105 +1178,80 @@ static void while_statement() {
     restore_break_point();
 }
 
-/**
- * jump -> start
- * 
- * temp:
- *     jump -> end
- * 
- * start:
- *     expression_0  // [value]
- * 
- * case 1:
- *     expression_1  // [value, exp1]
- *     if not equal, jump -> case 2
- *     pop expression_1
- *     pop expression_0
- *     statement...
- *     jump -> temp
- * 
- * case 2:
- *     pop expression_1 // [value]
- *     expression_2     // [value, exp2]
- *     if not equal, jump -> default
- *     pop expression_2
- *     pop expression_0
- *     statement...
- *     jump -> temp
- * 
- * default:
- *     pop expression_2
- *     pop expression_1
- *     statement....
- * 
- * end:
- * 
- * */
 static void switch_statement() {
-    consume(TOKEN_LEFT_PAREN, "Expect ( to start the expression for switch");
 
-    int start = emit_jump(OP_JUMP);
+    /**
+     * switch num {
+     *      case 1:
+     *          print 1;
+     *      case 2:
+     *          print 2;
+     *      case 3 | 4 | 5 | 6: {
+     *          print "cool";
+     *      }
+     *      default: {
+     *          print "final";
+     *      }
+     * }
+     */
 
-    int temp = current_chunk()->count;
-    int to_end = emit_jump(OP_JUMP);
+#define ONE_CASE_EXPR_LIMIT 64
+#define CASE_LIMIT 256
 
-    patch_jump(start);
+    static int one_case_expr[ONE_CASE_EXPR_LIMIT];
+    static int cases[CASE_LIMIT];
+    int one_case_count = 0;
+    int case_count = 0;
 
-    expression();
+    expression(); // [value]
 
-    consume(TOKEN_RIGHT_PAREN, "Expect ) to end the expression for switch");
-    consume(TOKEN_LEFT_BRACE, "Expect { to start switch cases");
-    int bridge = -1;
-    while (!check(TOKEN_EOF) && match(TOKEN_CASE)) {
-        if (bridge != -1) {
-            patch_jump(bridge);
-            emit_byte(OP_POP);
+    consume(TOKEN_LEFT_BRACE, "Expect '{' to start switch cases");
+
+    while (match(TOKEN_CASE)) {
+
+        one_case_count = 0;
+        do {
+            expression(); // [value] -> [value, expr]
+            one_case_expr[one_case_count++] = emit_jump(OP_JUMP_IF_EQUAL);
+            emit_byte(OP_POP); // [value, expr] -> [value]
+        } while (match(TOKEN_PIPE));
+
+        // [value]
+        // reaching here means all expr in this case fails, so jump to the end of this case (start of next case)
+        int end_case = emit_jump(OP_JUMP);
+
+        consume(TOKEN_COLON, "Expect ':' for each case");
+
+        for (int i = 0; i < one_case_count; ++i) {
+            patch_jump(one_case_expr[i]);
         }
-        if (match(TOKEN_NIL) || match(TOKEN_FALSE) || match(TOKEN_TRUE)) {
-            literal(false);
-        } else if (match(TOKEN_FLOAT)) {
-            float_num(false);
-        } else if (match(TOKEN_INT)) {
-            int_num(false);
-        } else if (match(TOKEN_STRING)) {
-            string(false);
-        } else {
-            error_at_current("only constant values can be used as switch cases");
-            return;
-        }
-        consume(TOKEN_COLON, "Expect ':' after each case");
-        bridge = emit_jump(OP_JUMP_IF_NOT_EQUAL);
+
+        // pop both value and expr. [value, expr] -> []
         emit_byte(OP_POP);
         emit_byte(OP_POP);
 
         statement();
-        if (!check(TOKEN_CASE) && !check(TOKEN_DEFAULT)) {
-            error_at_current("Use {} to group multiple statements in one case");
-            return;
-        }
-        loop_back(temp);
+
+        cases[case_count++] = emit_jump(OP_JUMP); // to the end of the switch
+
+        patch_jump(end_case); // end of this case, i.e. start of the next case
     }
 
-    patch_jump(bridge);
-    emit_byte(OP_POP);
-
-    // if the switch statement has no any cases, we only have one expression to pop
-    // otherwise, we need to pop two
-    if (bridge != -1) {
-        emit_byte(OP_POP);
-    }
+    // reaching here means all cases have failed
+    emit_byte(OP_POP); // [value] -> []
 
     if (match(TOKEN_DEFAULT)) {
-        consume(TOKEN_COLON, "Expect ':' after each case");
+        consume(TOKEN_COLON, "Expect ':' after default" );
         statement();
-        if (!check(TOKEN_RIGHT_BRACE)) {
-            error_at_current("Use {} to group multiple statements in one case");
-            return;
-        }
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' to end the switch statement");
+
+    for (int i = 0; i < case_count; ++i) {
+        patch_jump(cases[i]);
     }
 
-    patch_jump(to_end);
-    consume(TOKEN_RIGHT_BRACE, "Expect } to end the switch statement");
+#undef ONE_CASE_EXPR_LIMIT
+#undef CASE_LIMIT
 }
 
 /*

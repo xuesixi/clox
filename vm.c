@@ -1722,6 +1722,15 @@ static InterpretResult run_frame_until(int end_when) {
                 }
                 break;
             }
+            case OP_JUMP_IF_EQUAL: {
+                uint16_t offset = read_uint16();
+                Value b = stack_peek(0);
+                Value a = stack_peek(1);
+                if (value_equal(a, b)) {
+                    curr_frame->PC += offset;
+                }
+                break;
+            }
             case OP_POP_JUMP_IF_FALSE: {
                 uint16_t offset = read_uint16();
                 if (is_falsy(stack_pop())) {

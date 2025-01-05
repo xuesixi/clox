@@ -40,6 +40,7 @@ typedef enum OpCode{
     OP_JUMP_BACK, // op, offset16: ip -= offset16. 不消耗栈顶的值
     OP_JUMP, // op, offset16: 无条件跳转：ip += offset16
     OP_JUMP_IF_NOT_EQUAL, // op, offset16: 如果栈顶的两个值不相等，则跳转
+    OP_JUMP_IF_EQUAL, // op, offset: 如果栈顶的两个值相等，跳转
     OP_POP_JUMP_IF_FALSE,
     OP_POP_JUMP_IF_TRUE,
     OP_CALL, // op, arg_count: 将栈顶的值视为一个可调用对象，调用之。

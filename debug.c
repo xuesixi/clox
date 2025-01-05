@@ -254,6 +254,8 @@ int disassemble_instruction(Chunk *chunk, int offset, bool line_break) {
             return simple_instruction("THROW", offset);
         case OP_TEST_VALUE_OF:
             return byte_instruction("TEST_VALUE_OF", chunk, offset, "amount");
+        case OP_JUMP_IF_EQUAL:
+            return jump_instruction("JUMP_IF_EQUAL", chunk, offset, true);
         default:
             printf("Unknown instruction: %d\n", instruction);
             return -1;
