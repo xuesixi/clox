@@ -1012,10 +1012,8 @@ static void patch_jump(int from) {
  * after:
  */
 static void if_statement() {
-    consume(TOKEN_LEFT_PAREN, "Expect ( to start the condition after if");
     // condition
     expression();
-    consume(TOKEN_RIGHT_PAREN, "Expect ) to end the condition");
 
     // jump to else if false
     int to_else = emit_jump(OP_POP_JUMP_IF_FALSE);
@@ -1155,14 +1153,12 @@ static void iteration_statement() {
  * end:
  * */
 static void while_statement() {
-    consume(TOKEN_LEFT_PAREN, "Expect ( to start the condition");
 
     save_continue_point();
     int condition = current_chunk()->count;
 
     // condition:
     expression();
-    consume(TOKEN_RIGHT_PAREN, "Expect ) to end the condition");
     save_break_point();
     int to_end = emit_jump(OP_POP_JUMP_IF_FALSE);
 

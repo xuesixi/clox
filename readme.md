@@ -100,19 +100,34 @@ Lox provides a built-in keyword `print` to output to stdout. A new line will be 
 ## control flow
 Lox support `if/else/while/for` as in c/java/javascript。***continue, break, switch, and for in are supported.***
 
+`if` and `while` do not  require `()` around the condition.`if num == 10 {}` is valid.
+
+For `for` statement, `()` is used to distinguish c style `for` loop and `for in` loop. 
+
 ### switch
 
-Each case is automatically "break". Only **literals of int, float, bool, nil, string** can be used as cases. 
+You can use expressions (not just literal values) as cases. 
+
+* Each case has only one statements.
+* To have multiple statements in a case, group them into one block statement. 
+* No `break` is needed. 
+
+* `|` allows one case to match multiple values.
+
+ `switch` is not faster than `if-else`. Cases are compared in order. 
 
 ```lox
 var num = 10;
-switch (num) {
+var a = 4;
+switch num {
 	case 1:
     	print 1;
-    case 2: { // you need {} if you define, import, or export inside a case
+    case a: { 
     	var money = 40;
     	print money; 
-    }  	
+    } 
+    case a + 2 | 5 * a | 6:
+    	print "huhu";
     default:
     	print 998;
 }
@@ -309,8 +324,8 @@ var m = {
 var name = m["name"]; // map get
 m[true] += 3; // map set
 
-for entry in m {
-	print f("key: #, value: #", entry[0], entry[1]);
+for k, v in m {
+	print f("key: #, value: #", k, v);
 }
 ```
 
