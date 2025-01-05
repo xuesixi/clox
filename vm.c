@@ -635,7 +635,7 @@ static void invoke_property(String *name, int arg_count) {
                 if (table_get(&class->static_fields, name, &static_field)) {
                     call_value(static_field, arg_count);
                 } else {
-                    invoke_from_class(module_class, name, arg_count);
+                    invoke_from_class(class_class, name, arg_count);
                 }
                 break;
             }

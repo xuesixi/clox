@@ -65,10 +65,10 @@ bool is_subclass(Class *one, Class *two) {
     return is_subclass(one->super_class, two);
 }
 
-static Value native_subclass_of(int count, Value *values) {
+static Value native_class_method_subclass_of(int count, Value *values) {
     (void ) count;
-    Value v0 = values[0];
-    Value v1 = values[1];
+    Value v0 = values[-1];
+    Value v1 = values[0];
     assert_ref_type(v0, OBJ_CLASS, "class");
     assert_ref_type(v1, OBJ_CLASS, "class");
     bool res = is_subclass(as_class(v0), as_class(v1));
@@ -227,6 +227,20 @@ static void add_native_method(Class *class, const char *name, NativeImplementati
     stack_push(fun_value);
 
     table_add_new(&class->methods, native_name, fun_value, true, false);
+
+    stack_pop();
+    stack_pop();
+}
+
+static void add_native_class_static_function(Class *class, const char *name, NativeImplementation impl, int arity) {
+    String *native_name = auto_length_string_copy(name);
+    stack_push(ref_value_cast(native_name));
+
+    NativeFunction *fun = new_native(impl, native_name, arity);
+    Value fun_value = ref_value_cast(fun);
+    stack_push(fun_value);
+
+    table_add_new(&class->static_fields, native_name, fun_value, true, false);
 
     stack_pop();
     stack_pop();
@@ -752,9 +766,8 @@ void init_vm_native() {
     define_native("native_map_iter", native_map_iter, 1);
     define_native("backtrace", native_backtrace, 0);
     define_native("value_of", native_value_of, 2);
-    define_native("subclass_of", native_subclass_of, 2);
     define_native("is_object", native_is_object, 1);
-    define_native("array_copy", native_array_copy, 5);
+//    define_native("array_copy", native_array_copy, 5);
 }
 
 void additional_repl_init() {
@@ -872,6 +885,8 @@ void load_libraries() {
     add_native_method(string_class, "replace", native_string_method_replace, 3);
     add_native_method(string_class, "char_at", native_string_method_char_at, 1);
     add_native_method(map_class, "delete", native_map_method_delete, 1);
+    add_native_method(class_class, "subclass_of", native_class_method_subclass_of, 1);
+    add_native_class_static_function(array_class, "copy", native_array_copy, 5);
 
     add_native_method(int_class, "hash", native_method_general_hash, 0);
     add_native_method(nil_class, "hash", native_method_general_hash, 0);

@@ -28,12 +28,18 @@ class Array {
     iterator() {
         return native_array_iter(this, this.length);
     }
-    join(delimiter: String = ", ", prefix: String = "[", suffix: String = "]") {
+    join(delimiter: String = ", ", prefix: String = "[", suffix: String = "]"): String {
         return native_value_join(delimiter, prefix, suffix, this);
     }
-    copy(start: Int = 0, end: Int = this.length, new_length: Int = end - start) {
+
+    // when the array contains only strings, this function is faster
+    string_join(delimiter: String = ", ", prefix: String = "[", suffix: String = "]"): String {
+        return native_string_join(delimiter, prefix, suffix, this);
+    }
+
+    subarray(start: Int = 0, end: Int = this.length, new_length: Int = end - start): Array {
         var new_arr = [new_length];
-        array_copy(this, new_arr, start, 0, end - start);
+        Array.copy(this, new_arr, start, 0, end - start);
         return new_arr;
     }
 }
@@ -54,6 +60,9 @@ class Map {
 }
 
 class String {
+    static concat(values...): String {
+        return native_string_combine_array(values);
+    }
     iterator() {
         return StringIter(this);
     }
@@ -71,19 +80,6 @@ class StringIter {
     next() {
         return this.str.char_at(this.curr += 1);
     }
-}
-
-fun concat(values...) {
-    return native_string_combine_array(values);
-}
-
-fun join(arr: Array, delimiter: String = "", prefix: String = "", suffix: String = "") {
-    return native_value_join(delimiter, prefix, suffix, arr);
-}
-
-// when the array contains only strings, this function is faster
-fun string_join(arr: Array, delimiter: String = "", prefix: String = "", suffix: String = "") {
-    return native_string_join(delimiter, prefix, suffix, arr);
 }
 
 fun benchmark(task) {

@@ -148,7 +148,7 @@ class Vector {
             var backing = this.backing;
             var new_capacity = 2 * backing.length;
             var new_backing = [new_capacity];
-            array_copy(backing, new_backing, 0, 0, backing.length);
+            Array.copy(backing, new_backing, 0, 0, backing.length);
             new_backing[backing.length] = element;
             this.backing = new_backing;
         } else {
@@ -165,14 +165,14 @@ class Vector {
         if (backing.length == this.size) {
             var new_capacity = 2 * backing.length;
             var new_backing = [new_capacity];
-            array_copy(backing, new_backing, 0, 0, index);
-            array_copy(backing, new_backing, index, index + 1, backing.length - index);
+            Array.copy(backing, new_backing, 0, 0, index);
+            Array.copy(backing, new_backing, index, index + 1, backing.length - index);
             new_backing[index] = element;
             this.backing = new_backing;
         } else {
             if (index != this.size) {
                 var move_length = this.size - index;
-                array_copy(this.backing, this.backing, index, index + 1, move_length);
+                Array.copy(this.backing, this.backing, index, index + 1, move_length);
             }
             backing[index] = element;
         }
@@ -196,7 +196,7 @@ class Vector {
         var backing = this.backing;
         var move_length = this.size - 1 - index; 
         var result = backing[index];
-        array_copy(backing, backing, index + 1, index, move_length);
+        Array.copy(backing, backing, index + 1, index, move_length);
         this.size -= 1;
         return result;
     }

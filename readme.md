@@ -15,7 +15,7 @@ The implementation uses `asprintf()`  a lot. It also requires GNU/readline. A do
 ***
 
 * `$ docker run --rm -itv $(pwd):/clox xuesixi/clox` : run the image and mount current directory into the `/clox`. You should run this command in the root of the project. 
-    
+  
 	Once inside the container:
 	
 	* `$ cd /clox`: go the `/clox`
@@ -55,7 +55,7 @@ Primitive types:
 
 Reference types:
 
-* `String`: immutable.
+* `String`: immutable. String supports indexing. `str[i]` returns the character at `i` as a string. 
 * `object`
 * ***`Array`***
 * ***`Map`***
@@ -422,25 +422,11 @@ Clox has some built-in functions written in C.
 * `rand(low: Int, high: Int): Int`: return a random int in [low, high]. Both arguments need to be int. 
 * `f(format: String, values...): String`: return a formated string according to the specify format. `#` is used as the placeholder. 
     * For example, ` var str = f("the name is #, age is #", "anda", 22)`
-
 * `read(prompt: String): String`: read a line of string from the keyboard (excluding the newline). If `prompt` is provided, it will be printed out first.
-
 * `type(value): Class`: return the type (a class object) of the input
-
-* `char_at(value: String, index: Int): String`: return a char at a specific index (as a string). The String class has a wrapper method over this called `char_at(index: Int): String`
-
 * `backtrace(): String`: return a string representing the call frames.
-
 * `value_of(value, t: Class): Bool`: return if the give value is of the given type.
-
-* `subclass_of(a: Class, b: Class): Bool`: return if class A is a subclass of class B (or A == B)
-
 * `is_object(value): Bool`: return if the given value is an "object" (not Int, Float, Bool, Nil, String, Array, Map, Function, Module, Class...)
-
-* `map_delete(map: Map, key)`: delete a key and its value in a map. Return the deleted value. The Map class has a wrapper method over this called `delete(key)`. 
-
-* `array_copy(src: Array, dest: Array, src_index: Int, dest_index: Int, length: Int)`: memcpy for arrays. src is allowed to be the same as dest, in which case memmove is used. 
-
 * Some other functions with names starting with `native_`. The standard library provides some wrapper functions over them. For example, `range` is a wrapper over `native_range` that supports optional parameters and is more convenient to use. 
 
 # REPL
