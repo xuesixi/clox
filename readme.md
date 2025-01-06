@@ -44,12 +44,12 @@ Other options
 * As in c/java/javascript, structural statements do not need `;`
 *  `//` can be used to start a single line comment
 *  ***`# ` can also be used to start a single line comment***
-* ***`/* comment */` is also supported***
+* ***`/* block comment */` is also supported***
 
 ## type
 Primitive types: 
-* ***`Int` : 32 bits integer***
-* `Float`: 64 bits float point number
+* ***`Int` : integer (bit size is the same as `int` in c, which is implementation specific)***
+* `Float`: float point number (bit size is the same as `double` in c, which is implementation specific)
 * `Bool`: `true`/`false`
 * `Nil`: `nil`
 
@@ -81,7 +81,13 @@ var name = "anda";
 name = 10;
 ```
 
-* ***`var` and `const` allow definining multiple variables at the same time. e.g. `var a, b, c = 1, 2, 3;` The value on the right hand side of the equal sign must be an array. It is an error if the length of the array is less than the number of variables to definie.***
+* ***`var` and `const` allow definining multiple variables at the same time. e.g.***
+
+```lox
+var a, b, c = 1, 2, 3;
+var e, f = fun_returning_array();
+```
+The value on the right hand side of the equal sign must be an array. It is an error if the length of the array is less than the number of variables to definie.
 
 ## scope
 
@@ -100,9 +106,67 @@ Lox provides a built-in keyword `print` to output to stdout. A new line will be 
 ## control flow
 Lox support `if/else/while/for` as in c/java/javascript。***continue, break, switch, and for in are supported.***
 
-`if` and `while` do not  require `()` around the condition.`if num == 10 {}` is valid.
+### if else
 
-For `for` statement, `()` is used to distinguish c style `for` loop and `for in` loop. 
+```lox
+var num = 9;
+if num == 9 { // no parentheses around the condition is needed
+	print "num is 9";
+} else if num == 20 {
+	print "num is 20";
+}
+```
+
+### while
+
+```lox
+var i = 0;
+while i < 10 { // no parentheses around the condition is needed
+	print i;
+	i += 1;
+}
+```
+
+### c style for
+
+For `for` statement, `()` is used to distinguish c style `for` loop from `for in` loop. 
+
+```lox
+for (var i = 0; i < 1; i += 1) {
+	print i;
+}
+```
+
+### for in
+It requires the value after `in` to be "iterable".
+
+* Iterable: has the `iterator` property: `iterator(): Iterator` and map are iterable. 
+* Iterator: an object with `has_next` and `next` callable properties. 
+    * `has_next(): Bool`
+    * `next(): any`
+
+```lox
+var arr = 1, 2, 3;
+
+for i in arr {
+	print i;
+}
+
+for i in range(10) { // range is a optimized function
+	print i;
+}
+
+var map = {
+	1: 10,
+	2: 20,
+	3: "huhuh",
+};
+
+for k, v in map { // support defining multiple variables 
+	print k;
+	print v;
+}
+```
 
 ### switch
 
@@ -121,45 +185,15 @@ var num = 10;
 var a = 4;
 switch num {
 	case 1:
-    	print 1;
-    case a: { 
-    	var money = 40;
-    	print money; 
+		print 1;
+	case a: { 
+		var money = 40;
+		print money; 
     } 
-    case a + 2 | 5 * a | 6:
-    	print "huhu";
+	case a + 2 | 5 * a | 6:
+		print "huhu";
     default:
-    	print 998;
-}
-```
-
-### for in
-It requires the value after `in` to be iterable.
-
-* Iterable: has the `iterator` property: `iterator(): Iterator` and map are iterable. 
-* Iterator: an object with `has_next` and `next` callable properties. 
-    * `has_next(): Bool`
-    * `next(): any`
-
-```lox
-var arr = 1, 2, 3;
-for i in arr {
-	print i;
-}
-
-for i in range(10) { // range is a optimized function
-	print i;
-}
-
-var map = {
-	1: 10,
-	2: 20,
-	3: "huhuh",
-};
-
-for k, v in map {
-	print k;
-	print v;
+		print 998;
 }
 ```
 
@@ -230,9 +264,9 @@ class Dog: Animal {
 
 	static dog_count = 0;
 
-    static show_count() {
-        print f("the count is #", Dog.dog_count);
-    }
+	static show_count() {
+		print f("the count is #", Dog.dog_count);
+	}
 
 	init(name, age) {
 		this.name = name;
@@ -272,9 +306,7 @@ Like python, lox does not use the `new` keyword to create an instance. `init` is
 
 `class Dog: Animal {}`  suggests that Animal is the superclass of Dog. 
 
-A subclass method can use `super.` to access a method of the superclass (this is only needed when a method shadows a 
-
-same-name method of its superclass)
+A subclass method can use `super.` to access a method of the superclass (this is only needed when a method shadows a same-name method of its superclass)
 
 ## data structure
 
@@ -310,7 +342,7 @@ for i in arr {
 * A map has a`length` field.
 * In context where an expression is expected, `{}` creates a map. We can initialize the map with `key : value` pairs separated by `,`.
 * If the key does not exist in the map, `map[key]` returns `nil`.
-* Map is also iterable. The iterator returns the key-value pair array (of length 2) each time. Map is unordered. 
+* Maps are also iterable. The iterator returns the key-value pair array (of length 2) each time. Map iteration is unordered. 
 
 ```lox
 var m = {
@@ -331,12 +363,12 @@ for k, v in m {
 
 Only values have callable properties `hash` and `equal` can be used as keys in maps.
 
-* `hash(): int`
-* `equal(another_value): bool`
+* `hash(): Int`
+* `equal(another_value): Bool`
 
  The map stores hash values of keys internally and expect they never change. 
 
-The builtin equality test functions for `int, float, bool, nil, string` are based on "value." Other builtin types like function, module, class, array, and map are based on reference. 
+The builtin equality test functions for `Int, Float, Bool, Nil, String` are based on "value." Other builtin types like function, module, class, array, and map are based on reference. 
 
 If you want a user-defined class to be used as the key, you have to implement its `hash` and `equal` manually. A user-defined class **does not** have default `hash` and `equal` implementations.
 

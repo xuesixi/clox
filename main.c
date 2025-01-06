@@ -27,6 +27,7 @@ bool SHOW_COMPILE_RESULT = false;
 bool TRACE_EXECUTION = false;
 
 int TRACE_SKIP = -1;
+
 jmp_buf consume_buf;/* Function to insert a literal tab */
 
 static void print_result_with_color(InterpretResult result) {
@@ -195,7 +196,7 @@ static void produce_bytecode(const char *code_path, const char *result_path) {
         printf("error when opening file %s\n", code_path);
         exit(1);
     }
-    load_libraries();
+//    load_libraries();
     InterpretResult result = produce(src, result_path);
     free(src);
 #ifdef COLOR_RUN_FILE_RESULT

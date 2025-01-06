@@ -1392,6 +1392,11 @@ InterpretResult disassemble_byte_code(const char *path) {
 InterpretResult load_bytes_into_builtin(unsigned char *bytes, size_t len, const char *path) {
     FILE *file = fmemopen(bytes, len, "rb");
 
+    if (file == NULL) {
+        printf("error when loading bytes\n");
+        exit(1);
+    }
+
     DISABLE_GC;
     LoxFunction *function = read_function(file);
     fclose(file);

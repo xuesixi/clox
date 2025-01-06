@@ -108,7 +108,7 @@ class IndexError: Error {
     }
 } 
 
-// arg number does work match param number
+// arg number does not match param number
 class ArgError: Error {
     init(message: String) {
         this.message = ("ArgError: " + message);

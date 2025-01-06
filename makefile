@@ -5,15 +5,10 @@ TARGET = clox
 LIB_HEADERS = liblox_iter.h liblox_core.h liblox_data_structure.h
 C_HEADERS = chunk.h common.h compiler.h debug.h io.h memory.h native.h object.h scanner.h table.h value.h vm.h
 
-all: $(TARGET) $(LIB_HEADERS)
-	@rm native.o # so that load_libraries() is recompiled with the updated loxlib
-	@make $(TARGET)
 
-$(TARGET): $(OBJ) 
-	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm
-
-%.o: %.c $(C_HEADERS)
-	@$(CC) $(CFLAGS) -c $< -o $@
+.PHONY: all
+all: $(LIB_HEADERS)
+	@rm native.o && $(MAKE) $(TARGET)
 
 liblox_%.h: liblox_% 
 	@xxd -i $< $@
@@ -21,22 +16,20 @@ liblox_%.h: liblox_%
 liblox_%: liblox/%.lox $(TARGET)
 	@./clox -c $@ $<
 
+.PHONY: $(TARGET)
+$(TARGET): $(OBJ) 
+	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm 
+
+%.o: %.c $(C_HEADERS)
+	@$(CC) $(CFLAGS) -c $< -o $@
+
+.PHONY: opt
 opt: $(SRC) $(LIB_HEADERS)
 	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm # for optimized clox
 
-.PHONY: lldb
-lldb: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm 
-	@lldb $(TARGET)
-
-.PHONY: gdb
-gdb: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm
-	@gdb $(TARGET)
-
-.PHONY: clion_debug
-clion_debug: $(OBJ)
-	@$(CC) -g $(OBJ) -o $(TARGET) -l readline -lm
+.PHONY: debug
+debug: $(SRC)
+	@$(CC) -g $(SRC) -o $(TARGET) -l readline -lm 
 
 .PHONY: clean
 clean:
