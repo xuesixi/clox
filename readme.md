@@ -14,13 +14,15 @@ The implementation uses `asprintf()`  a lot. It also requires GNU/readline. A do
 
 ***
 
-* `$ docker run --rm -itv $(pwd):/clox xuesixi/clox` : run the image and mount current directory into the `/clox`. You should run this command in the root of the project. 
+* `$ docker run --rm -itv .:/clox xuesixi/clox` : run the image and mount current directory into the `/clox`. You should run this command in the root of the project. 
   
-	Once inside the container:
-	
-	* `$ cd /clox`: go the `/clox`
-	
-	* `$ make`: produce the executable "clox".  `$ make opt` does the same thing but apply O3 optimization. 
+* If that does not work, you may try `$ docker run --platform linux/arm64/v8 --rm -itv .:/clox xuesixi/clox`
+  
+***
+
+Once inside the container:
+
+* `$ make`: produce the executable "clox".  `$ make opt` does the same thing but apply O3 optimization. 
 
 ## usage
 * `$ clox`: run REPL

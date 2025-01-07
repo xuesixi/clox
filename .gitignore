@@ -8,6 +8,7 @@ bc
 lox
 LOX_REPL
 liblox_*
+/dock
 clox
 clox.sublime-project
 clox.sublime-workspace
