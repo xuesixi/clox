@@ -918,6 +918,7 @@ static void throw_value(Value value) {
     TrySavePoint *last_save = vm.last_save;
     if (last_save == NULL) {
         print_error(value);
+        reset_stack();
         longjmp(error_buf, INTERPRET_RUNTIME_ERROR);
         return;
     }

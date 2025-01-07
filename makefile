@@ -1,4 +1,5 @@
-CFLAGS = -Wall -Wextra -g 
+CFLAGS = -Wall -Wextra 
+LINK_FLAGS = -l readline -l m
 SRC = chunk.c compiler.c debug.c io.c main.c memory.c object.c scanner.c table.c value.c vm.c native.c
 OBJ = $(SRC:.c=.o)
 TARGET = clox
@@ -18,18 +19,18 @@ liblox_%: liblox/%.lox $(TARGET)
 
 .PHONY: $(TARGET)
 $(TARGET): $(OBJ) 
-	@$(CC) $(OBJ) -o $(TARGET) -l readline -lm 
+	@$(CC) $(OBJ) -o $(TARGET) $(LINK_FLAGS)
 
 %.o: %.c $(C_HEADERS)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: opt
-opt: $(SRC) $(LIB_HEADERS)
-	@$(CC) $(SRC) -o $(TARGET) -O3 -l readline -lm # for optimized clox
+opt: all
+	@$(CC) $(SRC) -o $(TARGET) -O3 $(LINK_FLAGS) # for optimized clox
 
 .PHONY: debug
 debug: $(SRC)
-	@$(CC) -g $(SRC) -o $(TARGET) -l readline -lm 
+	@$(CC) -g $(SRC) -o $(TARGET) $(LINK_FLAGS) $(CFLAGS) -g
 
 .PHONY: clean
 clean:

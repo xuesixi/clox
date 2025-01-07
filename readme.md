@@ -24,6 +24,28 @@ Once inside the container:
 
 * `$ make`: produce the executable "clox".  `$ make opt` does the same thing but apply O3 optimization. 
 
+***
+
+### circular dependency
+
+Clox does have a circular dependency issue. 
+
+* The lox standard libraries (`liblox/core.lox, liblox/iter.lox, liblox/data_structure.lox`) are compiled into bytecode by clox. 
+* The bytecode files are transformed into c headers (`liblox_core.h, liblox_iter.h, liblox_data_structure.h`).
+* Those headers are used to build clox itself. This assures that the standard libraries are embedded into the executable. 
+
+As long as`liblox_core.h, liblox_iter.h, liblox_data_structure.h`  exist to provide some placeholders initially, the makefile will handle the building process. 
+
+Tht provided docker image uses an entrypoint script to do that automatically when entering the container. If you are not using the docker image, you can create those files by doing:
+
+```shell
+$ touch liblox_core liblox_iter liblox_data_structure
+$ xxd -i liblox_core liblox_core.h
+$ xxd -i liblox_iter liblox_iter.h
+$ xxd -i liblox_data_structure liblox_data_structure.h
+$ rm liblox_core liblox_iter liblox_data_structure
+```
+
 ## usage
 * `$ clox`: run REPL
 * `$ clox path/to/script`: run a lox script 
